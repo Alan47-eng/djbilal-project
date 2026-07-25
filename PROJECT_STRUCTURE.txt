@@ -1,0 +1,9 @@
+backend/
+  Dockerfile
+  requirements.txt
+frontend/
+  Dockerfile
+  package.json
+postgres/
+
+docker-compose.yml
