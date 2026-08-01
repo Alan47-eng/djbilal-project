@@ -22,9 +22,7 @@ from .utils import (
 
 app = FastAPI()
 
-app.mount("/media", StaticFiles(directory=str(UPLOAD_ROOT)), name="media")
-
-# Allow all origins for now - simplest solution
+# CORS middleware MUST be first (before mount)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -32,6 +30,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.mount("/media", StaticFiles(directory=str(UPLOAD_ROOT)), name="media")
 
 user_service = UserService()
 track_service = TrackService()
