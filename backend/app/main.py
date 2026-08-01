@@ -118,7 +118,6 @@ async def seed_admin_user():
         if admin_user:
             if not admin_user.is_admin:
                 admin_user.is_admin = True
-                await session.commit()
         else:
             admin_user = User(
                 email="admin@djbilal.com",
@@ -126,7 +125,8 @@ async def seed_admin_user():
                 is_admin=True,
             )
             session.add(admin_user)
-            await session.commit()
+        
+        await session.commit()
 
 
 @app.get("/health")
