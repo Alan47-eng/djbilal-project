@@ -2,11 +2,11 @@ FROM node:18-alpine
 
 WORKDIR /app
 
-# Ensure devDependencies (vite) are installed for the dev server
+# Ensure devDependencies are installed
 ENV NODE_ENV=development
 
-COPY package.json package-lock.json* ./
-RUN npm install --legacy-peer-deps
+COPY package.json ./
+RUN npm install --force
 
 COPY . .
 
