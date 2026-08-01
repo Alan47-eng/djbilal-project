@@ -5,4 +5,3 @@ dockerfilePath = "backend/Dockerfile"
 [deploy]
 startCommand = "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
 restartPolicyType = "always"
-restartPolicyMaxRetries = 0
