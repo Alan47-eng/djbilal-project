@@ -1,0 +1,6 @@
+backend/
+docker-compose.yml
+render.yaml
+README.md
+.git/
+.env

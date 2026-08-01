@@ -110,6 +110,10 @@ async def seed_tracks():
 
 
 async def seed_admin_user():
+    """Only seed admin in development. Production users should be promoted via endpoint."""
+    if os.getenv("ENVIRONMENT") == "production":
+        return
+    
     async with async_session() as session:
         result = await session.execute(select(User).where(User.email == "admin@djbilal.com"))
         admin_user = result.scalars().first()
@@ -126,23 +130,6 @@ async def seed_admin_user():
 
         await session.commit()
 
-
-async def seed_admin_user():
-    async with async_session() as session:
-        result = await session.execute(select(User).where(User.email == "admin@djbilal.com"))
-        admin_user = result.scalars().first()
-
-        if admin_user:
-            admin_user.is_admin = True
-        else:
-            admin_user = User(
-                email="admin@djbilal.com",
-                hashed_password=auth.hash_password("Admin123!"),
-                is_admin=True,
-            )
-            session.add(admin_user)
-
-        await session.commit()
 
 @app.get("/health")
 async def health():
@@ -186,6 +173,15 @@ async def list_users(
 ):
     require_admin(current_user)
     return await user_service.get_all(session)
+
+@app.post("/users/{email}/make-admin", response_model=schemas.UserRead)
+async def promote_to_admin(
+    email: str,
+    current_user: User = Depends(auth.get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Promote a user to admin. Requires admin privileges."""
+    return await user_service.make_admin(session, email, current_user)
 
 @app.post("/tracks", response_model=schemas.TrackResponse)
 async def create_track(

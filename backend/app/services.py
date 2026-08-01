@@ -51,6 +51,26 @@ class UserService:
     async def get_all(self, session: AsyncSession) -> list[User]:
         """Get all users (admin only)."""
         return await self.repo.get_all(session)
+    
+    async def make_admin(self, session: AsyncSession, email: str, current_user: User) -> User:
+        """Make a user admin. Only admins can do this."""
+        if not current_user.is_admin:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only admins can promote users"
+            )
+        
+        user = await self.repo.get_by_email(session, email)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+        
+        user.is_admin = True
+        await session.commit()
+        await session.refresh(user)
+        return user
 
 
 class TrackService:
