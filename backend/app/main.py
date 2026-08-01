@@ -24,19 +24,28 @@ app = FastAPI()
 
 app.mount("/media", StaticFiles(directory=str(UPLOAD_ROOT)), name="media")
 
-frontend_origins = [
-    origin.strip()
-    for origin in os.getenv("FRONTEND_ORIGINS", "http://localhost:3000").split(",")
-    if origin.strip()
-]
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=frontend_origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# CORS configuration
+if os.getenv("ENVIRONMENT") == "production":
+    # Production: Allow only Railway frontend domain
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[
+            "https://djbilal-frontend-production.up.railway.app",
+            os.getenv("FRONTEND_URL", "https://djbilal-frontend-production.up.railway.app")
+        ],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+else:
+    # Development: Allow localhost
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["http://localhost:3000", "http://localhost:5173"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 user_service = UserService()
 track_service = TrackService()
