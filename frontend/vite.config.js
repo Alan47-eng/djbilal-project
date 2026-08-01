@@ -8,4 +8,9 @@ export default defineConfig({
       usePolling: true,
     },
   },
+  preview: {
+    host: '0.0.0.0',
+    port: 4173,
+    allowedHosts: ['djbilal-frontend-production.up.railway.app', 'localhost', '127.0.0.1'],
+  },
 });
