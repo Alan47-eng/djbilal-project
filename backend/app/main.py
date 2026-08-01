@@ -110,16 +110,15 @@ async def seed_tracks():
 
 
 async def seed_admin_user():
-    """Only seed admin in development. Production users should be promoted via endpoint."""
-    if os.getenv("ENVIRONMENT") == "production":
-        return
-    
+    """Create seed admin user if it doesn't exist."""
     async with async_session() as session:
         result = await session.execute(select(User).where(User.email == "admin@djbilal.com"))
         admin_user = result.scalars().first()
 
         if admin_user:
-            admin_user.is_admin = True
+            if not admin_user.is_admin:
+                admin_user.is_admin = True
+                await session.commit()
         else:
             admin_user = User(
                 email="admin@djbilal.com",
@@ -127,8 +126,7 @@ async def seed_admin_user():
                 is_admin=True,
             )
             session.add(admin_user)
-
-        await session.commit()
+            await session.commit()
 
 
 @app.get("/health")
