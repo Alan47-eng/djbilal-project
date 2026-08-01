@@ -1,8 +1,13 @@
 import axios from 'axios';
 
+const runtimeBaseUrl =
+  typeof window !== 'undefined' && window.__ENV__ && window.__ENV__.VITE_API_BASE_URL
+    ? window.__ENV__.VITE_API_BASE_URL
+    : null;
+
 // Create Axios instance with base URL pointing to backend
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000',
+  baseURL: runtimeBaseUrl || import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000',
 });
 
 // Interceptor: Add JWT token from localStorage to every request
