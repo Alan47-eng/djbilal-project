@@ -90,7 +90,7 @@ function AppContent() {
               <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
                 DJ Bilal Music Store
               </h1>
-              <p className="text-xs text-slate-400">Yeni parçalar, preview ve Lemon Squeezy ödeme</p>
+              <p className="text-xs text-slate-400">New releases, previews, and Lemon Squeezy checkout</p>
             </div>
           </div>
 
@@ -155,11 +155,11 @@ function AppContent() {
                 <div>
                   <p className="mb-2 inline-flex items-center gap-2 rounded-full bg-purple-600/20 px-3 py-1 text-xs font-semibold text-purple-300">
                     <LayoutGrid size={12} />
-                    Keşfet
+                    Explore
                   </p>
-                  <h2 className="text-3xl font-bold text-white">Şarkılar burada, admin araçları menüde.</h2>
+                  <h2 className="text-3xl font-bold text-white">Tracks live here, admin tools are in the menu.</h2>
                   <p className="mt-2 max-w-2xl text-slate-400">
-                    Admin hesabıyla sol üst menüyü açıp yeni şarkı ekleyebilir, kullanıcıları admin yapabilir ve Lemon Squeezy checkout akışını yönetebilirsin.
+                    Open the top-left menu with an admin account to add tracks, promote users, and manage Lemon Squeezy checkout links.
                   </p>
                 </div>
                 {isAdmin && (
@@ -169,7 +169,7 @@ function AppContent() {
                     className="inline-flex items-center gap-2 rounded-xl bg-purple-600 px-4 py-3 font-semibold text-white hover:bg-purple-700"
                   >
                     <ShieldCheck size={16} />
-                    Admin Panelini Aç
+                    Open Admin Panel
                   </button>
                 )}
               </div>
@@ -177,7 +177,7 @@ function AppContent() {
 
             {tracks.length === 0 ? (
               <div className="rounded-2xl border border-slate-800 bg-slate-900 p-8 text-center text-slate-300">
-                Henüz şarkı yok. Admin menüsünden ilk parçayı ekleyebilirsin.
+                No tracks yet. Use the admin menu to add the first one.
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-32">

@@ -31,7 +31,7 @@ const PurchaseModal = ({ isOpen, track, onClose, onConfirm, loading = false, err
       >
         <div className="mb-6 flex items-center justify-between">
           <div>
-            <h3 className="text-2xl font-bold text-white">Satın Alma</h3>
+            <h3 className="text-2xl font-bold text-white">Checkout</h3>
             <p className="text-sm text-slate-400">
               {track.title} • {track.artist}
             </p>
@@ -48,7 +48,7 @@ const PurchaseModal = ({ isOpen, track, onClose, onConfirm, loading = false, err
 
         <div className="mb-4 flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-950 p-3 text-slate-300">
           <ExternalLink size={18} className="text-purple-400" />
-          <span>Lemon Squeezy güvenli ödeme sayfasına yönlendirileceksin.</span>
+          <span>You&apos;ll be redirected to Lemon Squeezy’s secure checkout page.</span>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -63,7 +63,7 @@ const PurchaseModal = ({ isOpen, track, onClose, onConfirm, loading = false, err
             disabled={loading || loadingState}
             className="w-full rounded-lg bg-emerald-600 px-4 py-3 font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
           >
-            {loading || loadingState ? 'Yönlendiriliyor...' : 'Ödemeye Git'}
+            {loading || loadingState ? 'Redirecting...' : 'Proceed to Checkout'}
           </button>
         </form>
       </div>

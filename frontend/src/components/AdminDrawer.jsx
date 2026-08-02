@@ -27,9 +27,9 @@ const AdminDrawer = ({ isOpen, onClose }) => {
   const isAdmin = user?.is_admin === true;
 
   const stats = useMemo(() => [
-    { label: 'Şarkılar', value: 'Katalog' },
-    { label: 'Satış', value: 'Lemon Squeezy' },
-    { label: 'Erişim', value: isAdmin ? 'Admin' : 'Üye' },
+    { label: 'Tracks', value: 'Catalog' },
+    { label: 'Sales', value: 'Lemon Squeezy' },
+    { label: 'Access', value: isAdmin ? 'Admin' : 'Member' },
   ], [isAdmin]);
 
   useEffect(() => {
@@ -42,7 +42,7 @@ const AdminDrawer = ({ isOpen, onClose }) => {
         setUsers(response.data);
         setError(null);
       } catch (err) {
-        setError(err.response?.data?.detail || 'Kullanıcılar yüklenemedi');
+        setError(err.response?.data?.detail || 'Could not load users');
       } finally {
         setLoadingUsers(false);
       }
@@ -69,12 +69,12 @@ const AdminDrawer = ({ isOpen, onClose }) => {
           onClick={(event) => event.stopPropagation()}
         >
           <div className="mb-6 flex items-center justify-between">
-            <h2 className="text-xl font-bold">Menü</h2>
+            <h2 className="text-xl font-bold">Menu</h2>
             <button onClick={onClose} className="rounded-full p-2 hover:bg-slate-800">
               <X size={18} />
             </button>
           </div>
-          <p className="text-sm text-slate-400">Admin araçları yalnızca admin hesabında görünür.</p>
+          <p className="text-sm text-slate-400">Admin tools are only visible for admin accounts.</p>
         </div>
       </div>
     );
@@ -92,16 +92,16 @@ const AdminDrawer = ({ isOpen, onClose }) => {
       await api.post(`/users/${encodeURIComponent(email)}/make-admin`);
       const response = await api.get('/users');
       setUsers(response.data);
-      setMessage(`${email} admin yapıldı`);
+      setMessage(`${email} was promoted to admin`);
     } catch (err) {
-      setError(err.response?.data?.detail || 'Admin yetkisi verilemedi');
+      setError(err.response?.data?.detail || 'Could not promote user');
     }
   };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
     if (!form.track_file || !form.preview_file) {
-      setError('Şarkı ve preview dosyası zorunlu');
+      setError('Track and preview files are required');
       return;
     }
 
@@ -129,9 +129,9 @@ const AdminDrawer = ({ isOpen, onClose }) => {
 
       await fetchTracks();
       setForm(emptyForm);
-      setMessage('Şarkı eklendi');
+      setMessage('Track added');
     } catch (err) {
-      setError(err.response?.data?.detail || 'Şarkı eklenemedi');
+      setError(err.response?.data?.detail || 'Could not add track');
     } finally {
       setUploading(false);
     }
@@ -145,7 +145,7 @@ const AdminDrawer = ({ isOpen, onClose }) => {
       >
         <div className="flex items-center justify-between border-b border-slate-800 px-5 py-4">
           <div>
-            <h2 className="text-xl font-bold">Admin Paneli</h2>
+            <h2 className="text-xl font-bold">Admin Panel</h2>
             <p className="text-sm text-slate-400">{user.email}</p>
           </div>
           <button onClick={onClose} className="rounded-full p-2 hover:bg-slate-800">
@@ -166,20 +166,20 @@ const AdminDrawer = ({ isOpen, onClose }) => {
           <section className="rounded-2xl border border-slate-800 bg-slate-950 p-4">
             <div className="mb-4 flex items-center gap-2">
               <Upload size={18} className="text-purple-400" />
-              <h3 className="font-semibold">Şarkı Ekle</h3>
+              <h3 className="font-semibold">Add Track</h3>
             </div>
             <form className="space-y-3" onSubmit={handleSubmit}>
               <input
                 value={form.title}
                 onChange={handleChange('title')}
-                placeholder="Başlık"
+                placeholder="Title"
                 className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
                 required
               />
               <input
                 value={form.artist}
                 onChange={handleChange('artist')}
-                placeholder="Sanatçı"
+                placeholder="Artist"
                 className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
                 required
               />
@@ -188,7 +188,7 @@ const AdminDrawer = ({ isOpen, onClose }) => {
                 step="0.01"
                 value={form.price}
                 onChange={handleChange('price')}
-                placeholder="Fiyat"
+                placeholder="Price"
                 className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
                 required
               />
@@ -199,18 +199,18 @@ const AdminDrawer = ({ isOpen, onClose }) => {
                 className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
               />
               <p className="text-xs text-slate-400">
-                Her şarkı için ayrı checkout URL ekle. Aynı ürünse aynı URL kullanılabilir.
+                Add a separate checkout URL for each track. If they share the same product, you can reuse the same URL.
               </p>
               <label className="block text-sm text-slate-300">
-                Track dosyası
+                Track file
                 <input type="file" onChange={handleChange('track_file')} className="mt-1 block w-full text-sm" required />
               </label>
               <label className="block text-sm text-slate-300">
-                Preview dosyası
+                Preview file
                 <input type="file" onChange={handleChange('preview_file')} className="mt-1 block w-full text-sm" required />
               </label>
               <label className="block text-sm text-slate-300">
-                Kapak görseli
+                Cover image
                 <input type="file" onChange={handleChange('cover_file')} className="mt-1 block w-full text-sm" />
               </label>
 
@@ -223,7 +223,7 @@ const AdminDrawer = ({ isOpen, onClose }) => {
                 className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-purple-600 px-4 py-3 font-semibold text-white hover:bg-purple-700 disabled:opacity-60"
               >
                 <PlusCircle size={16} />
-                {uploading ? 'Ekleniyor...' : 'Şarkı Ekle'}
+                {uploading ? 'Adding...' : 'Add Track'}
               </button>
             </form>
           </section>
@@ -231,17 +231,17 @@ const AdminDrawer = ({ isOpen, onClose }) => {
           <section className="rounded-2xl border border-slate-800 bg-slate-950 p-4">
             <div className="mb-4 flex items-center gap-2">
               <Users size={18} className="text-purple-400" />
-              <h3 className="font-semibold">Kullanıcılar</h3>
+              <h3 className="font-semibold">Users</h3>
             </div>
             {loadingUsers ? (
-              <p className="text-sm text-slate-400">Yükleniyor...</p>
+              <p className="text-sm text-slate-400">Loading...</p>
             ) : (
               <div className="space-y-2">
                 {users.map((item) => (
                   <div key={item.id} className="flex items-center justify-between rounded-lg border border-slate-800 px-3 py-2">
                     <div>
                       <p className="text-sm font-medium text-white">{item.email}</p>
-                      <p className="text-xs text-slate-400">{item.is_admin ? 'Admin' : 'Üye'}</p>
+                      <p className="text-xs text-slate-400">{item.is_admin ? 'Admin' : 'Member'}</p>
                     </div>
                     {!item.is_admin && (
                       <button
@@ -250,7 +250,7 @@ const AdminDrawer = ({ isOpen, onClose }) => {
                         className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700"
                       >
                         <ShieldCheck size={14} />
-                        Admin Yap
+                        Make Admin
                       </button>
                     )}
                   </div>

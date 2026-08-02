@@ -95,7 +95,7 @@ const TrackCard = ({ track, onPlay, onBuy, onDownload, isPurchased }) => {
           {isPurchased ? (
             <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600/20 px-3 py-1 text-sm font-semibold text-emerald-400">
               <BadgeCheck size={16} />
-              Satın Alındı
+              Purchased
             </span>
           ) : (
             <span className="text-xl font-bold text-purple-400">
@@ -112,7 +112,7 @@ const TrackCard = ({ track, onPlay, onBuy, onDownload, isPurchased }) => {
               className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-700"
             >
               <Download size={16} />
-              İndir
+              Download
             </button>
           ) : (
             <button
@@ -121,7 +121,7 @@ const TrackCard = ({ track, onPlay, onBuy, onDownload, isPurchased }) => {
               className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-purple-600 px-4 py-3 text-sm font-semibold text-white hover:bg-purple-700"
             >
               <ShoppingCart size={16} />
-              Satın Al
+              Buy
             </button>
           )}
         </div>

@@ -66,7 +66,7 @@ const AuthModal = ({ isOpen, initialMode = 'login', onClose, onSuccess }) => {
       >
         <div className="mb-6 flex items-center justify-between">
           <h3 className="text-2xl font-bold text-white">
-            {activeTab === 'login' ? 'Giriş Yap' : 'Kayıt Ol'}
+            {activeTab === 'login' ? 'Sign In' : 'Sign Up'}
           </h3>
           <button
             type="button"
