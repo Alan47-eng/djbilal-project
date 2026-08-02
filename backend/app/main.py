@@ -42,10 +42,8 @@ def parse_frontend_origins(raw_value: str | None) -> list[str]:
 
 FRONTEND_ORIGINS = parse_frontend_origins(os.getenv("FRONTEND_ORIGINS"))
 ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "admin@djbilal.com")
-ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
 DEFAULT_ADMIN_PASSWORD = "V9!qL3#tX7@pN2$zR8^mW5&cH1"
-if not ADMIN_PASSWORD and os.getenv("ENVIRONMENT", "development").lower() != "production":
-    ADMIN_PASSWORD = DEFAULT_ADMIN_PASSWORD
+ADMIN_PASSWORD = DEFAULT_ADMIN_PASSWORD
 
 # CORS middleware MUST be first (before mount)
 app.add_middleware(
