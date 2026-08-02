@@ -4,6 +4,7 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',
     port: 5173,
+    allowedHosts: true,
     watch: {
       usePolling: true,
     },
@@ -11,6 +12,6 @@ export default defineConfig({
   preview: {
     host: '0.0.0.0',
     port: 4173,
-    allowedHosts: ['djbilal-frontend-production.up.railway.app', 'localhost', '127.0.0.1'],
+    allowedHosts: true,
   },
 });

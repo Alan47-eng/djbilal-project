@@ -13,4 +13,4 @@ RUN npm run build
 
 EXPOSE 4173
 
-CMD ["sh", "-c", "printf 'window.__ENV__ = { VITE_API_BASE_URL: \"%s\" };\\n' \"${VITE_API_BASE_URL:-http://localhost:8000}\" > dist/env.js && npm run preview -- --host 0.0.0.0 --port ${PORT:-4173}"]
+CMD ["sh", "-c", "printf 'window.__ENV__ = { VITE_API_BASE_URL: \"%s\" };\\n' \"${VITE_API_BASE_URL:-http://localhost:8000}\" > dist/env.js && npm run start -- --port ${PORT:-4173}"]

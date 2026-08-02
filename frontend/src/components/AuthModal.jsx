@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import api from '../api';
+import { useAuth } from '../context/AuthContext';
 
 const AuthModal = ({ isOpen, initialMode = 'login', onClose, onSuccess }) => {
+  const { refreshUser } = useAuth();
   const [activeTab, setActiveTab] = useState(initialMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -28,8 +30,9 @@ const AuthModal = ({ isOpen, initialMode = 'login', onClose, onSuccess }) => {
     try {
       if (activeTab === 'login') {
         const response = await api.post('/login', { email, password });
-        localStorage.setItem('accessToken', response.data.access_token);
+        localStorage.setItem('access_token', response.data.access_token);
         localStorage.setItem('userEmail', email);
+        await refreshUser();
         onSuccess(email);
         onClose();
         return;
@@ -37,8 +40,9 @@ const AuthModal = ({ isOpen, initialMode = 'login', onClose, onSuccess }) => {
 
       await api.post('/register', { email, password });
       const loginResponse = await api.post('/login', { email, password });
-      localStorage.setItem('accessToken', loginResponse.data.access_token);
+      localStorage.setItem('access_token', loginResponse.data.access_token);
       localStorage.setItem('userEmail', email);
+      await refreshUser();
       onSuccess(email);
       onClose();
     } catch (err) {
