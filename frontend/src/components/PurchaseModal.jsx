@@ -11,10 +11,13 @@ const PurchaseModal = ({ isOpen, track, onClose, onConfirm, loading = false, err
 
   if (!isOpen || !track) return null;
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
     setLoadingState(true);
-    onConfirm();
+    const result = await onConfirm();
+    if (!result) {
+      setLoadingState(false);
+    }
   };
 
   return (

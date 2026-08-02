@@ -1,11 +1,9 @@
 import { useState } from 'react';
 import api from '../api';
 import { useAuth } from '../context/AuthContext';
-import { usePurchases } from '../context/PurchaseContext';
 
 export function useCheckout() {
   const { user } = useAuth();
-  const { addPurchase } = usePurchases();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -17,8 +15,8 @@ export function useCheckout() {
 
     try {
       setLoading(true);
-      const response = await api.post(`/tracks/${trackId}/checkout`);
       setError(null);
+      const response = await api.post(`/tracks/${trackId}/checkout`);
       return response.data.checkout_url;
     } catch (err) {
       const errorMsg = err.response?.data?.detail || 'Checkout failed';
@@ -45,8 +43,8 @@ export function useDownload() {
 
     try {
       setLoading(true);
-      const response = await api.get(`/tracks/${trackId}/download`);
       setError(null);
+      const response = await api.get(`/tracks/${trackId}/download`);
       return response.data.download_url;
     } catch (err) {
       const errorMsg = err.response?.data?.detail || 'Download failed';
