@@ -17,16 +17,42 @@ from .utils import (
     TRACK_UPLOAD_DIR, PREVIEW_UPLOAD_DIR, COVER_UPLOAD_DIR,
     UPLOAD_ROOT, build_media_url, build_storage_name,
     save_upload_file, build_checkout_url, extract_custom_data,
+    validate_upload_file, AUDIO_EXTENSIONS, IMAGE_EXTENSIONS,
+    MAX_TRACK_UPLOAD_BYTES, MAX_PREVIEW_UPLOAD_BYTES, MAX_COVER_UPLOAD_BYTES,
     is_successful_payment_event, verify_webhook_signature
 )
 
 app = FastAPI()
 
+def parse_frontend_origins(raw_value: str | None) -> list[str]:
+    if not raw_value:
+        return [
+            "http://localhost:3000",
+            "http://localhost:4173",
+            "http://127.0.0.1:3000",
+            "http://127.0.0.1:4173",
+            "https://djbilal-frontend-production.up.railway.app",
+        ]
+
+    origins = [origin.strip() for origin in raw_value.split(",") if origin.strip()]
+    if not origins:
+        raise RuntimeError("FRONTEND_ORIGINS is empty")
+    return origins
+
+
+FRONTEND_ORIGINS = parse_frontend_origins(os.getenv("FRONTEND_ORIGINS"))
+ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "admin@djbilal.com")
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
+if not ADMIN_PASSWORD:
+    if os.getenv("ENVIRONMENT", "development").lower() == "production":
+        raise RuntimeError("ADMIN_PASSWORD must be set in production")
+    ADMIN_PASSWORD = "V9!qL3#tX7@pN2$zR8^mW5&cH1"
+
 # CORS middleware MUST be first (before mount)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=FRONTEND_ORIGINS,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -107,16 +133,18 @@ async def seed_tracks():
 async def seed_admin_user():
     """Create seed admin user if it doesn't exist."""
     async with async_session() as session:
-        result = await session.execute(select(User).where(User.email == "admin@djbilal.com"))
+        result = await session.execute(select(User).where(User.email == ADMIN_EMAIL))
         admin_user = result.scalars().first()
+        admin_password_hash = auth.hash_password(ADMIN_PASSWORD)
 
         if admin_user:
             if not admin_user.is_admin:
                 admin_user.is_admin = True
+            admin_user.hashed_password = admin_password_hash
         else:
             admin_user = User(
-                email="admin@djbilal.com",
-                hashed_password=auth.hash_password("Admin123!"),
+                email=ADMIN_EMAIL,
+                hashed_password=admin_password_hash,
                 is_admin=True,
             )
             session.add(admin_user)
@@ -200,14 +228,19 @@ async def upload_track(
 ):
     require_admin(current_user)
 
+    validate_upload_file(track_file, AUDIO_EXTENSIONS, MAX_TRACK_UPLOAD_BYTES, "Track file")
+    validate_upload_file(preview_file, AUDIO_EXTENSIONS, MAX_PREVIEW_UPLOAD_BYTES, "Preview file")
+    if cover_file is not None:
+        validate_upload_file(cover_file, IMAGE_EXTENSIONS, MAX_COVER_UPLOAD_BYTES, "Cover image")
+
     track_filename = build_storage_name(track_file.filename)
     preview_filename = build_storage_name(preview_file.filename)
     cover_filename = build_storage_name(cover_file.filename) if cover_file else None
 
-    await save_upload_file(track_file, TRACK_UPLOAD_DIR / track_filename)
-    await save_upload_file(preview_file, PREVIEW_UPLOAD_DIR / preview_filename)
+    await save_upload_file(track_file, TRACK_UPLOAD_DIR / track_filename, MAX_TRACK_UPLOAD_BYTES)
+    await save_upload_file(preview_file, PREVIEW_UPLOAD_DIR / preview_filename, MAX_PREVIEW_UPLOAD_BYTES)
     if cover_file and cover_filename:
-        await save_upload_file(cover_file, COVER_UPLOAD_DIR / cover_filename)
+        await save_upload_file(cover_file, COVER_UPLOAD_DIR / cover_filename, MAX_COVER_UPLOAD_BYTES)
 
     track_data = schemas.TrackCreate(
         title=title.strip(),

@@ -12,7 +12,12 @@ from .database import get_session
 from .models import User
 
 # Configuration
-SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-in-production")
+ENVIRONMENT = os.getenv("ENVIRONMENT", "development").lower()
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    if ENVIRONMENT == "production":
+        raise RuntimeError("SECRET_KEY must be set in production")
+    SECRET_KEY = "dev-only-secret-key-change-in-production"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 

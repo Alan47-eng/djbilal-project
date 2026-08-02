@@ -203,15 +203,15 @@ const AdminDrawer = ({ isOpen, onClose }) => {
               </p>
               <label className="block text-sm text-slate-300">
                 Track file
-                <input type="file" onChange={handleChange('track_file')} className="mt-1 block w-full text-sm" required />
+                <input type="file" accept=".mp3,.wav,.m4a,.flac,.ogg,audio/*" onChange={handleChange('track_file')} className="mt-1 block w-full text-sm" required />
               </label>
               <label className="block text-sm text-slate-300">
                 Preview file
-                <input type="file" onChange={handleChange('preview_file')} className="mt-1 block w-full text-sm" required />
+                <input type="file" accept=".mp3,.wav,.m4a,.flac,.ogg,audio/*" onChange={handleChange('preview_file')} className="mt-1 block w-full text-sm" required />
               </label>
               <label className="block text-sm text-slate-300">
                 Cover image
-                <input type="file" onChange={handleChange('cover_file')} className="mt-1 block w-full text-sm" />
+                <input type="file" accept=".png,.jpg,.jpeg,.webp,image/*" onChange={handleChange('cover_file')} className="mt-1 block w-full text-sm" />
               </label>
 
               {message && <p className="text-sm text-emerald-400">{message}</p>}

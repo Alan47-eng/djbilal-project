@@ -3,10 +3,11 @@ import os
 import hmac
 import json
 import hashlib
+import re
 from pathlib import Path
 from urllib.parse import urlencode, urlparse, parse_qsl, urlunparse
 from uuid import uuid4
-from fastapi import Request
+from fastapi import Request, HTTPException, status
 
 
 UPLOAD_ROOT = Path(__file__).resolve().parent / "uploads"
@@ -14,16 +15,51 @@ TRACK_UPLOAD_DIR = UPLOAD_ROOT / "tracks"
 PREVIEW_UPLOAD_DIR = UPLOAD_ROOT / "previews"
 COVER_UPLOAD_DIR = UPLOAD_ROOT / "covers"
 
+MAX_TRACK_UPLOAD_BYTES = int(os.getenv("MAX_TRACK_UPLOAD_BYTES", str(250 * 1024 * 1024)))
+MAX_PREVIEW_UPLOAD_BYTES = int(os.getenv("MAX_PREVIEW_UPLOAD_BYTES", str(50 * 1024 * 1024)))
+MAX_COVER_UPLOAD_BYTES = int(os.getenv("MAX_COVER_UPLOAD_BYTES", str(10 * 1024 * 1024)))
+
+AUDIO_EXTENSIONS = {".mp3", ".wav", ".m4a", ".flac", ".ogg", ".aac"}
+IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
+
 TRACK_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 PREVIEW_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 COVER_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
+ENVIRONMENT = os.getenv("ENVIRONMENT", "development").lower()
+
 
 def build_storage_name(filename: str) -> str:
     """Generate unique filename for uploaded file."""
-    suffix = Path(filename).suffix
-    stem = Path(filename).stem or "upload"
+    safe_name = Path(filename).name
+    suffix = Path(safe_name).suffix.lower()
+    stem = Path(safe_name).stem or "upload"
+    stem = re.sub(r"[^A-Za-z0-9._-]+", "-", stem).strip("._-") or "upload"
     return f"{stem}-{uuid4().hex}{suffix}"
+
+
+def validate_upload_file(upload_file, allowed_extensions: set[str], max_bytes: int, label: str) -> None:
+    """Validate an uploaded file before persisting it."""
+    filename = (upload_file.filename or "").strip()
+    if not filename:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"{label} filename is required",
+        )
+
+    extension = Path(filename).suffix.lower()
+    if extension not in allowed_extensions:
+        allowed = ", ".join(sorted(allowed_extensions))
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"{label} must use one of these file types: {allowed}",
+        )
+
+    if max_bytes <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"{label} size limit is misconfigured",
+        )
 
 
 def build_media_url(request: Request, folder: str, filename: str) -> str:
@@ -31,11 +67,31 @@ def build_media_url(request: Request, folder: str, filename: str) -> str:
     return f"{str(request.base_url).rstrip('/')}/media/{folder}/{filename}"
 
 
-async def save_upload_file(upload_file, destination: Path) -> None:
-    """Save uploaded file to disk."""
-    contents = await upload_file.read()
-    destination.write_bytes(contents)
-    await upload_file.close()
+async def save_upload_file(upload_file, destination: Path, max_bytes: int | None = None) -> None:
+    """Save uploaded file to disk without buffering the whole payload in memory."""
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    written = 0
+
+    try:
+        with destination.open("wb") as output_file:
+            while True:
+                chunk = await upload_file.read(1024 * 1024)
+                if not chunk:
+                    break
+
+                written += len(chunk)
+                if max_bytes is not None and written > max_bytes:
+                    raise HTTPException(
+                        status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+                        detail=f"{Path(upload_file.filename or 'upload').name} exceeds the allowed size",
+                    )
+
+                output_file.write(chunk)
+    except Exception:
+        destination.unlink(missing_ok=True)
+        raise
+    finally:
+        await upload_file.close()
 
 
 def build_checkout_url(base_url: str, custom_data: dict[str, str], email: str | None = None) -> str:
@@ -112,7 +168,7 @@ def verify_webhook_signature(raw_body: bytes, signature: str | None) -> bool:
     secret = os.getenv("LEMON_SQUEEZY_WEBHOOK_SECRET", "").strip()
     
     if not secret:
-        return True  # Skip verification if secret not configured
+        return ENVIRONMENT != "production"
     
     if not signature:
         return False
