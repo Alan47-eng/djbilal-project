@@ -50,7 +50,7 @@ if not ADMIN_PASSWORD and os.getenv("ENVIRONMENT", "development").lower() != "pr
 # CORS middleware MUST be first (before mount)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=FRONTEND_ORIGINS,
+    allow_origins=["*"],
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
