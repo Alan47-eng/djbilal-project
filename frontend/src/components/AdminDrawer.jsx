@@ -198,6 +198,9 @@ const AdminDrawer = ({ isOpen, onClose }) => {
                 placeholder="Lemon Squeezy checkout URL"
                 className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
               />
+              <p className="text-xs text-slate-400">
+                Her şarkı için ayrı checkout URL ekle. Aynı ürünse aynı URL kullanılabilir.
+              </p>
               <label className="block text-sm text-slate-300">
                 Track dosyası
                 <input type="file" onChange={handleChange('track_file')} className="mt-1 block w-full text-sm" required />

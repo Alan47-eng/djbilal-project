@@ -1,23 +1,63 @@
 import React from 'react';
-import { Play, ShoppingCart, Music, Download, BadgeCheck } from 'lucide-react';
+import { Play, ShoppingCart, Download, BadgeCheck } from 'lucide-react';
+
+function hashString(value) {
+  let hash = 0;
+  for (let i = 0; i < value.length; i += 1) {
+    hash = (hash << 5) - hash + value.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash);
+}
+
+function escapeSvgText(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function buildCoverArt(track) {
+  const seed = hashString(`${track.title}:${track.artist}`);
+  const colors = [
+    ['#7c3aed', '#2563eb'],
+    ['#0f172a', '#7c3aed'],
+    ['#1d4ed8', '#06b6d4'],
+    ['#4c1d95', '#ec4899'],
+  ];
+  const [start, end] = colors[seed % colors.length];
+  const title = track.title || 'Track';
+  const artist = track.artist || '';
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800">
+      <defs>
+        <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="${start}" />
+          <stop offset="100%" stop-color="${end}" />
+        </linearGradient>
+      </defs>
+      <rect width="800" height="800" fill="url(#g)" />
+      <circle cx="640" cy="160" r="120" fill="rgba(255,255,255,0.14)" />
+      <circle cx="140" cy="620" r="180" fill="rgba(255,255,255,0.1)" />
+      <text x="60" y="585" fill="white" font-family="Arial, Helvetica, sans-serif" font-size="54" font-weight="700">${escapeSvgText(title)}</text>
+      <text x="60" y="640" fill="rgba(255,255,255,0.8)" font-family="Arial, Helvetica, sans-serif" font-size="30">${escapeSvgText(artist)}</text>
+      <text x="60" y="120" fill="rgba(255,255,255,0.7)" font-family="Arial, Helvetica, sans-serif" font-size="28" letter-spacing="3">DJ BILAL</text>
+    </svg>
+  `;
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+}
 
 const TrackCard = ({ track, onPlay, onBuy, onDownload, isPurchased }) => {
   return (
     <div className="bg-slate-800 rounded-lg overflow-hidden hover:bg-slate-700 transition-colors duration-300 group cursor-pointer">
       {/* Track Cover / Placeholder */}
       <div className="aspect-square bg-gradient-to-br from-purple-600 to-blue-600 relative overflow-hidden">
-        {track.cover_image_url ? (
-          <img
-            src={track.cover_image_url}
-            alt={`${track.title} cover`}
-            className="h-full w-full object-cover"
-            loading="lazy"
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center">
-            <Music size={64} className="text-slate-300 opacity-50" />
-          </div>
-        )}
+        <img
+          src={track.cover_image_url || buildCoverArt(track)}
+          alt={`${track.title} cover`}
+          className="h-full w-full object-cover"
+          loading="lazy"
+        />
 
         {/* Overlay on hover */}
         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center gap-4">
