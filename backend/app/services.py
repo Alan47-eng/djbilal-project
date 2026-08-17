@@ -92,6 +92,8 @@ class TrackService:
             checkout_url=track_data.checkout_url,
             preview_url=track_data.preview_url,
             full_file_path=track_data.full_file_path,
+            is_free=track_data.is_free,
+            free_download_url=track_data.free_download_url,
         )
     
     async def get_track(self, session: AsyncSession, track_id: int) -> Track:
@@ -121,7 +123,7 @@ class PurchaseService:
         return await self.repo.get_user_purchases(session, user_id)
     
     async def record_purchase(
-        self, session: AsyncSession, user_id: int, track_id: int
+        self, session: AsyncSession, user_id: int, track_id: int, license_type: str | None = None
     ) -> Purchase:
         """Record a purchase."""
         # Verify track exists
@@ -136,8 +138,13 @@ class PurchaseService:
         return await self.repo.create(
             session,
             user_id=user_id,
-            track_id=track_id
+            track_id=track_id,
+            license_type=license_type,
         )
+    
+    async def get_user_purchases_detailed(self, session: AsyncSession, user_id: int) -> list[dict]:
+        """Get detailed purchase list with track info."""
+        return await self.repo.get_user_purchases_detailed(session, user_id)
     
     async def can_download(
         self, session: AsyncSession, user_id: int, track_id: int

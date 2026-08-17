@@ -98,3 +98,26 @@ class PurchaseRepository(BaseRepository):
             ).limit(1)
         )
         return result.scalar_one_or_none() is not None
+
+    async def get_user_purchases_detailed(self, session: AsyncSession, user_id: int) -> List[dict]:
+        """Get detailed purchase list with track info for a user."""
+        result = await session.execute(
+            select(Purchase, Track)
+            .join(Track, Purchase.track_id == Track.id)
+            .where(Purchase.user_id == user_id)
+            .order_by(Purchase.created_at.desc())
+        )
+        rows = result.all()
+        details = []
+        for purchase, track in rows:
+            details.append({
+                "id": purchase.id,
+                "track_id": track.id,
+                "track_title": track.title,
+                "track_artist": track.artist,
+                "cover_image_url": track.cover_image_url,
+                "download_url": track.full_file_path,
+                "license_type": purchase.license_type,
+                "purchased_at": purchase.created_at,
+            })
+        return details

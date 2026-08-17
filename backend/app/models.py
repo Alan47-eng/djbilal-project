@@ -23,6 +23,8 @@ class Track(Base):
     checkout_url = Column(String(1024), nullable=True)
     preview_url = Column(String(1024), nullable=False)
     full_file_path = Column(String(1024), nullable=False)
+    is_free = Column(Boolean, default=False, nullable=False)
+    free_download_url = Column(String(1024), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -35,4 +37,5 @@ class Purchase(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=False, index=True)
     track_id = Column(Integer, ForeignKey('tracks.id', ondelete='CASCADE'), nullable=False, index=True)
+    license_type = Column(String(100), nullable=True)
     created_at = Column('purchased_at', DateTime(timezone=True), server_default=func.now())
