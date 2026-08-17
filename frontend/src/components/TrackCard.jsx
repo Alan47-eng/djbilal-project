@@ -1,5 +1,5 @@
 import React from 'react';
-import { Play, ShoppingCart, Download, BadgeCheck } from 'lucide-react';
+import { Play, ShoppingCart, Download, BadgeCheck, Gift } from 'lucide-react';
 
 function hashString(value) {
   let hash = 0;
@@ -78,6 +78,16 @@ const TrackCard = ({ track, onPlay, onBuy, onDownload, isPurchased }) => {
             {isPurchased ? <Download size={24} /> : <ShoppingCart size={24} />}
           </button>
         </div>
+
+        {/* FREE badge */}
+        {track.is_free && (
+          <div className="absolute top-3 left-3">
+            <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-500 px-2.5 py-1 text-xs font-extrabold text-white shadow-lg">
+              <Gift size={12} />
+              ÜCRETSİZ
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Track Info */}

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LogOut, LogIn, UserPlus, Music, User, Menu, LayoutGrid, ShieldCheck } from 'lucide-react';
+import { LogOut, LogIn, UserPlus, Music, User, Menu, LayoutGrid, ShieldCheck, Gift, Library, Info } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { TrackProvider, useTracks } from './context/TrackContext';
 import { PurchaseProvider, usePurchases } from './context/PurchaseContext';
@@ -9,6 +9,9 @@ import AudioPlayer from './components/AudioPlayer';
 import AuthModal from './components/AuthModal';
 import PurchaseModal from './components/PurchaseModal';
 import AdminDrawer from './components/AdminDrawer';
+import AboutSection from './components/AboutSection';
+import FreeTracksList from './components/FreeTracksList';
+import UserPurchases from './components/UserPurchases';
 import './index.css';
 
 function AppContent() {
@@ -22,6 +25,7 @@ function AppContent() {
   const [purchaseModal, setPurchaseModal] = useState({ isOpen: false, track: null });
   const [pendingPurchaseTrack, setPendingPurchaseTrack] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState('store'); // 'store' | 'free' | 'about' | 'library'
 
   const isAdmin = user?.is_admin === true;
   const loading = authLoading || tracksLoading;
@@ -90,7 +94,6 @@ function AppContent() {
               <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
                 DJ Bilal Music Store
               </h1>
-              <p className="text-xs text-slate-400">New releases, previews, and Lemon Squeezy checkout</p>
             </div>
           </div>
 
@@ -137,7 +140,37 @@ function AppContent() {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-6 py-12">
+      <main className="max-w-7xl mx-auto px-6 py-8">
+        {/* Tab Navigation */}
+        <nav className="flex items-center gap-1 mb-8 rounded-2xl border border-slate-800 bg-slate-900 p-1 w-fit">
+          {[
+            { id: 'store', label: 'Mağaza', icon: <LayoutGrid size={15} /> },
+            { id: 'free', label: 'Ücretsiz', icon: <Gift size={15} /> },
+            { id: 'about', label: 'Hakkımda', icon: <Info size={15} /> },
+            ...(user ? [{ id: 'library', label: 'Kütüphanem', icon: <Library size={15} /> }] : []),
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => {
+                if (tab.id === 'library' && !user) {
+                  setAuthModal({ isOpen: true, mode: 'login' });
+                  return;
+                }
+                setActiveTab(tab.id);
+              }}
+              className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-all duration-200 ${
+                activeTab === tab.id
+                  ? 'bg-purple-600 text-white shadow'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800'
+              }`}
+            >
+              {tab.icon}
+              {tab.label}
+            </button>
+          ))}
+        </nav>
+
         {loading ? (
           <div className="flex justify-center items-center h-96">
             <div className="animate-spin">
@@ -150,48 +183,82 @@ function AppContent() {
           </div>
         ) : (
           <>
-            <section className="mb-8 rounded-3xl border border-slate-800 bg-gradient-to-r from-slate-900 to-slate-800 p-6">
-              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <p className="mb-2 inline-flex items-center gap-2 rounded-full bg-purple-600/20 px-3 py-1 text-xs font-semibold text-purple-300">
-                    <LayoutGrid size={12} />
-                    Explore
+            {/* Store tab */}
+            {activeTab === 'store' && (
+              <>
+                {isAdmin && (
+                  <section className="mb-8 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setMenuOpen(true)}
+                      className="inline-flex items-center gap-2 rounded-xl bg-purple-600 px-4 py-3 font-semibold text-white hover:bg-purple-700"
+                    >
+                      <ShieldCheck size={16} />
+                      Open Admin Panel
+                    </button>
+                  </section>
+                )}
+
+                {tracks.length === 0 ? (
+                  <div className="rounded-2xl border border-slate-800 bg-slate-900 p-8 text-center text-slate-300">
+                    Henüz parça eklenmedi. Çok yakında yeni içerikler burada olacak.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-32">
+                    {tracks.map(track => (
+                      <TrackCard
+                        key={track.id}
+                        track={track}
+                        isPurchased={purchases.includes(track.id)}
+                        onPlay={handlePlayPreview}
+                        onBuy={handleBuyTrack}
+                        onDownload={handleDownloadTrack}
+                      />
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Free Downloads tab */}
+            {activeTab === 'free' && (
+              <section>
+                <div className="mb-6">
+                  <p className="mb-1 inline-flex items-center gap-2 rounded-full bg-emerald-600/20 px-3 py-1 text-xs font-semibold text-emerald-300">
+                    <Gift size={12} />
+                    Ücretsiz İndir
                   </p>
-                  <h2 className="text-3xl font-bold text-white">Tracks live here, admin tools are in the menu.</h2>
-                  <p className="mt-2 max-w-2xl text-slate-400">
-                    Open the top-left menu with an admin account to add tracks, promote users, and manage Lemon Squeezy checkout links.
+                  <h2 className="mt-2 text-2xl font-bold text-white">Kaliteyi Ücretsiz Keşfet</h2>
+                  <p className="text-slate-400 mt-1 text-sm max-w-xl">
+                    Seçilmiş şarkıları herhangi bir ödeme yapmadan indir, dinle ve projende kullan.
                   </p>
                 </div>
-                {isAdmin && (
-                  <button
-                    type="button"
-                    onClick={() => setMenuOpen(true)}
-                    className="inline-flex items-center gap-2 rounded-xl bg-purple-600 px-4 py-3 font-semibold text-white hover:bg-purple-700"
-                  >
-                    <ShieldCheck size={16} />
-                    Open Admin Panel
-                  </button>
-                )}
-              </div>
-            </section>
+                <FreeTracksList tracks={tracks} onPlay={handlePlayPreview} />
+              </section>
+            )}
 
-            {tracks.length === 0 ? (
-              <div className="rounded-2xl border border-slate-800 bg-slate-900 p-8 text-center text-slate-300">
-                No tracks yet. Use the admin menu to add the first one.
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-32">
-                {tracks.map(track => (
-                  <TrackCard
-                    key={track.id}
-                    track={track}
-                    isPurchased={purchases.includes(track.id)}
-                    onPlay={handlePlayPreview}
-                    onBuy={handleBuyTrack}
-                    onDownload={handleDownloadTrack}
-                  />
-                ))}
-              </div>
+            {/* About tab */}
+            {activeTab === 'about' && (
+              <section className="pb-32">
+                <AboutSection />
+              </section>
+            )}
+
+            {/* My Library tab */}
+            {activeTab === 'library' && (
+              <section className="pb-32">
+                <div className="mb-6">
+                  <p className="mb-1 inline-flex items-center gap-2 rounded-full bg-purple-600/20 px-3 py-1 text-xs font-semibold text-purple-300">
+                    <Library size={12} />
+                    Kütüphanem
+                  </p>
+                  <h2 className="mt-2 text-2xl font-bold text-white">Satın Aldıklarım</h2>
+                  <p className="text-slate-400 mt-1 text-sm max-w-xl">
+                    Satın aldığın tüm lisanslı şarkıları dilediğin zaman buradan yeniden indirebilirsin.
+                  </p>
+                </div>
+                <UserPurchases />
+              </section>
             )}
           </>
         )}
@@ -219,7 +286,20 @@ function AppContent() {
         loading={checkoutLoading}
         error={checkoutError}
       />
-      <AdminDrawer isOpen={menuOpen} onClose={() => setMenuOpen(false)} />
+      <AdminDrawer
+        isOpen={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        activeTab={activeTab}
+        onNavigate={(tabId) => {
+          setActiveTab(tabId);
+          setMenuOpen(false);
+        }}
+        onOpenAuth={(mode) => {
+          setMenuOpen(false);
+          setAuthModal({ isOpen: true, mode });
+        }}
+        onLogout={handleLogout}
+      />
     </div>
   );
 }
