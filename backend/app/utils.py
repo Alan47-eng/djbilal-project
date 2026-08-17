@@ -63,8 +63,8 @@ def validate_upload_file(upload_file, allowed_extensions: set[str], max_bytes: i
 
 
 def build_media_url(request: Request, folder: str, filename: str) -> str:
-    """Build full URL to media file."""
-    return f"{str(request.base_url).rstrip('/')}/media/{folder}/{filename}"
+    """Build media path to avoid proxy scheme/domain mismatches."""
+    return f"/media/{folder}/{filename}"
 
 
 async def save_upload_file(upload_file, destination: Path, max_bytes: int | None = None) -> None:

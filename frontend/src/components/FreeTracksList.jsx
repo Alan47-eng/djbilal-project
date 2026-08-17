@@ -22,21 +22,64 @@ const FreeTracksList = ({ tracks, onPlay }) => {
     return `${track.title} - ${track.artist}.${extension}`;
   };
 
+  const buildDownloadCandidates = (rawUrl) => {
+    if (!rawUrl) return [];
+    const candidates = [];
+    const add = (value) => {
+      if (value && !candidates.includes(value)) {
+        candidates.push(value);
+      }
+    };
+
+    try {
+      const parsed = new URL(rawUrl, window.location.origin);
+      if (window.location.protocol === 'https:' && parsed.protocol === 'http:') {
+        parsed.protocol = 'https:';
+      }
+      add(parsed.toString());
+      if (parsed.pathname.startsWith('/media/')) {
+        add(parsed.pathname);
+      }
+    } catch {
+      add(rawUrl);
+      if (rawUrl.startsWith('/media/')) {
+        add(rawUrl);
+      }
+    }
+
+    return candidates;
+  };
+
   const handleFreeDownload = async (track) => {
     try {
       setDownloading(track.id);
       setError(null);
       const res = await api.get(`/tracks/${track.id}/free-download`);
       const url = res.data.download_url;
-      const fileResponse = await api.get(url, { responseType: 'blob' });
-      const blobUrl = window.URL.createObjectURL(fileResponse.data);
-      const link = document.createElement('a');
-      link.href = blobUrl;
-      link.download = buildDownloadName(track, url);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(blobUrl);
+      const candidates = buildDownloadCandidates(url);
+      let downloaded = false;
+
+      for (const candidate of candidates) {
+        try {
+          const fileResponse = await api.get(candidate, { responseType: 'blob' });
+          const blobUrl = window.URL.createObjectURL(fileResponse.data);
+          const link = document.createElement('a');
+          link.href = blobUrl;
+          link.download = buildDownloadName(track, candidate);
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          window.URL.revokeObjectURL(blobUrl);
+          downloaded = true;
+          break;
+        } catch {
+          // Try next candidate URL.
+        }
+      }
+
+      if (!downloaded) {
+        setError('Dosya bulunamadı. Lütfen parçayı yeniden yükleyin.');
+      }
     } catch (err) {
       setError(err.response?.data?.detail || 'İndirme başarısız oldu.');
     } finally {

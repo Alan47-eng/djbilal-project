@@ -47,6 +47,34 @@ function AppContent() {
     return `${track.title} - ${track.artist}.${extension}`;
   };
 
+  const buildDownloadCandidates = (rawUrl) => {
+    if (!rawUrl) return [];
+    const candidates = [];
+    const add = (value) => {
+      if (value && !candidates.includes(value)) {
+        candidates.push(value);
+      }
+    };
+
+    try {
+      const parsed = new URL(rawUrl, window.location.origin);
+      if (window.location.protocol === 'https:' && parsed.protocol === 'http:') {
+        parsed.protocol = 'https:';
+      }
+      add(parsed.toString());
+      if (parsed.pathname.startsWith('/media/')) {
+        add(parsed.pathname);
+      }
+    } catch {
+      add(rawUrl);
+      if (rawUrl.startsWith('/media/')) {
+        add(rawUrl);
+      }
+    }
+
+    return candidates;
+  };
+
   const handlePlayPreview = (track) => {
     setCurrentTrack(track);
     setIsPlaying(true);
@@ -93,15 +121,30 @@ function AppContent() {
         return;
       }
 
-      const fileResponse = await api.get(downloadUrl, { responseType: 'blob' });
-      const blobUrl = window.URL.createObjectURL(fileResponse.data);
-      const link = document.createElement('a');
-      link.href = blobUrl;
-      link.download = buildDownloadName(track, downloadUrl);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(blobUrl);
+      const candidates = buildDownloadCandidates(downloadUrl);
+      let downloaded = false;
+
+      for (const candidate of candidates) {
+        try {
+          const fileResponse = await api.get(candidate, { responseType: 'blob' });
+          const blobUrl = window.URL.createObjectURL(fileResponse.data);
+          const link = document.createElement('a');
+          link.href = blobUrl;
+          link.download = buildDownloadName(track, candidate);
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          window.URL.revokeObjectURL(blobUrl);
+          downloaded = true;
+          break;
+        } catch {
+          // Try next candidate URL.
+        }
+      }
+
+      if (!downloaded) {
+        setDownloadError('Dosya bulunamadı. Lütfen parçayı yeniden yükleyin.');
+      }
     } catch (err) {
       setDownloadError(err.response?.data?.detail || 'İndirme başarısız oldu.');
     }
