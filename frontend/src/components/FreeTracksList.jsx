@@ -42,7 +42,7 @@ const FreeTracksList = ({ tracks, onPlay }) => {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(blobUrl);
     } catch (err) {
-      setError(err.response?.data?.detail || 'İndirme başarısız oldu.');
+      setError(err.response?.data?.detail || 'Download failed.');
     } finally {
       setDownloading(null);
     }
@@ -52,7 +52,7 @@ const FreeTracksList = ({ tracks, onPlay }) => {
     return (
       <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-900 p-10 text-center text-slate-500">
         <Gift size={36} className="mx-auto mb-3 opacity-40" />
-        <p>Henüz ücretsiz şarkı eklenmemiş.</p>
+        <p>No free tracks have been added yet.</p>
       </div>
     );
   }
@@ -60,7 +60,7 @@ const FreeTracksList = ({ tracks, onPlay }) => {
   return (
     <div>
       <p className="mb-4 text-sm text-slate-400">
-        Aşağıdaki şarkıları ücretsiz indirebilirsin — tek tıkla, kayıt olmadan!
+        Download the tracks below for free — one click, no signup required.
       </p>
 
       {error && (
@@ -106,7 +106,7 @@ const FreeTracksList = ({ tracks, onPlay }) => {
                 type="button"
                 onClick={() => onPlay(track)}
                 className="rounded-lg border border-slate-700 bg-slate-800 p-2 text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
-                title="Önizle"
+                title="Preview"
               >
                 <Play size={16} fill="currentColor" />
               </button>
@@ -117,7 +117,7 @@ const FreeTracksList = ({ tracks, onPlay }) => {
                 className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60 transition-colors"
               >
                 <Download size={15} />
-                {downloading === track.id ? 'İndiriliyor...' : 'İndir'}
+                {downloading === track.id ? 'Downloading...' : 'Download'}
               </button>
             </div>
           </div>

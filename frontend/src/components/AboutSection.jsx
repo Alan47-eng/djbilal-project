@@ -69,24 +69,23 @@ const AboutSection = () => {
 
           {/* Tagline */}
           <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-purple-500/40 bg-purple-600/10 px-4 py-2 text-sm font-semibold text-purple-300">
-            🎚️ Lisanslı altyapılar · Özel mixing/mastering çözümleri · Telifsiz beat'ler
+            🎚️ Licensed instrumentals · Custom mixing/mastering solutions · Royalty-free beats
           </div>
 
           {/* Bio */}
           <p className="text-slate-300 leading-relaxed text-base mb-8 max-w-2xl">
-            Merhaba! Ben DJ Bilal — yıllardır sahne ve stüdyo arasında gidip gelen, 
-            elektronik müzikten hip-hop'a kadar geniş bir yelpazede profesyonel beat ve 
-            altyapılar üreten bir prodüksiyon sanatçısıyım. Her bir şarkıyı titizlikle 
-            mixing ve mastering aşamalarından geçirerek sana en yüksek kaliteyi sunuyorum. 
-            İster hazır beat al, ister sana özel bir proje için teklif al — buraya doğru geldin!
+            Hi! I am DJ Bilal — a production artist with years of experience across live stages and studio sessions.
+            I create professional beats and instrumentals across a wide range of styles, from electronic music to hip-hop.
+            Every track is carefully mixed and mastered to deliver top-level quality.
+            Whether you want a ready-to-use beat or a custom offer for your project, you are in the right place.
           </p>
 
           {/* Stats */}
           <div className="grid grid-cols-3 gap-4 mb-8">
             {[
-              { label: 'Yıl Deneyim', value: '10+' },
-              { label: 'Yayınlanan Beat', value: '200+' },
-              { label: 'Mutlu Müşteri', value: '500+' },
+              { label: 'Years of Experience', value: '10+' },
+              { label: 'Released Beats', value: '200+' },
+              { label: 'Happy Clients', value: '500+' },
             ].map((stat) => (
               <div key={stat.label} className="rounded-xl bg-slate-800 p-4 text-center border border-slate-700">
                 <div className="text-2xl font-extrabold text-purple-400">{stat.value}</div>
@@ -97,7 +96,7 @@ const AboutSection = () => {
 
           {/* Social links */}
           <div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-3">Beni Takip Et</p>
+            <p className="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-3">Follow Me</p>
             <div className="flex items-center gap-4 flex-wrap">
               {SOCIAL_LINKS.map((link) => (
                 <a

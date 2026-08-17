@@ -88,7 +88,7 @@ const TrackCard = ({ track, onPlay, onBuy, onDownload, isPurchased }) => {
           <div className="absolute top-3 left-3">
             <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-500 px-2.5 py-1 text-xs font-extrabold text-white shadow-lg">
               <Gift size={12} />
-              ÜCRETSİZ
+              FREE
             </span>
           </div>
         )}
@@ -109,7 +109,7 @@ const TrackCard = ({ track, onPlay, onBuy, onDownload, isPurchased }) => {
           {isFree ? (
             <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600/20 px-3 py-1 text-sm font-semibold text-emerald-400">
               <Gift size={16} />
-              Ücretsiz
+              Free
             </span>
           ) : isPurchased ? (
             <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600/20 px-3 py-1 text-sm font-semibold text-emerald-400">
@@ -131,7 +131,7 @@ const TrackCard = ({ track, onPlay, onBuy, onDownload, isPurchased }) => {
               className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-700"
             >
               <Download size={16} />
-              İndir
+              Download
             </button>
           ) : (
             <button

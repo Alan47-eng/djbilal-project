@@ -89,14 +89,14 @@ function AppContent() {
       const response = await api.get(endpoint);
       const downloadUrl = response.data?.download_url;
       if (!downloadUrl) {
-        setDownloadError('İndirme bağlantısı bulunamadı.');
+        setDownloadError('Download link not found.');
         return;
       }
       const resolvedUrl = resolveAssetUrl(downloadUrl);
       const fileResponse = await api.get(resolvedUrl, { responseType: 'blob' });
       const contentType = (fileResponse.headers && fileResponse.headers['content-type']) || '';
       if (contentType.includes('text/html')) {
-        setDownloadError('Dosya bulunamadı. Lütfen parçayı yeniden yükleyin.');
+        setDownloadError('File not found. Please upload the track again.');
         return;
       }
       const blobUrl = window.URL.createObjectURL(fileResponse.data);
@@ -108,7 +108,7 @@ function AppContent() {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(blobUrl);
     } catch (err) {
-      setDownloadError(err.response?.data?.detail || 'İndirme başarısız oldu.');
+      setDownloadError(err.response?.data?.detail || 'Download failed.');
     }
   };
 
@@ -206,10 +206,10 @@ function AppContent() {
         {/* Tab Navigation */}
         <nav className="flex items-center gap-1 mb-8 rounded-2xl border border-slate-800 bg-slate-900 p-1 w-fit">
           {[
-            { id: 'store', label: 'Mağaza', icon: <LayoutGrid size={15} /> },
-            { id: 'free', label: 'Ücretsiz', icon: <Gift size={15} /> },
-            { id: 'about', label: 'Hakkımda', icon: <Info size={15} /> },
-            ...(user ? [{ id: 'library', label: 'Kütüphanem', icon: <Library size={15} /> }] : []),
+            { id: 'store', label: 'Store', icon: <LayoutGrid size={15} /> },
+            { id: 'free', label: 'Free', icon: <Gift size={15} /> },
+            { id: 'about', label: 'About', icon: <Info size={15} /> },
+            ...(user ? [{ id: 'library', label: 'My Library', icon: <Library size={15} /> }] : []),
           ].map((tab) => (
             <button
               key={tab.id}
@@ -263,7 +263,7 @@ function AppContent() {
 
                 {tracks.length === 0 ? (
                   <div className="rounded-2xl border border-slate-800 bg-slate-900 p-8 text-center text-slate-300">
-                    Henüz parça eklenmedi. Çok yakında yeni içerikler burada olacak.
+                    No tracks yet. New releases are coming soon.
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-32">
@@ -288,11 +288,11 @@ function AppContent() {
                 <div className="mb-6">
                   <p className="mb-1 inline-flex items-center gap-2 rounded-full bg-emerald-600/20 px-3 py-1 text-xs font-semibold text-emerald-300">
                     <Gift size={12} />
-                    Ücretsiz İndir
+                    Free Download
                   </p>
-                  <h2 className="mt-2 text-2xl font-bold text-white">Kaliteyi Ücretsiz Keşfet</h2>
+                  <h2 className="mt-2 text-2xl font-bold text-white">Explore Free Tracks</h2>
                   <p className="text-slate-400 mt-1 text-sm max-w-xl">
-                    Seçilmiş şarkıları herhangi bir ödeme yapmadan indir, dinle ve projende kullan.
+                    Download selected tracks for free, listen instantly, and use them in your projects.
                   </p>
                 </div>
                 <FreeTracksList tracks={tracks} onPlay={handlePlayPreview} />
@@ -312,11 +312,11 @@ function AppContent() {
                 <div className="mb-6">
                   <p className="mb-1 inline-flex items-center gap-2 rounded-full bg-purple-600/20 px-3 py-1 text-xs font-semibold text-purple-300">
                     <Library size={12} />
-                    Kütüphanem
+                    My Library
                   </p>
-                  <h2 className="mt-2 text-2xl font-bold text-white">Satın Aldıklarım</h2>
+                  <h2 className="mt-2 text-2xl font-bold text-white">My Purchases</h2>
                   <p className="text-slate-400 mt-1 text-sm max-w-xl">
-                    Satın aldığın tüm lisanslı şarkıları dilediğin zaman buradan yeniden indirebilirsin.
+                    Re-download all licensed tracks you have purchased anytime from here.
                   </p>
                 </div>
                 <UserPurchases />

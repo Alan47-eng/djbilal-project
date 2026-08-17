@@ -23,7 +23,7 @@ const UserPurchases = () => {
       const res = await api.get('/purchases/details');
       setPurchases(res.data);
     } catch (err) {
-      setError(err.response?.data?.detail || 'Satın alınanlar yüklenemedi.');
+      setError(err.response?.data?.detail || 'Could not load purchases.');
     } finally {
       setLoading(false);
     }
@@ -52,7 +52,7 @@ const UserPurchases = () => {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(blobUrl);
     } catch (err) {
-      setError(err.response?.data?.detail || 'İndirme başarısız.');
+      setError(err.response?.data?.detail || 'Download failed.');
     } finally {
       setDownloading(null);
     }
@@ -62,7 +62,7 @@ const UserPurchases = () => {
     return (
       <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-900 p-12 text-center text-slate-500">
         <ShoppingBag size={40} className="mx-auto mb-4 opacity-40" />
-        <p className="font-medium">Satın aldıklarını görmek için giriş yap.</p>
+        <p className="font-medium">Sign in to view your purchases.</p>
       </div>
     );
   }
@@ -71,7 +71,7 @@ const UserPurchases = () => {
     return (
       <div className="flex items-center justify-center py-20 text-slate-400">
         <RefreshCw size={28} className="animate-spin mr-3" />
-        Yükleniyor...
+        Loading...
       </div>
     );
   }
@@ -80,7 +80,7 @@ const UserPurchases = () => {
     <div>
       <div className="flex items-center justify-between mb-6">
         <p className="text-sm text-slate-400">
-          Satın aldığın tüm şarkıları buradan tekrar indirebilirsin.
+          Re-download all purchased tracks from here.
         </p>
         <button
           type="button"
@@ -88,7 +88,7 @@ const UserPurchases = () => {
           className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-700 transition-colors"
         >
           <RefreshCw size={14} />
-          Yenile
+          Refresh
         </button>
       </div>
 
@@ -101,16 +101,16 @@ const UserPurchases = () => {
       {purchases.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-900 p-12 text-center text-slate-500">
           <ShoppingBag size={40} className="mx-auto mb-4 opacity-40" />
-          <p className="font-medium">Henüz satın aldığın bir şarkı yok.</p>
+          <p className="font-medium">You have not purchased any tracks yet.</p>
         </div>
       ) : (
         <div className="rounded-2xl border border-slate-700 bg-slate-900 overflow-hidden">
           {/* Table header */}
           <div className="grid grid-cols-12 gap-4 px-6 py-3 text-xs font-semibold uppercase tracking-widest text-slate-500 border-b border-slate-800 bg-slate-950">
-            <div className="col-span-5">Şarkı</div>
-            <div className="col-span-3">Satın Alma Tarihi</div>
-            <div className="col-span-2">Lisans</div>
-            <div className="col-span-2 text-right">İndir</div>
+            <div className="col-span-5">Track</div>
+            <div className="col-span-3">Purchase Date</div>
+            <div className="col-span-2">License</div>
+            <div className="col-span-2 text-right">Download</div>
           </div>
 
           {/* Rows */}
@@ -146,7 +146,7 @@ const UserPurchases = () => {
 
                 {/* Date */}
                 <div className="col-span-3 text-sm text-slate-400">
-                  {new Date(purchase.purchased_at).toLocaleDateString('tr-TR', {
+                  {new Date(purchase.purchased_at).toLocaleDateString('en-US', {
                     year: 'numeric',
                     month: 'short',
                     day: 'numeric',
@@ -158,7 +158,7 @@ const UserPurchases = () => {
                   <span
                     className={`inline-block rounded-full border px-2.5 py-0.5 text-xs font-semibold ${licenseClass}`}
                   >
-                    {purchase.license_type || 'Standart'}
+                    {purchase.license_type || 'Standard'}
                   </span>
                 </div>
 
@@ -171,7 +171,7 @@ const UserPurchases = () => {
                     className="inline-flex items-center gap-1.5 rounded-lg bg-purple-600 px-3 py-2 text-xs font-semibold text-white hover:bg-purple-700 disabled:opacity-60 transition-colors"
                   >
                     <Download size={13} />
-                    {downloading === purchase.track_id ? '...' : 'İndir'}
+                    {downloading === purchase.track_id ? '...' : 'Download'}
                   </button>
                 </div>
               </div>

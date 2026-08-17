@@ -41,10 +41,10 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
   const isAdmin = user?.is_admin === true;
 
   const menuItems = useMemo(() => ([
-    { id: 'store', label: 'Mağaza', icon: <LayoutGrid size={16} /> },
-    { id: 'free', label: 'Ücretsiz', icon: <Gift size={16} /> },
-    { id: 'about', label: 'Hakkımda', icon: <Info size={16} /> },
-    ...(user ? [{ id: 'library', label: 'Kütüphanem', icon: <Library size={16} /> }] : []),
+    { id: 'store', label: 'Store', icon: <LayoutGrid size={16} /> },
+    { id: 'free', label: 'Free', icon: <Gift size={16} /> },
+    { id: 'about', label: 'About', icon: <Info size={16} /> },
+    ...(user ? [{ id: 'library', label: 'My Library', icon: <Library size={16} /> }] : []),
   ]), [user]);
 
   const stats = useMemo(() => [
@@ -170,7 +170,7 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
       >
         <div className="flex items-center justify-between border-b border-slate-800 px-5 py-4">
           <div>
-            <h2 className="text-xl font-bold">{isAdmin ? 'Admin Panel' : 'Menü'}</h2>
+            <h2 className="text-xl font-bold">{isAdmin ? 'Admin Panel' : 'Menu'}</h2>
             <p className="text-sm text-slate-400">{user ? user.email : 'DJ Bilal Music Store'}</p>
           </div>
           <button onClick={onClose} className="rounded-full p-2 hover:bg-slate-800">
@@ -179,7 +179,7 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
         </div>
 
         <div className="space-y-3 border-b border-slate-800 px-5 py-4">
-          <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">Site Menü</p>
+          <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">Site Menu</p>
           <div className="grid grid-cols-2 gap-2">
             {menuItems.map((item) => (
               <button
@@ -222,7 +222,7 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
 
         {user && !isAdmin && (
           <div className="space-y-2 border-b border-slate-800 px-5 py-4">
-            <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">Hesap</p>
+            <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">Account</p>
             <button
               type="button"
               onClick={onLogout}
@@ -236,7 +236,7 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
 
         {!isAdmin ? (
           <div className="px-5 py-4 text-sm text-slate-400">
-            Buradan mağazayı, ücretsiz parçaları ve hakkımda bölümünü hızlıca gezebilirsin.
+            Quickly navigate the store, free tracks, and about section from here.
           </div>
         ) : (
           <>
@@ -276,7 +276,7 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
                     min="0"
                     value={form.price}
                     onChange={handleChange('price')}
-                    placeholder={form.is_free ? 'Ücretsiz parça için 0.00' : 'Price'}
+                    placeholder={form.is_free ? '0.00 for free tracks' : 'Price'}
                     className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
                     required={!form.is_free}
                     disabled={form.is_free}
@@ -302,12 +302,12 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
                       onChange={handleChange('is_free')}
                       className="h-4 w-4 accent-emerald-500"
                     />
-                    <span className="text-sm text-slate-300">Ücretsiz indirilebilir şarkı (FREE)</span>
+                    <span className="text-sm text-slate-300">Free downloadable track (FREE)</span>
                   </label>
 
                   {form.is_free && (
                     <p className="text-xs text-emerald-300">
-                      Ücretsiz parçalarda ayrı bir URL gerekmez, tam dosya otomatik indirilebilir olur.
+                      Free tracks do not require a separate URL; the full file becomes downloadable automatically.
                     </p>
                   )}
                   <label className="block text-sm text-slate-300">
