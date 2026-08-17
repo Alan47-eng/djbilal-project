@@ -60,7 +60,14 @@ async def create_user_record(session, email, password, is_admin=False):
     return user
 
 
-async def create_track_record(session, checkout_url=None, is_free=False, price=9.99):
+async def create_track_record(
+    session,
+    checkout_url=None,
+    is_free=False,
+    price=9.99,
+    full_file_path="/server/music/track.mp3",
+    free_download_url=None,
+):
     track = Track(
         title="Webhook Track",
         artist="Tester",
@@ -68,9 +75,9 @@ async def create_track_record(session, checkout_url=None, is_free=False, price=9
         cover_image_url=None,
         checkout_url=checkout_url,
         preview_url="https://example.com/preview.mp3",
-        full_file_path="/server/music/track.mp3",
+        full_file_path=full_file_path,
         is_free=is_free,
-        free_download_url="/server/music/track.mp3" if is_free else None,
+        free_download_url=free_download_url if free_download_url is not None else (full_file_path if is_free else None),
     )
     session.add(track)
     await session.commit()
@@ -566,6 +573,25 @@ class TestCheckoutAndWebhook:
 
         assert response.status_code == 400
         assert "free to download" in response.json()["detail"]
+
+    @pytest.mark.asyncio
+    async def test_free_download_normalizes_legacy_http_media_url(self, client, test_db):
+        _, AsyncSessionLocal = test_db
+
+        async with AsyncSessionLocal() as session:
+            track = await create_track_record(
+                session,
+                is_free=True,
+                price=0,
+                full_file_path="http://legacy.example.com/media/tracks/sample.mp3",
+                free_download_url="http://legacy.example.com/media/tracks/sample.mp3",
+            )
+
+        response = await client.get(f"/tracks/{track.id}/free-download")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["download_url"] == "/media/tracks/sample.mp3"
+        assert data["full_file_path"] == "/media/tracks/sample.mp3"
 
 
 class TestEdgeCases:

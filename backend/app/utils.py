@@ -67,6 +67,21 @@ def build_media_url(request: Request, folder: str, filename: str) -> str:
     return f"/media/{folder}/{filename}"
 
 
+def normalize_media_url(url: str | None) -> str | None:
+    """Normalize media URLs to app-relative /media paths when possible."""
+    if not url:
+        return url
+
+    if url.startswith("/media/"):
+        return url
+
+    parsed = urlparse(url)
+    if parsed.path.startswith("/media/"):
+        return parsed.path
+
+    return url
+
+
 async def save_upload_file(upload_file, destination: Path, max_bytes: int | None = None) -> None:
     """Save uploaded file to disk without buffering the whole payload in memory."""
     destination.parent.mkdir(parents=True, exist_ok=True)

@@ -17,6 +17,7 @@ from .utils import (
     TRACK_UPLOAD_DIR, PREVIEW_UPLOAD_DIR, COVER_UPLOAD_DIR,
     UPLOAD_ROOT, build_media_url, build_storage_name,
     save_upload_file, build_checkout_url, extract_custom_data,
+    normalize_media_url,
     validate_upload_file, AUDIO_EXTENSIONS, IMAGE_EXTENSIONS,
     MAX_TRACK_UPLOAD_BYTES, MAX_PREVIEW_UPLOAD_BYTES, MAX_COVER_UPLOAD_BYTES,
     is_successful_payment_event, verify_webhook_signature
@@ -277,11 +278,38 @@ async def upload_track(
 
 @app.get("/tracks", response_model=list[schemas.TrackResponse])
 async def list_tracks(session: AsyncSession = Depends(get_session)):
-    return await track_service.get_all_tracks(session)
+    tracks = await track_service.get_all_tracks(session)
+    return [
+        {
+            "id": track.id,
+            "title": track.title,
+            "artist": track.artist,
+            "price": track.price,
+            "cover_image_url": normalize_media_url(track.cover_image_url),
+            "checkout_url": track.checkout_url,
+            "preview_url": normalize_media_url(track.preview_url),
+            "is_free": track.is_free,
+            "free_download_url": normalize_media_url(track.free_download_url),
+            "created_at": track.created_at,
+        }
+        for track in tracks
+    ]
 
 @app.get("/tracks/{track_id}", response_model=schemas.TrackResponse)
 async def get_track(track_id: int, session: AsyncSession = Depends(get_session)):
-    return await track_service.get_track(session, track_id)
+    track = await track_service.get_track(session, track_id)
+    return {
+        "id": track.id,
+        "title": track.title,
+        "artist": track.artist,
+        "price": track.price,
+        "cover_image_url": normalize_media_url(track.cover_image_url),
+        "checkout_url": track.checkout_url,
+        "preview_url": normalize_media_url(track.preview_url),
+        "is_free": track.is_free,
+        "free_download_url": normalize_media_url(track.free_download_url),
+        "created_at": track.created_at,
+    }
 
 @app.get("/tracks/{track_id}/free-download", response_model=schemas.DownloadResponse)
 async def free_download_track(
@@ -294,10 +322,10 @@ async def free_download_track(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="This track is not available for free download",
         )
-    download_url = track.free_download_url or track.full_file_path
+    download_url = normalize_media_url(track.free_download_url) or normalize_media_url(track.full_file_path)
     return {
         "track_id": track.id,
-        "full_file_path": track.full_file_path,
+        "full_file_path": normalize_media_url(track.full_file_path),
         "download_url": download_url,
     }
 
@@ -392,6 +420,6 @@ async def download_track(
 
     return {
         "track_id": track.id,
-        "full_file_path": track.full_file_path,
-        "download_url": track.full_file_path,
+        "full_file_path": normalize_media_url(track.full_file_path),
+        "download_url": normalize_media_url(track.full_file_path),
     }
