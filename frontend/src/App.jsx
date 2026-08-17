@@ -32,6 +32,21 @@ function AppContent() {
   const isAdmin = user?.is_admin === true;
   const loading = authLoading || tracksLoading;
 
+  const buildDownloadName = (track, sourceUrl) => {
+    const fallbackExt = 'mp3';
+    let extension = fallbackExt;
+    try {
+      const parsed = new URL(sourceUrl, window.location.origin);
+      const match = parsed.pathname.match(/\.([a-zA-Z0-9]+)$/);
+      if (match?.[1]) {
+        extension = match[1].toLowerCase();
+      }
+    } catch {
+      extension = fallbackExt;
+    }
+    return `${track.title} - ${track.artist}.${extension}`;
+  };
+
   const handlePlayPreview = (track) => {
     setCurrentTrack(track);
     setIsPlaying(true);
@@ -78,12 +93,15 @@ function AppContent() {
         return;
       }
 
+      const fileResponse = await api.get(downloadUrl, { responseType: 'blob' });
+      const blobUrl = window.URL.createObjectURL(fileResponse.data);
       const link = document.createElement('a');
-      link.href = downloadUrl;
-      link.download = `${track.title} - ${track.artist}.mp3`;
+      link.href = blobUrl;
+      link.download = buildDownloadName(track, downloadUrl);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
     } catch (err) {
       setDownloadError(err.response?.data?.detail || 'İndirme başarısız oldu.');
     }

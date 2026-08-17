@@ -7,18 +7,36 @@ const FreeTracksList = ({ tracks, onPlay }) => {
   const [downloading, setDownloading] = useState(null);
   const [error, setError] = useState(null);
 
+  const buildDownloadName = (track, sourceUrl) => {
+    const fallbackExt = 'mp3';
+    let extension = fallbackExt;
+    try {
+      const parsed = new URL(sourceUrl, window.location.origin);
+      const match = parsed.pathname.match(/\.([a-zA-Z0-9]+)$/);
+      if (match?.[1]) {
+        extension = match[1].toLowerCase();
+      }
+    } catch {
+      extension = fallbackExt;
+    }
+    return `${track.title} - ${track.artist}.${extension}`;
+  };
+
   const handleFreeDownload = async (track) => {
     try {
       setDownloading(track.id);
       setError(null);
       const res = await api.get(`/tracks/${track.id}/free-download`);
       const url = res.data.download_url;
+      const fileResponse = await api.get(url, { responseType: 'blob' });
+      const blobUrl = window.URL.createObjectURL(fileResponse.data);
       const link = document.createElement('a');
-      link.href = url;
-      link.download = `${track.title} - ${track.artist}.mp3`;
+      link.href = blobUrl;
+      link.download = buildDownloadName(track, url);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
     } catch (err) {
       setError(err.response?.data?.detail || 'İndirme başarısız oldu.');
     } finally {
