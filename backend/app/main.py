@@ -84,6 +84,15 @@ async def startup():
             await conn.execute(text(
                 "ALTER TABLE tracks ADD COLUMN IF NOT EXISTS checkout_url VARCHAR(1024)"
             ))
+            await conn.execute(text(
+                "ALTER TABLE tracks ADD COLUMN IF NOT EXISTS is_free BOOLEAN NOT NULL DEFAULT FALSE"
+            ))
+            await conn.execute(text(
+                "ALTER TABLE tracks ADD COLUMN IF NOT EXISTS free_download_url VARCHAR(1024)"
+            ))
+            await conn.execute(text(
+                "ALTER TABLE purchases ADD COLUMN IF NOT EXISTS license_type VARCHAR(100)"
+            ))
 
     await seed_tracks()
     await seed_admin_user()
@@ -218,8 +227,10 @@ async def upload_track(
     request: Request,
     title: str = Form(...),
     artist: str = Form(...),
-    price: float = Form(...),
+    price: float | None = Form(None),
     checkout_url: str | None = Form(None),
+    is_free: bool = Form(False),
+    free_download_url: str | None = Form(None),
     track_file: UploadFile = File(...),
     preview_file: UploadFile = File(...),
     cover_file: UploadFile | None = File(None),
@@ -227,6 +238,12 @@ async def upload_track(
     session: AsyncSession = Depends(get_session),
 ):
     require_admin(current_user)
+
+    if not is_free and price is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Price is required for paid tracks",
+        )
 
     validate_upload_file(track_file, AUDIO_EXTENSIONS, MAX_TRACK_UPLOAD_BYTES, "Track file")
     validate_upload_file(preview_file, AUDIO_EXTENSIONS, MAX_PREVIEW_UPLOAD_BYTES, "Preview file")
@@ -242,14 +259,19 @@ async def upload_track(
     if cover_file and cover_filename:
         await save_upload_file(cover_file, COVER_UPLOAD_DIR / cover_filename, MAX_COVER_UPLOAD_BYTES)
 
+    track_full_url = build_media_url(request, "tracks", track_filename)
+    normalized_price = 0.0 if is_free and price is None else (price or 0.0)
+    checkout_url_value = None if is_free else (checkout_url.strip() if checkout_url else None)
     track_data = schemas.TrackCreate(
         title=title.strip(),
         artist=artist.strip(),
-        price=price,
+        price=normalized_price,
         cover_image_url=build_media_url(request, "covers", cover_filename) if cover_filename else None,
-        checkout_url=checkout_url.strip() if checkout_url else None,
+        checkout_url=checkout_url_value,
         preview_url=build_media_url(request, "previews", preview_filename),
-        full_file_path=build_media_url(request, "tracks", track_filename),
+        full_file_path=track_full_url,
+        is_free=is_free,
+        free_download_url=free_download_url.strip() if free_download_url else (track_full_url if is_free else None),
     )
     return await track_service.create_track(session, track_data)
 
@@ -261,6 +283,24 @@ async def list_tracks(session: AsyncSession = Depends(get_session)):
 async def get_track(track_id: int, session: AsyncSession = Depends(get_session)):
     return await track_service.get_track(session, track_id)
 
+@app.get("/tracks/{track_id}/free-download", response_model=schemas.DownloadResponse)
+async def free_download_track(
+    track_id: int,
+    session: AsyncSession = Depends(get_session),
+):
+    track = await track_service.get_track(session, track_id)
+    if not track.is_free:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This track is not available for free download",
+        )
+    download_url = track.free_download_url or track.full_file_path
+    return {
+        "track_id": track.id,
+        "full_file_path": track.full_file_path,
+        "download_url": download_url,
+    }
+
 
 @app.post("/tracks/{track_id}/checkout")
 async def create_checkout(
@@ -269,6 +309,12 @@ async def create_checkout(
     session: AsyncSession = Depends(get_session),
 ):
     track = await track_service.get_track(session, track_id)
+
+    if track.is_free:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This track is free to download",
+        )
 
     if not track.checkout_url:
         raise HTTPException(
@@ -297,6 +343,13 @@ async def list_purchases(
 ):
     return await purchase_service.get_user_purchases(session, current_user.id)
 
+@app.get("/purchases/details", response_model=list[schemas.PurchaseDetail])
+async def list_purchases_detailed(
+    current_user: User = Depends(auth.get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    return await purchase_service.get_user_purchases_detailed(session, current_user.id)
+
 @app.post("/webhooks/lemonsqueezy")
 async def lemonsqueezy_webhook(request: Request, session: AsyncSession = Depends(get_session)):
     raw_body = await request.body()
@@ -312,6 +365,7 @@ async def lemonsqueezy_webhook(request: Request, session: AsyncSession = Depends
     custom_data = extract_custom_data(payload)
     track_id = custom_data.get("track_id")
     user_id = custom_data.get("user_id")
+    license_type = custom_data.get("license_type")
 
     if not track_id or not user_id:
         raise HTTPException(
@@ -319,7 +373,7 @@ async def lemonsqueezy_webhook(request: Request, session: AsyncSession = Depends
             detail="Missing custom data",
         )
 
-    purchase = await purchase_service.record_purchase(session, int(user_id), int(track_id))
+    purchase = await purchase_service.record_purchase(session, int(user_id), int(track_id), license_type)
     return {"status": "ok", "purchase_id": purchase.id}
 
 @app.get("/tracks/{track_id}/download", response_model=schemas.DownloadResponse)

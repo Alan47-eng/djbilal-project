@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { LogOut, LogIn, UserPlus, Music, User, Menu, LayoutGrid, ShieldCheck, Gift, Library, Info } from 'lucide-react';
+import api from './api';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { TrackProvider, useTracks } from './context/TrackContext';
 import { PurchaseProvider, usePurchases } from './context/PurchaseContext';
@@ -26,6 +27,7 @@ function AppContent() {
   const [pendingPurchaseTrack, setPendingPurchaseTrack] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('store'); // 'store' | 'free' | 'about' | 'library'
+  const [downloadError, setDownloadError] = useState(null);
 
   const isAdmin = user?.is_admin === true;
   const loading = authLoading || tracksLoading;
@@ -36,6 +38,10 @@ function AppContent() {
   };
 
   const handleBuyTrack = (track) => {
+    if (track.is_free) {
+      handleDownloadTrack(track);
+      return;
+    }
     if (!user) {
       setPendingPurchaseTrack(track);
       setAuthModal({ isOpen: true, mode: 'login' });
@@ -53,8 +59,34 @@ function AppContent() {
     return checkoutUrl;
   };
 
-  const handleDownloadTrack = (track) => {
-    // Download logic handled in TrackCard component
+  const handleDownloadTrack = async (track) => {
+    try {
+      setDownloadError(null);
+      const endpoint = track.is_free
+        ? `/tracks/${track.id}/free-download`
+        : `/tracks/${track.id}/download`;
+
+      if (!track.is_free && !user) {
+        setAuthModal({ isOpen: true, mode: 'login' });
+        return;
+      }
+
+      const response = await api.get(endpoint);
+      const downloadUrl = response.data?.download_url;
+      if (!downloadUrl) {
+        setDownloadError('İndirme bağlantısı bulunamadı.');
+        return;
+      }
+
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = `${track.title} - ${track.artist}.mp3`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      setDownloadError(err.response?.data?.detail || 'İndirme başarısız oldu.');
+    }
   };
 
   const handleLogout = () => {
@@ -63,6 +95,7 @@ function AppContent() {
     setCurrentTrack(null);
     setPendingPurchaseTrack(null);
     setPurchaseModal({ isOpen: false, track: null });
+    setDownloadError(null);
     setMenuOpen(false);
   };
 
@@ -141,6 +174,12 @@ function AppContent() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-6 py-8">
+        {downloadError && (
+          <div className="mb-6 rounded-lg border border-red-500 bg-red-600/20 px-4 py-3 text-sm text-red-200">
+            {downloadError}
+          </div>
+        )}
+
         {/* Tab Navigation */}
         <nav className="flex items-center gap-1 mb-8 rounded-2xl border border-slate-800 bg-slate-900 p-1 w-fit">
           {[

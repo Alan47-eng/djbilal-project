@@ -48,6 +48,9 @@ function buildCoverArt(track) {
 }
 
 const TrackCard = ({ track, onPlay, onBuy, onDownload, isPurchased }) => {
+  const isFree = track.is_free === true;
+  const canDownloadDirectly = isFree || isPurchased;
+
   return (
     <div className="bg-slate-800 rounded-lg overflow-hidden hover:bg-slate-700 transition-colors duration-300 group cursor-pointer">
       {/* Track Cover / Placeholder */}
@@ -69,13 +72,13 @@ const TrackCard = ({ track, onPlay, onBuy, onDownload, isPurchased }) => {
             <Play size={24} fill="currentColor" />
           </button>
           <button
-            onClick={() => (isPurchased ? onDownload(track) : onBuy(track))}
+            onClick={() => (canDownloadDirectly ? onDownload(track) : onBuy(track))}
             className={`text-white p-4 rounded-full transition-all duration-200 transform hover:scale-110 ${
-              isPurchased ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-blue-600 hover:bg-blue-700'
+              canDownloadDirectly ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-blue-600 hover:bg-blue-700'
             }`}
-            title={isPurchased ? 'Download track' : 'Buy track'}
+            title={canDownloadDirectly ? 'Download track' : 'Buy track'}
           >
-            {isPurchased ? <Download size={24} /> : <ShoppingCart size={24} />}
+            {canDownloadDirectly ? <Download size={24} /> : <ShoppingCart size={24} />}
           </button>
         </div>
 
@@ -102,7 +105,12 @@ const TrackCard = ({ track, onPlay, onBuy, onDownload, isPurchased }) => {
           <span className="text-xs text-slate-500">
             {new Date(track.created_at).toLocaleDateString()}
           </span>
-          {isPurchased ? (
+          {isFree ? (
+            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600/20 px-3 py-1 text-sm font-semibold text-emerald-400">
+              <Gift size={16} />
+              Ücretsiz
+            </span>
+          ) : isPurchased ? (
             <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600/20 px-3 py-1 text-sm font-semibold text-emerald-400">
               <BadgeCheck size={16} />
               Purchased
@@ -115,14 +123,14 @@ const TrackCard = ({ track, onPlay, onBuy, onDownload, isPurchased }) => {
         </div>
 
         <div className="mt-4 flex items-center gap-3">
-          {isPurchased ? (
+          {canDownloadDirectly ? (
             <button
               type="button"
               onClick={() => onDownload(track)}
               className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-700"
             >
               <Download size={16} />
-              Download
+              İndir
             </button>
           ) : (
             <button

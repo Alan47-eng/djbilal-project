@@ -8,7 +8,7 @@ from app.main import app
 from app.models import Base
 from app.database import get_session
 from app.models import User, Track
-from app import auth
+from app import auth, schemas
 
 
 # Test database setup
@@ -60,15 +60,17 @@ async def create_user_record(session, email, password, is_admin=False):
     return user
 
 
-async def create_track_record(session, checkout_url=None):
+async def create_track_record(session, checkout_url=None, is_free=False, price=9.99):
     track = Track(
         title="Webhook Track",
         artist="Tester",
-        price=9.99,
+        price=price,
         cover_image_url=None,
         checkout_url=checkout_url,
         preview_url="https://example.com/preview.mp3",
         full_file_path="/server/music/track.mp3",
+        is_free=is_free,
+        free_download_url="/server/music/track.mp3" if is_free else None,
     )
     session.add(track)
     await session.commit()
@@ -538,6 +540,33 @@ class TestCheckoutAndWebhook:
         assert purchases_response.status_code == 200
         assert track.id in purchases_response.json()
 
+    @pytest.mark.asyncio
+    async def test_checkout_rejects_free_track(self, client, test_db):
+        _, AsyncSessionLocal = test_db
+
+        async with AsyncSessionLocal() as session:
+            user = await create_user_record(session, "freebuyer@example.com", "password123")
+            track = await create_track_record(
+                session,
+                checkout_url="https://buy.lemonsqueezy.com/checkout/buy/abc123",
+                is_free=True,
+                price=0,
+            )
+
+        login_response = await client.post(
+            "/login",
+            json={"email": user.email, "password": "password123"}
+        )
+        token = login_response.json()["access_token"]
+
+        response = await client.post(
+            f"/tracks/{track.id}/checkout",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+
+        assert response.status_code == 400
+        assert "free to download" in response.json()["detail"]
+
 
 class TestEdgeCases:
     """Test edge cases for auth endpoints"""
@@ -606,3 +635,26 @@ class TestEdgeCases:
         # Tokens might be different due to different exp times
         assert len(token1) > 0
         assert len(token2) > 0
+
+    def test_track_schema_allows_zero_price_for_free_track(self):
+        track = schemas.TrackCreate(
+            title="Free Track",
+            artist="Test Artist",
+            price=0,
+            is_free=True,
+            preview_url="https://example.com/preview.mp3",
+            full_file_path="https://example.com/full.mp3",
+        )
+        assert track.price == 0
+        assert track.is_free is True
+
+    def test_track_schema_rejects_zero_price_for_paid_track(self):
+        with pytest.raises(ValueError):
+            schemas.TrackCreate(
+                title="Paid Track",
+                artist="Test Artist",
+                price=0,
+                is_free=False,
+                preview_url="https://example.com/preview.mp3",
+                full_file_path="https://example.com/full.mp3",
+            )

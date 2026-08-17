@@ -23,7 +23,6 @@ const emptyForm = {
   price: '',
   checkout_url: '',
   is_free: false,
-  free_download_url: '',
   track_file: null,
   preview_file: null,
   cover_file: null,
@@ -84,6 +83,17 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
   if (!isOpen) return null;
 
   const handleChange = (key) => (event) => {
+    if (key === 'is_free') {
+      const checked = event.target.checked;
+      setForm((prev) => ({
+        ...prev,
+        is_free: checked,
+        price: checked ? '0' : prev.price === '0' ? '' : prev.price,
+        checkout_url: checked ? '' : prev.checkout_url,
+      }));
+      return;
+    }
+
     let value;
     if (event.target.type === 'file') {
       value = event.target.files?.[0] || null;
@@ -114,6 +124,10 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
       setError('Track and preview files are required');
       return;
     }
+    if (!form.is_free && !form.price) {
+      setError('Paid tracks require a price');
+      return;
+    }
 
     try {
       setUploading(true);
@@ -123,13 +137,10 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
       const formData = new FormData();
       formData.append('title', form.title);
       formData.append('artist', form.artist);
-      formData.append('price', form.price);
+      formData.append('price', form.is_free ? '0' : form.price);
       formData.append('is_free', form.is_free ? 'true' : 'false');
-      if (form.checkout_url) {
+      if (!form.is_free && form.checkout_url) {
         formData.append('checkout_url', form.checkout_url);
-      }
-      if (form.free_download_url) {
-        formData.append('free_download_url', form.free_download_url);
       }
       formData.append('track_file', form.track_file);
       formData.append('preview_file', form.preview_file);
@@ -262,21 +273,27 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
                   <input
                     type="number"
                     step="0.01"
+                    min="0"
                     value={form.price}
                     onChange={handleChange('price')}
-                    placeholder="Price"
+                    placeholder={form.is_free ? 'Ücretsiz parça için 0.00' : 'Price'}
                     className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
-                    required
+                    required={!form.is_free}
+                    disabled={form.is_free}
                   />
-                  <input
-                    value={form.checkout_url}
-                    onChange={handleChange('checkout_url')}
-                    placeholder="Lemon Squeezy checkout URL"
-                    className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
-                  />
-                  <p className="text-xs text-slate-400">
-                    Add a separate checkout URL for each track. If they share the same product, you can reuse the same URL.
-                  </p>
+                  {!form.is_free && (
+                    <>
+                      <input
+                        value={form.checkout_url}
+                        onChange={handleChange('checkout_url')}
+                        placeholder="Lemon Squeezy checkout URL"
+                        className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
+                      />
+                      <p className="text-xs text-slate-400">
+                        Add a separate checkout URL for each track. If they share the same product, you can reuse the same URL.
+                      </p>
+                    </>
+                  )}
 
                   <label className="flex cursor-pointer select-none items-center gap-3 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2">
                     <input
@@ -289,12 +306,9 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
                   </label>
 
                   {form.is_free && (
-                    <input
-                      value={form.free_download_url}
-                      onChange={handleChange('free_download_url')}
-                      placeholder="Ücretsiz indirme URL'i (boş bırakılırsa tam dosya kullanılır)"
-                      className="w-full rounded-lg border border-emerald-700/50 bg-slate-900 px-3 py-2 text-sm text-white"
-                    />
+                    <p className="text-xs text-emerald-300">
+                      Ücretsiz parçalarda ayrı bir URL gerekmez, tam dosya otomatik indirilebilir olur.
+                    </p>
                   )}
                   <label className="block text-sm text-slate-300">
                     Track file

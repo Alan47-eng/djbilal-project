@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, field_validator, ConfigDict
+from pydantic import BaseModel, EmailStr, field_validator, model_validator, ConfigDict
 from datetime import datetime
 
 class UserCreate(BaseModel):
@@ -29,6 +29,8 @@ class TrackCreate(BaseModel):
     checkout_url: str | None = None
     preview_url: str
     full_file_path: str
+    is_free: bool = False
+    free_download_url: str | None = None
 
     @field_validator('title', 'artist')
     @classmethod
@@ -39,14 +41,20 @@ class TrackCreate(BaseModel):
 
     @field_validator('price')
     @classmethod
-    def price_must_be_positive(cls, v):
-        if v <= 0:
-            raise ValueError('Price must be greater than 0')
+    def price_must_be_valid(cls, v):
+        if v < 0:
+            raise ValueError('Price cannot be negative')
         if v > 999999.99:
             raise ValueError('Price cannot exceed 999999.99')
         return v
 
-    @field_validator('cover_image_url', 'checkout_url', 'preview_url', 'full_file_path')
+    @model_validator(mode='after')
+    def validate_price_by_type(self):
+        if not self.is_free and self.price <= 0:
+            raise ValueError('Price must be greater than 0 for paid tracks')
+        return self
+
+    @field_validator('cover_image_url', 'checkout_url', 'preview_url', 'full_file_path', 'free_download_url')
     @classmethod
     def urls_not_empty(cls, v):
         if v is None:
@@ -63,7 +71,22 @@ class TrackResponse(BaseModel):
     cover_image_url: str | None = None
     checkout_url: str | None = None
     preview_url: str
+    is_free: bool
+    free_download_url: str | None = None
     created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PurchaseDetail(BaseModel):
+    id: int
+    track_id: int
+    track_title: str
+    track_artist: str
+    cover_image_url: str | None = None
+    download_url: str
+    license_type: str | None = None
+    purchased_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
 
