@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Play, Pause, Volume2, VolumeX } from 'lucide-react';
+import { resolveAssetUrl } from '../api';
 
 const AudioPlayer = ({ track, isPlaying, onPlayPause }) => {
   const audioRef = useRef(null);
@@ -146,7 +147,7 @@ const AudioPlayer = ({ track, isPlaying, onPlayPause }) => {
       {/* Hidden Audio Element */}
       <audio
         ref={audioRef}
-        src={track?.preview_url}
+        src={resolveAssetUrl(track?.preview_url)}
         crossOrigin="anonymous"
             preload="metadata"
             onEnded={() => onPlayPause(false)}

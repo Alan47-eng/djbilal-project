@@ -1,5 +1,6 @@
 import React from 'react';
 import { Play, ShoppingCart, Download, BadgeCheck, Gift } from 'lucide-react';
+import { resolveAssetUrl } from '../api';
 
 function hashString(value) {
   let hash = 0;
@@ -56,7 +57,7 @@ const TrackCard = ({ track, onPlay, onBuy, onDownload, isPurchased }) => {
       {/* Track Cover / Placeholder */}
       <div className="aspect-square bg-gradient-to-br from-purple-600 to-blue-600 relative overflow-hidden">
         <img
-          src={track.cover_image_url || buildCoverArt(track)}
+          src={resolveAssetUrl(track.cover_image_url) || buildCoverArt(track)}
           alt={`${track.title} cover`}
           className="h-full w-full object-cover"
           loading="lazy"

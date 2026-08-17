@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Download, Play, Gift } from 'lucide-react';
-import api from '../api';
+import api, { resolveAssetUrl } from '../api';
 
 const FreeTracksList = ({ tracks, onPlay }) => {
   const freeTracks = tracks.filter((t) => t.is_free);
@@ -22,64 +22,25 @@ const FreeTracksList = ({ tracks, onPlay }) => {
     return `${track.title} - ${track.artist}.${extension}`;
   };
 
-  const buildDownloadCandidates = (rawUrl) => {
-    if (!rawUrl) return [];
-    const candidates = [];
-    const add = (value) => {
-      if (value && !candidates.includes(value)) {
-        candidates.push(value);
-      }
-    };
-
-    try {
-      const parsed = new URL(rawUrl, window.location.origin);
-      if (window.location.protocol === 'https:' && parsed.protocol === 'http:') {
-        parsed.protocol = 'https:';
-      }
-      add(parsed.toString());
-      if (parsed.pathname.startsWith('/media/')) {
-        add(parsed.pathname);
-      }
-    } catch {
-      add(rawUrl);
-      if (rawUrl.startsWith('/media/')) {
-        add(rawUrl);
-      }
-    }
-
-    return candidates;
-  };
-
   const handleFreeDownload = async (track) => {
     try {
       setDownloading(track.id);
       setError(null);
       const res = await api.get(`/tracks/${track.id}/free-download`);
-      const url = res.data.download_url;
-      const candidates = buildDownloadCandidates(url);
-      let downloaded = false;
-
-      for (const candidate of candidates) {
-        try {
-          const fileResponse = await api.get(candidate, { responseType: 'blob' });
-          const blobUrl = window.URL.createObjectURL(fileResponse.data);
-          const link = document.createElement('a');
-          link.href = blobUrl;
-          link.download = buildDownloadName(track, candidate);
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          window.URL.revokeObjectURL(blobUrl);
-          downloaded = true;
-          break;
-        } catch {
-          // Try next candidate URL.
-        }
+      const resolvedUrl = resolveAssetUrl(res.data.download_url);
+      const fileResponse = await api.get(resolvedUrl, { responseType: 'blob' });
+      const contentType = (fileResponse.headers && fileResponse.headers['content-type']) || '';
+      if (contentType.includes('text/html')) {
+        throw new Error('Received HTML instead of media file');
       }
-
-      if (!downloaded) {
-        setError('Dosya bulunamadı. Lütfen parçayı yeniden yükleyin.');
-      }
+      const blobUrl = window.URL.createObjectURL(fileResponse.data);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = buildDownloadName(track, resolvedUrl);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
     } catch (err) {
       setError(err.response?.data?.detail || 'İndirme başarısız oldu.');
     } finally {
@@ -118,7 +79,7 @@ const FreeTracksList = ({ tracks, onPlay }) => {
             <div className="relative w-16 h-16 flex-shrink-0 rounded-xl overflow-hidden bg-gradient-to-br from-emerald-800 to-teal-700">
               {track.cover_image_url ? (
                 <img
-                  src={track.cover_image_url}
+                  src={resolveAssetUrl(track.cover_image_url)}
                   alt={track.title}
                   className="w-full h-full object-cover"
                 />

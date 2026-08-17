@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { LogOut, LogIn, UserPlus, Music, User, Menu, LayoutGrid, ShieldCheck, Gift, Library, Info } from 'lucide-react';
-import api from './api';
+import api, { resolveAssetUrl } from './api';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { TrackProvider, useTracks } from './context/TrackContext';
 import { PurchaseProvider, usePurchases } from './context/PurchaseContext';
@@ -45,34 +45,6 @@ function AppContent() {
       extension = fallbackExt;
     }
     return `${track.title} - ${track.artist}.${extension}`;
-  };
-
-  const buildDownloadCandidates = (rawUrl) => {
-    if (!rawUrl) return [];
-    const candidates = [];
-    const add = (value) => {
-      if (value && !candidates.includes(value)) {
-        candidates.push(value);
-      }
-    };
-
-    try {
-      const parsed = new URL(rawUrl, window.location.origin);
-      if (window.location.protocol === 'https:' && parsed.protocol === 'http:') {
-        parsed.protocol = 'https:';
-      }
-      add(parsed.toString());
-      if (parsed.pathname.startsWith('/media/')) {
-        add(parsed.pathname);
-      }
-    } catch {
-      add(rawUrl);
-      if (rawUrl.startsWith('/media/')) {
-        add(rawUrl);
-      }
-    }
-
-    return candidates;
   };
 
   const handlePlayPreview = (track) => {
@@ -120,31 +92,21 @@ function AppContent() {
         setDownloadError('İndirme bağlantısı bulunamadı.');
         return;
       }
-
-      const candidates = buildDownloadCandidates(downloadUrl);
-      let downloaded = false;
-
-      for (const candidate of candidates) {
-        try {
-          const fileResponse = await api.get(candidate, { responseType: 'blob' });
-          const blobUrl = window.URL.createObjectURL(fileResponse.data);
-          const link = document.createElement('a');
-          link.href = blobUrl;
-          link.download = buildDownloadName(track, candidate);
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          window.URL.revokeObjectURL(blobUrl);
-          downloaded = true;
-          break;
-        } catch {
-          // Try next candidate URL.
-        }
-      }
-
-      if (!downloaded) {
+      const resolvedUrl = resolveAssetUrl(downloadUrl);
+      const fileResponse = await api.get(resolvedUrl, { responseType: 'blob' });
+      const contentType = (fileResponse.headers && fileResponse.headers['content-type']) || '';
+      if (contentType.includes('text/html')) {
         setDownloadError('Dosya bulunamadı. Lütfen parçayı yeniden yükleyin.');
+        return;
       }
+      const blobUrl = window.URL.createObjectURL(fileResponse.data);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = buildDownloadName(track, resolvedUrl);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
     } catch (err) {
       setDownloadError(err.response?.data?.detail || 'İndirme başarısız oldu.');
     }

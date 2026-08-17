@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Download, ShoppingBag, BadgeCheck, RefreshCw } from 'lucide-react';
-import api from '../api';
+import api, { resolveAssetUrl } from '../api';
 import { useAuth } from '../context/AuthContext';
 
 const LICENSE_COLORS = {
@@ -37,13 +37,20 @@ const UserPurchases = () => {
     try {
       setDownloading(purchase.track_id);
       const res = await api.get(`/tracks/${purchase.track_id}/download`);
-      const url = res.data.download_url;
+      const url = resolveAssetUrl(res.data.download_url);
+      const fileResponse = await api.get(url, { responseType: 'blob' });
+      const contentType = (fileResponse.headers && fileResponse.headers['content-type']) || '';
+      if (contentType.includes('text/html')) {
+        throw new Error('Received HTML instead of media file');
+      }
+      const blobUrl = window.URL.createObjectURL(fileResponse.data);
       const link = document.createElement('a');
-      link.href = url;
+      link.href = blobUrl;
       link.download = `${purchase.track_title} - ${purchase.track_artist}.mp3`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
     } catch (err) {
       setError(err.response?.data?.detail || 'İndirme başarısız.');
     } finally {
@@ -121,7 +128,7 @@ const UserPurchases = () => {
                   <div className="w-10 h-10 rounded-lg flex-shrink-0 overflow-hidden bg-gradient-to-br from-purple-700 to-blue-700">
                     {purchase.cover_image_url ? (
                       <img
-                        src={purchase.cover_image_url}
+                        src={resolveAssetUrl(purchase.cover_image_url)}
                         alt={purchase.track_title}
                         className="w-full h-full object-cover"
                       />
