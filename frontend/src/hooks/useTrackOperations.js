@@ -27,7 +27,31 @@ export function useCheckout() {
     }
   };
 
-  return { checkout, loading, error };
+  const checkoutCart = async (trackIds) => {
+    if (!user) {
+      setError('You must be logged in to purchase');
+      return null;
+    }
+    if (!Array.isArray(trackIds) || trackIds.length === 0) {
+      setError('Cart is empty');
+      return null;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await api.post('/checkout/cart', { track_ids: trackIds });
+      return response.data.checkout_url;
+    } catch (err) {
+      const errorMsg = err.response?.data?.detail || 'Checkout failed';
+      setError(typeof errorMsg === 'string' ? errorMsg : 'Checkout failed');
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return { checkout, checkoutCart, loading, error };
 }
 
 export function useDownload() {

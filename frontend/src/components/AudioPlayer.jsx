@@ -8,6 +8,7 @@ const AudioPlayer = ({ track, isPlaying, onPlayPause }) => {
   const [currentTime, setCurrentTime] = useState(0);
   const [volume, setVolume] = useState(0.7);
   const [isMuted, setIsMuted] = useState(false);
+  const [playbackError, setPlaybackError] = useState(null);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -36,10 +37,12 @@ const AudioPlayer = ({ track, isPlaying, onPlayPause }) => {
 
     audio.currentTime = 0;
     setCurrentTime(0);
+    setPlaybackError(null);
 
     if (isPlaying) {
       audio.play().catch(() => {
-        console.log('Play interrupted or not allowed');
+        setPlaybackError('Preview could not be played. Please try again.');
+        onPlayPause(false);
       });
     } else {
       audio.pause();
@@ -77,7 +80,10 @@ const AudioPlayer = ({ track, isPlaying, onPlayPause }) => {
   }
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-slate-800 border-t border-slate-700 shadow-2xl z-50">
+    <div
+      className="fixed bottom-0 left-0 right-0 bg-slate-800 border-t border-slate-700 shadow-2xl z-50"
+      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+    >
       {/* Progress Bar */}
       <div
         onClick={handleProgressClick}
@@ -90,15 +96,15 @@ const AudioPlayer = ({ track, isPlaying, onPlayPause }) => {
       />
 
       {/* Player Content */}
-      <div className="flex items-center justify-between px-6 py-4 gap-6">
+      <div className="flex flex-col gap-3 px-4 sm:px-6 py-3 sm:py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
         {/* Track Info */}
-        <div className="flex-1 min-w-0">
+        <div className="w-full sm:flex-1 min-w-0">
           <h4 className="text-white font-semibold truncate">{track.title}</h4>
           <p className="text-slate-400 text-sm truncate">{track.artist}</p>
         </div>
 
         {/* Controls */}
-        <div className="flex items-center gap-4">
+        <div className="flex w-full items-center justify-between gap-3 sm:w-auto sm:justify-start sm:gap-4">
           {/* Play/Pause Button */}
           <button
             onClick={() => onPlayPause(!isPlaying)}
@@ -112,12 +118,12 @@ const AudioPlayer = ({ track, isPlaying, onPlayPause }) => {
           </button>
 
           {/* Time Display */}
-          <div className="text-slate-300 text-sm whitespace-nowrap">
+          <div className="text-slate-300 text-xs sm:text-sm whitespace-nowrap">
             {formatTime(currentTime)} / {formatTime(duration)}
           </div>
 
           {/* Volume Control */}
-          <div className="flex items-center gap-2">
+          <div className="hidden sm:flex items-center gap-2">
             <button
               onClick={() => setIsMuted(!isMuted)}
               className="text-slate-400 hover:text-white transition-colors"
@@ -143,15 +149,30 @@ const AudioPlayer = ({ track, isPlaying, onPlayPause }) => {
           </div>
         </div>
       </div>
+      {playbackError && (
+        <div className="px-6 pb-3 text-sm text-red-300">{playbackError}</div>
+      )}
 
       {/* Hidden Audio Element */}
       <audio
+        key={track?.id}
         ref={audioRef}
         src={resolveAssetUrl(track?.preview_url)}
-        crossOrigin="anonymous"
-            preload="metadata"
-            onEnded={() => onPlayPause(false)}
-          />
+        autoPlay={isPlaying}
+        preload="metadata"
+        onCanPlay={() => {
+          if (!isPlaying || !audioRef.current) return;
+          audioRef.current.play().catch(() => {
+            setPlaybackError('Preview could not be played. Please try again.');
+            onPlayPause(false);
+          });
+        }}
+        onError={() => {
+          setPlaybackError('Preview file could not be loaded.');
+          onPlayPause(false);
+        }}
+        onEnded={() => onPlayPause(false)}
+      />
     </div>
   );
 };

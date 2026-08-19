@@ -6,8 +6,8 @@ import {
   ShieldCheck,
   PlusCircle,
   LayoutGrid,
+  Music,
   Gift,
-  Info,
   Library,
   LogIn,
   UserPlus,
@@ -20,8 +20,10 @@ import { useTracks } from '../context/TrackContext';
 const emptyForm = {
   title: '',
   artist: '',
+  category: 'edit',
   price: '',
   checkout_url: '',
+  lemon_variant_id: '',
   is_free: false,
   track_file: null,
   preview_file: null,
@@ -41,9 +43,9 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
   const isAdmin = user?.is_admin === true;
 
   const menuItems = useMemo(() => ([
-    { id: 'store', label: 'Store', icon: <LayoutGrid size={16} /> },
+    { id: 'edits', label: 'Edits', icon: <LayoutGrid size={16} /> },
+    { id: 'remixes', label: 'Remixes', icon: <Music size={16} /> },
     { id: 'free', label: 'Free', icon: <Gift size={16} /> },
-    { id: 'about', label: 'About', icon: <Info size={16} /> },
     ...(user ? [{ id: 'library', label: 'My Library', icon: <Library size={16} /> }] : []),
   ]), [user]);
 
@@ -88,8 +90,12 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
       setForm((prev) => ({
         ...prev,
         is_free: checked,
+        category: checked
+          ? (prev.category === 'edit' ? 'remix' : prev.category)
+          : (['simple-pack', 'vst'].includes(prev.category) ? 'edit' : prev.category),
         price: checked ? '0' : prev.price === '0' ? '' : prev.price,
         checkout_url: checked ? '' : prev.checkout_url,
+        lemon_variant_id: checked ? '' : prev.lemon_variant_id,
       }));
       return;
     }
@@ -124,8 +130,16 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
       setError('Track and preview files are required');
       return;
     }
+    if (!form.category) {
+      setError('Category is required');
+      return;
+    }
     if (!form.is_free && !form.price) {
       setError('Paid tracks require a price');
+      return;
+    }
+    if (!form.is_free && !form.lemon_variant_id) {
+      setError('Paid tracks require a Lemon variant ID');
       return;
     }
 
@@ -137,10 +151,14 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
       const formData = new FormData();
       formData.append('title', form.title);
       formData.append('artist', form.artist);
+      formData.append('category', form.category);
       formData.append('price', form.is_free ? '0' : form.price);
       formData.append('is_free', form.is_free ? 'true' : 'false');
       if (!form.is_free && form.checkout_url) {
         formData.append('checkout_url', form.checkout_url);
+      }
+      if (!form.is_free && form.lemon_variant_id) {
+        formData.append('lemon_variant_id', form.lemon_variant_id);
       }
       formData.append('track_file', form.track_file);
       formData.append('preview_file', form.preview_file);
@@ -236,7 +254,7 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
 
         {!isAdmin ? (
           <div className="px-5 py-4 text-sm text-slate-400">
-            Quickly navigate the store, free tracks, and about section from here.
+            Quickly navigate edits, remixes, and free tracks from here.
           </div>
         ) : (
           <>
@@ -270,6 +288,28 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
                     className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
                     required
                   />
+                  <label className="block text-sm text-slate-300">
+                    Category
+                    <select
+                      value={form.category}
+                      onChange={handleChange('category')}
+                      className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
+                      required
+                    >
+                      {form.is_free ? (
+                        <>
+                          <option value="remix">Remix</option>
+                          <option value="simple-pack">Simple Pack</option>
+                          <option value="vst">VST</option>
+                        </>
+                      ) : (
+                        <>
+                          <option value="edit">Edit</option>
+                          <option value="remix">Remix</option>
+                        </>
+                      )}
+                    </select>
+                  </label>
                   <input
                     type="number"
                     step="0.01"
@@ -289,8 +329,18 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
                         placeholder="Lemon Squeezy checkout URL"
                         className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
                       />
+                      <input
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={form.lemon_variant_id}
+                        onChange={handleChange('lemon_variant_id')}
+                        placeholder="Lemon Squeezy variant ID"
+                        className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
+                        required={!form.is_free}
+                      />
                       <p className="text-xs text-slate-400">
-                        Add a separate checkout URL for each track. If they share the same product, you can reuse the same URL.
+                        For cart checkout, each paid track should have its own Lemon variant ID.
                       </p>
                     </>
                   )}

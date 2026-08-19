@@ -7,6 +7,7 @@ import re
 from pathlib import Path
 from urllib.parse import urlencode, urlparse, parse_qsl, urlunparse
 from uuid import uuid4
+import httpx
 from fastapi import Request, HTTPException, status
 
 
@@ -80,6 +81,46 @@ def normalize_media_url(url: str | None) -> str | None:
         return parsed.path
 
     return url
+
+
+def resolve_uploaded_file_path(url: str | None, folder: str) -> Path:
+    """Resolve an app media URL to an existing local uploaded file path."""
+    normalized = normalize_media_url(url)
+    if not normalized:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="File path is missing",
+        )
+
+    parsed = urlparse(normalized)
+    media_path = parsed.path or normalized
+    expected_prefix = f"/media/{folder}/"
+    if not media_path.startswith(expected_prefix):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Unsupported media path",
+        )
+
+    filename = Path(media_path).name
+    if not filename:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="File name is missing",
+        )
+
+    target_dir = (UPLOAD_ROOT / folder).resolve()
+    file_path = (target_dir / filename).resolve()
+    if not str(file_path).startswith(str(target_dir)):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid file path",
+        )
+    if not file_path.is_file():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Uploaded file not found on server",
+        )
+    return file_path
 
 
 async def save_upload_file(upload_file, destination: Path, max_bytes: int | None = None) -> None:
@@ -195,3 +236,91 @@ def verify_webhook_signature(raw_body: bytes, signature: str | None) -> bool:
     ).hexdigest()
     
     return hmac.compare_digest(signature, expected)
+
+
+async def create_lemonsqueezy_checkout(
+    *,
+    variant_quantities: list[dict[str, int]],
+    custom_data: dict[str, str],
+    email: str | None = None,
+) -> str:
+    """Create a hosted Lemon Squeezy checkout and return redirect URL."""
+    api_key = os.getenv("LEMON_SQUEEZY_API_KEY", "").strip()
+    store_id = os.getenv("LEMON_SQUEEZY_STORE_ID", "").strip()
+    if not api_key or not store_id:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Lemon Squeezy API credentials are missing",
+        )
+
+    if not variant_quantities:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="variant_quantities cannot be empty",
+        )
+
+    first_variant_id = str(variant_quantities[0]["variant_id"])
+    enabled_variants = [int(item["variant_id"]) for item in variant_quantities]
+
+    checkout_data: dict[str, object] = {
+        "custom": custom_data,
+        "variant_quantities": variant_quantities,
+    }
+    if email:
+        checkout_data["email"] = email
+
+    payload = {
+        "data": {
+            "type": "checkouts",
+            "attributes": {
+                "product_options": {"enabled_variants": enabled_variants},
+                "checkout_data": checkout_data,
+            },
+            "relationships": {
+                "store": {"data": {"type": "stores", "id": store_id}},
+                "variant": {"data": {"type": "variants", "id": first_variant_id}},
+            },
+        }
+    }
+
+    headers = {
+        "Accept": "application/vnd.api+json",
+        "Content-Type": "application/vnd.api+json",
+        "Authorization": f"Bearer {api_key}",
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            response = await client.post(
+                "https://api.lemonsqueezy.com/v1/checkouts",
+                headers=headers,
+                json=payload,
+            )
+    except httpx.HTTPError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Lemon Squeezy request failed: {exc}",
+        ) from exc
+
+    if response.status_code >= 400:
+        detail = response.text
+        try:
+            detail = response.json()
+        except json.JSONDecodeError:
+            pass
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail={"message": "Lemon Squeezy checkout creation failed", "provider_error": detail},
+        )
+
+    body = response.json()
+    checkout_url = (
+        body.get("data", {}).get("attributes", {}).get("url")
+        or body.get("data", {}).get("attributes", {}).get("checkout_url")
+    )
+    if not checkout_url:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Lemon Squeezy response did not include checkout URL",
+        )
+    return str(checkout_url)

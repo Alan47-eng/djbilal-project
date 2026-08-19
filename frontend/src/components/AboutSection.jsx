@@ -55,20 +55,20 @@ const AboutSection = () => {
           />
         </div>
 
-        <div className="px-8 pb-10">
+        <div className="px-4 sm:px-8 pb-8 sm:pb-10">
           {/* Avatar */}
-          <div className="flex items-end gap-6 -mt-14 mb-6">
-            <div className="w-28 h-28 rounded-2xl border-4 border-slate-800 bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center shadow-xl flex-shrink-0">
+          <div className="flex flex-col sm:flex-row sm:items-end gap-4 sm:gap-6 -mt-12 sm:-mt-14 mb-6">
+            <div className="w-20 h-20 sm:w-28 sm:h-28 rounded-2xl border-4 border-slate-800 bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center shadow-xl flex-shrink-0">
               <Music2 size={48} className="text-white" />
             </div>
-            <div className="pb-2">
-              <h2 className="text-3xl font-extrabold text-white">DJ Bilal</h2>
+            <div className="pb-1 sm:pb-2">
+              <h2 className="text-2xl sm:text-3xl font-extrabold text-white">DJ Bilal</h2>
               <p className="text-purple-400 font-medium text-sm">Producer · Mixing & Mastering · Beat Maker</p>
             </div>
           </div>
 
           {/* Tagline */}
-          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-purple-500/40 bg-purple-600/10 px-4 py-2 text-sm font-semibold text-purple-300">
+          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-purple-500/40 bg-purple-600/10 px-3 sm:px-4 py-2 text-xs sm:text-sm font-semibold text-purple-300">
             🎚️ Licensed instrumentals · Custom mixing/mastering solutions · Royalty-free beats
           </div>
 
@@ -80,8 +80,23 @@ const AboutSection = () => {
             Whether you want a ready-to-use beat or a custom offer for your project, you are in the right place.
           </p>
 
+          <div className="mb-8 grid gap-4 md:grid-cols-2">
+            <div className="rounded-xl border border-slate-700 bg-slate-800 p-4">
+              <h3 className="text-sm font-bold uppercase tracking-wide text-slate-200">How purchase works</h3>
+              <p className="mt-2 text-sm text-slate-300">
+                Choose a track, complete payment via Lemon Squeezy, and instantly download your licensed audio file.
+              </p>
+            </div>
+            <div className="rounded-xl border border-slate-700 bg-slate-800 p-4">
+              <h3 className="text-sm font-bold uppercase tracking-wide text-slate-200">Contact</h3>
+              <p className="mt-2 text-sm text-slate-300">
+                Support e-mail: <strong>[E-POSTA-ADRESI-EKLENECEK]</strong>
+              </p>
+            </div>
+          </div>
+
           {/* Stats */}
-          <div className="grid grid-cols-3 gap-4 mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
             {[
               { label: 'Years of Experience', value: '10+' },
               { label: 'Released Beats', value: '200+' },

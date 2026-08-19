@@ -33,12 +33,25 @@ const UserPurchases = () => {
     if (user) fetchDetails();
   }, [user]);
 
+  const buildDownloadName = (purchase) => {
+    const fallbackExt = 'mp3';
+    let extension = fallbackExt;
+    try {
+      const parsed = new URL(purchase.download_url, window.location.origin);
+      const match = parsed.pathname.match(/\.([a-zA-Z0-9]+)$/);
+      if (match?.[1]) {
+        extension = match[1].toLowerCase();
+      }
+    } catch {
+      extension = fallbackExt;
+    }
+    return `${purchase.track_title} - ${purchase.track_artist}.${extension}`;
+  };
+
   const handleDownload = async (purchase) => {
     try {
       setDownloading(purchase.track_id);
-      const res = await api.get(`/tracks/${purchase.track_id}/download`);
-      const url = resolveAssetUrl(res.data.download_url);
-      const fileResponse = await api.get(url, { responseType: 'blob' });
+      const fileResponse = await api.get(`/tracks/${purchase.track_id}/download-file`, { responseType: 'blob' });
       const contentType = (fileResponse.headers && fileResponse.headers['content-type']) || '';
       if (contentType.includes('text/html')) {
         throw new Error('Received HTML instead of media file');
@@ -46,7 +59,7 @@ const UserPurchases = () => {
       const blobUrl = window.URL.createObjectURL(fileResponse.data);
       const link = document.createElement('a');
       link.href = blobUrl;
-      link.download = `${purchase.track_title} - ${purchase.track_artist}.mp3`;
+      link.download = buildDownloadName(purchase);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -78,7 +91,7 @@ const UserPurchases = () => {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-slate-400">
           Re-download all purchased tracks from here.
         </p>
@@ -104,80 +117,130 @@ const UserPurchases = () => {
           <p className="font-medium">You have not purchased any tracks yet.</p>
         </div>
       ) : (
-        <div className="rounded-2xl border border-slate-700 bg-slate-900 overflow-hidden">
-          {/* Table header */}
-          <div className="grid grid-cols-12 gap-4 px-6 py-3 text-xs font-semibold uppercase tracking-widest text-slate-500 border-b border-slate-800 bg-slate-950">
-            <div className="col-span-5">Track</div>
-            <div className="col-span-3">Purchase Date</div>
-            <div className="col-span-2">License</div>
-            <div className="col-span-2 text-right">Download</div>
+        <>
+          <div className="space-y-3 md:hidden">
+            {purchases.map((purchase) => {
+              const licenseClass =
+                LICENSE_COLORS[purchase.license_type] ||
+                'bg-slate-700/40 text-slate-300 border-slate-600/40';
+              return (
+                <div key={purchase.id} className="rounded-xl border border-slate-700 bg-slate-900 p-4">
+                  <div className="mb-3 flex items-center gap-3 min-w-0">
+                    <div className="w-10 h-10 rounded-lg flex-shrink-0 overflow-hidden bg-gradient-to-br from-purple-700 to-blue-700">
+                      {purchase.cover_image_url ? (
+                        <img
+                          src={resolveAssetUrl(purchase.cover_image_url)}
+                          alt={purchase.track_title}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <BadgeCheck size={16} className="text-white/60" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-semibold text-white truncate text-sm">{purchase.track_title}</p>
+                      <p className="text-xs text-slate-400 truncate">{purchase.track_artist}</p>
+                    </div>
+                  </div>
+                  <div className="mb-3 text-xs text-slate-400">
+                    {new Date(purchase.purchased_at).toLocaleDateString('en-US', {
+                      year: 'numeric',
+                      month: 'short',
+                      day: 'numeric',
+                    })}
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span
+                      className={`inline-block rounded-full border px-2.5 py-0.5 text-xs font-semibold ${licenseClass}`}
+                    >
+                      {purchase.license_type || 'Standard'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleDownload(purchase)}
+                      disabled={downloading === purchase.track_id}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-purple-600 px-3 py-2 text-xs font-semibold text-white hover:bg-purple-700 disabled:opacity-60 transition-colors"
+                    >
+                      <Download size={13} />
+                      {downloading === purchase.track_id ? '...' : 'Download'}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
-          {/* Rows */}
-          {purchases.map((purchase) => {
-            const licenseClass =
-              LICENSE_COLORS[purchase.license_type] ||
-              'bg-slate-700/40 text-slate-300 border-slate-600/40';
-            return (
-              <div
-                key={purchase.id}
-                className="grid grid-cols-12 gap-4 px-6 py-4 items-center border-b border-slate-800 last:border-0 hover:bg-slate-800/50 transition-colors"
-              >
-                {/* Track */}
-                <div className="col-span-5 flex items-center gap-3 min-w-0">
-                  <div className="w-10 h-10 rounded-lg flex-shrink-0 overflow-hidden bg-gradient-to-br from-purple-700 to-blue-700">
-                    {purchase.cover_image_url ? (
-                      <img
-                        src={resolveAssetUrl(purchase.cover_image_url)}
-                        alt={purchase.track_title}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <BadgeCheck size={16} className="text-white/60" />
-                      </div>
-                    )}
+          <div className="hidden rounded-2xl border border-slate-700 bg-slate-900 overflow-hidden md:block">
+            <div className="grid grid-cols-12 gap-4 px-6 py-3 text-xs font-semibold uppercase tracking-widest text-slate-500 border-b border-slate-800 bg-slate-950">
+              <div className="col-span-5">Track</div>
+              <div className="col-span-3">Purchase Date</div>
+              <div className="col-span-2">License</div>
+              <div className="col-span-2 text-right">Download</div>
+            </div>
+
+            {purchases.map((purchase) => {
+              const licenseClass =
+                LICENSE_COLORS[purchase.license_type] ||
+                'bg-slate-700/40 text-slate-300 border-slate-600/40';
+              return (
+                <div
+                  key={purchase.id}
+                  className="grid grid-cols-12 gap-4 px-6 py-4 items-center border-b border-slate-800 last:border-0 hover:bg-slate-800/50 transition-colors"
+                >
+                  <div className="col-span-5 flex items-center gap-3 min-w-0">
+                    <div className="w-10 h-10 rounded-lg flex-shrink-0 overflow-hidden bg-gradient-to-br from-purple-700 to-blue-700">
+                      {purchase.cover_image_url ? (
+                        <img
+                          src={resolveAssetUrl(purchase.cover_image_url)}
+                          alt={purchase.track_title}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <BadgeCheck size={16} className="text-white/60" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-semibold text-white truncate text-sm">{purchase.track_title}</p>
+                      <p className="text-xs text-slate-400 truncate">{purchase.track_artist}</p>
+                    </div>
                   </div>
-                  <div className="min-w-0">
-                    <p className="font-semibold text-white truncate text-sm">{purchase.track_title}</p>
-                    <p className="text-xs text-slate-400 truncate">{purchase.track_artist}</p>
+
+                  <div className="col-span-3 text-sm text-slate-400">
+                    {new Date(purchase.purchased_at).toLocaleDateString('en-US', {
+                      year: 'numeric',
+                      month: 'short',
+                      day: 'numeric',
+                    })}
+                  </div>
+
+                  <div className="col-span-2">
+                    <span
+                      className={`inline-block rounded-full border px-2.5 py-0.5 text-xs font-semibold ${licenseClass}`}
+                    >
+                      {purchase.license_type || 'Standard'}
+                    </span>
+                  </div>
+
+                  <div className="col-span-2 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => handleDownload(purchase)}
+                      disabled={downloading === purchase.track_id}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-purple-600 px-3 py-2 text-xs font-semibold text-white hover:bg-purple-700 disabled:opacity-60 transition-colors"
+                    >
+                      <Download size={13} />
+                      {downloading === purchase.track_id ? '...' : 'Download'}
+                    </button>
                   </div>
                 </div>
-
-                {/* Date */}
-                <div className="col-span-3 text-sm text-slate-400">
-                  {new Date(purchase.purchased_at).toLocaleDateString('en-US', {
-                    year: 'numeric',
-                    month: 'short',
-                    day: 'numeric',
-                  })}
-                </div>
-
-                {/* License */}
-                <div className="col-span-2">
-                  <span
-                    className={`inline-block rounded-full border px-2.5 py-0.5 text-xs font-semibold ${licenseClass}`}
-                  >
-                    {purchase.license_type || 'Standard'}
-                  </span>
-                </div>
-
-                {/* Download */}
-                <div className="col-span-2 flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => handleDownload(purchase)}
-                    disabled={downloading === purchase.track_id}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-purple-600 px-3 py-2 text-xs font-semibold text-white hover:bg-purple-700 disabled:opacity-60 transition-colors"
-                  >
-                    <Download size={13} />
-                    {downloading === purchase.track_id ? '...' : 'Download'}
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        </>
       )}
     </div>
   );

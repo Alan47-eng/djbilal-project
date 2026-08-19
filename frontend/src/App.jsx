@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { LogOut, LogIn, UserPlus, Music, User, Menu, LayoutGrid, ShieldCheck, Gift, Library, Info } from 'lucide-react';
-import api, { resolveAssetUrl } from './api';
+import { LogOut, LogIn, UserPlus, Music, User, Menu, LayoutGrid, ShieldCheck, Gift, Library, ShoppingCart } from 'lucide-react';
+import api from './api';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { TrackProvider, useTracks } from './context/TrackContext';
 import { PurchaseProvider, usePurchases } from './context/PurchaseContext';
@@ -8,9 +8,7 @@ import { useCheckout } from './hooks/useTrackOperations';
 import TrackCard from './components/TrackCard';
 import AudioPlayer from './components/AudioPlayer';
 import AuthModal from './components/AuthModal';
-import PurchaseModal from './components/PurchaseModal';
 import AdminDrawer from './components/AdminDrawer';
-import AboutSection from './components/AboutSection';
 import FreeTracksList from './components/FreeTracksList';
 import UserPurchases from './components/UserPurchases';
 import './index.css';
@@ -19,18 +17,76 @@ function AppContent() {
   const { user, logout, loading: authLoading } = useAuth();
   const { tracks, loading: tracksLoading, error: tracksError } = useTracks();
   const { purchases } = usePurchases();
-  const { checkout, loading: checkoutLoading, error: checkoutError } = useCheckout();
+  const { checkoutCart, loading: checkoutLoading, error: checkoutError } = useCheckout();
   const [currentTrack, setCurrentTrack] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [authModal, setAuthModal] = useState({ isOpen: false, mode: 'login' });
-  const [purchaseModal, setPurchaseModal] = useState({ isOpen: false, track: null });
-  const [pendingPurchaseTrack, setPendingPurchaseTrack] = useState(null);
+  const [pendingCartTrackId, setPendingCartTrackId] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('store'); // 'store' | 'free' | 'about' | 'library'
+  const [activeTab, setActiveTab] = useState('edits'); // 'edits' | 'remixes' | 'free' | 'library'
+  const [cartTrackIds, setCartTrackIds] = useState([]);
   const [downloadError, setDownloadError] = useState(null);
 
   const isAdmin = user?.is_admin === true;
   const loading = authLoading || tracksLoading;
+  const normalizedCategory = (track) => (track.category || '').toLowerCase();
+  const paidTracks = tracks.filter((track) => !track.is_free);
+  const remixTracks = paidTracks.filter((track) => {
+    const category = normalizedCategory(track);
+    if (category) return category === 'remix';
+    return `${track.title} ${track.artist}`.toLowerCase().includes('remix');
+  });
+  const editTracks = paidTracks.filter((track) => {
+    const category = normalizedCategory(track);
+    if (category) return category === 'edit';
+    return !`${track.title} ${track.artist}`.toLowerCase().includes('remix');
+  });
+  const cartTracks = paidTracks.filter((track) => cartTrackIds.includes(track.id) && !purchases.includes(track.id));
+  const cartTotal = cartTracks.reduce((sum, track) => sum + (track.price || 0), 0);
+
+  const addToCart = (track) => {
+    if (track.is_free) {
+      handleDownloadTrack(track);
+      return;
+    }
+    if (!user) {
+      setPendingCartTrackId(track.id);
+      setAuthModal({ isOpen: true, mode: 'login' });
+      return;
+    }
+    setCartTrackIds((prev) => (prev.includes(track.id) ? prev : [...prev, track.id]));
+  };
+
+  const removeFromCart = (trackId) => {
+    setCartTrackIds((prev) => prev.filter((id) => id !== trackId));
+  };
+
+  const renderTrackGrid = (tracksToRender, emptyMessage) => {
+    if (tracksToRender.length === 0) {
+      return (
+        <div className="rounded-2xl border border-slate-800 bg-slate-900 p-8 text-center text-slate-300">
+          {emptyMessage}
+        </div>
+      );
+    }
+
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-32">
+        {tracksToRender.map((track) => (
+          <TrackCard
+            key={track.id}
+            track={track}
+            isPurchased={purchases.includes(track.id)}
+            inCart={cartTrackIds.includes(track.id)}
+            onPlay={handlePlayPreview}
+            onBuy={handleBuyTrack}
+            onAddToCart={addToCart}
+            onDownload={handleDownloadTrack}
+          />
+        ))}
+      </div>
+    );
+  };
 
   const buildDownloadName = (track, sourceUrl) => {
     const fallbackExt = 'mp3';
@@ -48,26 +104,22 @@ function AppContent() {
   };
 
   const handlePlayPreview = (track) => {
+    if (!track?.preview_url) {
+      setDownloadError('Preview file is missing for this track.');
+      return;
+    }
+    setDownloadError(null);
     setCurrentTrack(track);
     setIsPlaying(true);
   };
 
   const handleBuyTrack = (track) => {
-    if (track.is_free) {
-      handleDownloadTrack(track);
-      return;
-    }
-    if (!user) {
-      setPendingPurchaseTrack(track);
-      setAuthModal({ isOpen: true, mode: 'login' });
-      return;
-    }
-    setPurchaseModal({ isOpen: true, track });
+    addToCart(track);
   };
 
   const handleCheckout = async () => {
-    if (!purchaseModal.track) return;
-    const checkoutUrl = await checkout(purchaseModal.track.id);
+    if (cartTracks.length === 0) return;
+    const checkoutUrl = await checkoutCart(cartTracks.map((track) => track.id));
     if (checkoutUrl) {
       window.location.assign(checkoutUrl);
     }
@@ -78,22 +130,16 @@ function AppContent() {
     try {
       setDownloadError(null);
       const endpoint = track.is_free
-        ? `/tracks/${track.id}/free-download`
-        : `/tracks/${track.id}/download`;
+        ? `/tracks/${track.id}/free-download-file`
+        : `/tracks/${track.id}/download-file`;
 
       if (!track.is_free && !user) {
         setAuthModal({ isOpen: true, mode: 'login' });
         return;
       }
 
-      const response = await api.get(endpoint);
-      const downloadUrl = response.data?.download_url;
-      if (!downloadUrl) {
-        setDownloadError('Download link not found.');
-        return;
-      }
-      const resolvedUrl = resolveAssetUrl(downloadUrl);
-      const fileResponse = await api.get(resolvedUrl, { responseType: 'blob' });
+      const sourceRef = track.full_file_path || track.preview_url || '';
+      const fileResponse = await api.get(endpoint, { responseType: 'blob' });
       const contentType = (fileResponse.headers && fileResponse.headers['content-type']) || '';
       if (contentType.includes('text/html')) {
         setDownloadError('File not found. Please upload the track again.');
@@ -102,7 +148,7 @@ function AppContent() {
       const blobUrl = window.URL.createObjectURL(fileResponse.data);
       const link = document.createElement('a');
       link.href = blobUrl;
-      link.download = buildDownloadName(track, resolvedUrl);
+      link.download = buildDownloadName(track, sourceRef);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -116,16 +162,19 @@ function AppContent() {
     logout();
     setIsPlaying(false);
     setCurrentTrack(null);
-    setPendingPurchaseTrack(null);
-    setPurchaseModal({ isOpen: false, track: null });
+    setPendingCartTrackId(null);
+    setCartTrackIds([]);
     setDownloadError(null);
     setMenuOpen(false);
   };
 
   const handleAuthSuccess = () => {
-    if (pendingPurchaseTrack) {
-      setPurchaseModal({ isOpen: true, track: pendingPurchaseTrack });
-      setPendingPurchaseTrack(null);
+    if (pendingCartTrackId) {
+      const track = tracks.find((item) => item.id === pendingCartTrackId);
+      if (track && !track.is_free) {
+        setCartTrackIds((prev) => (prev.includes(track.id) ? prev : [...prev, track.id]));
+      }
+      setPendingCartTrackId(null);
     }
   };
 
@@ -133,7 +182,7 @@ function AppContent() {
     <div className="min-h-screen bg-slate-900 text-slate-100">
       {/* Header */}
       <header className="sticky top-0 z-40 bg-slate-800/95 backdrop-blur-sm border-b border-slate-700 shadow-lg">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between gap-4">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <button
               type="button"
@@ -147,16 +196,16 @@ function AppContent() {
               <Music size={28} className="text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
+              <h1 className="text-lg sm:text-2xl font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
                 DJ Bilal Music Store
               </h1>
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4">
             {user ? (
               <>
-                <div className="flex items-center gap-2 text-slate-300">
+                <div className="hidden md:flex items-center gap-2 text-slate-300">
                   <User size={18} className="text-purple-400" />
                   <span>{user.email}</span>
                   {isAdmin && (
@@ -167,27 +216,27 @@ function AppContent() {
                 </div>
                 <button
                   onClick={handleLogout}
-                  className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition-colors duration-200 font-semibold"
+                  className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-3 sm:px-4 py-2 rounded-lg transition-colors duration-200 font-semibold text-sm sm:text-base"
                 >
                   <LogOut size={18} />
-                  Logout
+                  <span className="hidden sm:inline">Logout</span>
                 </button>
               </>
             ) : (
               <>
                 <button
                   onClick={() => setAuthModal({ isOpen: true, mode: 'login' })}
-                  className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg transition-colors duration-200 font-semibold"
+                  className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-white px-3 sm:px-4 py-2 rounded-lg transition-colors duration-200 font-semibold text-sm sm:text-base"
                 >
                   <LogIn size={18} />
-                  Sign In
+                  <span className="hidden sm:inline">Sign In</span>
                 </button>
                 <button
                   onClick={() => setAuthModal({ isOpen: true, mode: 'register' })}
-                  className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors duration-200 font-semibold"
+                  className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-3 sm:px-4 py-2 rounded-lg transition-colors duration-200 font-semibold text-sm sm:text-base"
                 >
                   <UserPlus size={18} />
-                  Sign Up
+                  <span className="hidden sm:inline">Sign Up</span>
                 </button>
               </>
             )}
@@ -196,7 +245,7 @@ function AppContent() {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-6 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         {downloadError && (
           <div className="mb-6 rounded-lg border border-red-500 bg-red-600/20 px-4 py-3 text-sm text-red-200">
             {downloadError}
@@ -204,11 +253,11 @@ function AppContent() {
         )}
 
         {/* Tab Navigation */}
-        <nav className="flex items-center gap-1 mb-8 rounded-2xl border border-slate-800 bg-slate-900 p-1 w-fit">
+        <nav className="mb-6 sm:mb-8 flex max-w-full items-center gap-1 overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900 p-1">
           {[
-            { id: 'store', label: 'Store', icon: <LayoutGrid size={15} /> },
+            { id: 'edits', label: 'Edits', icon: <LayoutGrid size={15} /> },
+            { id: 'remixes', label: 'Remixes', icon: <Music size={15} /> },
             { id: 'free', label: 'Free', icon: <Gift size={15} /> },
-            { id: 'about', label: 'About', icon: <Info size={15} /> },
             ...(user ? [{ id: 'library', label: 'My Library', icon: <Library size={15} /> }] : []),
           ].map((tab) => (
             <button
@@ -221,7 +270,7 @@ function AppContent() {
                 }
                 setActiveTab(tab.id);
               }}
-              className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-all duration-200 ${
+              className={`inline-flex shrink-0 items-center gap-2 rounded-xl px-3 sm:px-4 py-2 text-sm font-semibold transition-all duration-200 ${
                 activeTab === tab.id
                   ? 'bg-purple-600 text-white shadow'
                   : 'text-slate-400 hover:text-white hover:bg-slate-800'
@@ -232,6 +281,59 @@ function AppContent() {
             </button>
           ))}
         </nav>
+
+        {user && (
+          <section className="mb-8 rounded-2xl border border-slate-800 bg-slate-900 p-4">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <p className="inline-flex items-center gap-2 text-sm font-semibold text-purple-300">
+                  <ShoppingCart size={16} />
+                  Cart ({cartTracks.length})
+                </p>
+                <p className="mt-1 text-sm text-slate-400">
+                  Total: ${cartTotal.toFixed(2)}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleCheckout}
+                disabled={checkoutLoading || cartTracks.length === 0}
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
+              >
+                <ShoppingCart size={16} />
+                {checkoutLoading ? 'Redirecting...' : 'Checkout Cart'}
+              </button>
+            </div>
+
+            {checkoutError && (
+              <div className="mt-3 rounded-lg border border-red-600 bg-red-900/20 px-3 py-2 text-sm text-red-300">
+                {checkoutError}
+              </div>
+            )}
+
+            {cartTracks.length > 0 && (
+              <div className="mt-4 space-y-2">
+                {cartTracks.map((track) => (
+                  <div key={track.id} className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm">
+                    <span className="text-slate-200 break-words">
+                      {track.title} • {track.artist}
+                    </span>
+                    <div className="flex items-center justify-between sm:justify-end gap-3">
+                      <span className="font-semibold text-purple-300">${track.price.toFixed(2)}</span>
+                      <button
+                        type="button"
+                        onClick={() => removeFromCart(track.id)}
+                        className="text-xs font-semibold text-slate-300 hover:text-white"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
 
         {loading ? (
           <div className="flex justify-center items-center h-96">
@@ -245,64 +347,55 @@ function AppContent() {
           </div>
         ) : (
           <>
-            {/* Store tab */}
-            {activeTab === 'store' && (
-              <>
-                {isAdmin && (
-                  <section className="mb-8 flex justify-end">
-                    <button
-                      type="button"
-                      onClick={() => setMenuOpen(true)}
-                      className="inline-flex items-center gap-2 rounded-xl bg-purple-600 px-4 py-3 font-semibold text-white hover:bg-purple-700"
-                    >
-                      <ShieldCheck size={16} />
-                      Open Admin Panel
-                    </button>
-                  </section>
-                )}
+            {isAdmin && activeTab !== 'library' && (
+              <section className="mb-8 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setMenuOpen(true)}
+                  className="inline-flex items-center gap-2 rounded-xl bg-purple-600 px-4 py-3 font-semibold text-white hover:bg-purple-700"
+                >
+                  <ShieldCheck size={16} />
+                  Open Admin Panel
+                </button>
+              </section>
+            )}
 
-                {tracks.length === 0 ? (
-                  <div className="rounded-2xl border border-slate-800 bg-slate-900 p-8 text-center text-slate-300">
-                    No tracks yet. New releases are coming soon.
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-32">
-                    {tracks.map(track => (
-                      <TrackCard
-                        key={track.id}
-                        track={track}
-                        isPurchased={purchases.includes(track.id)}
-                        onPlay={handlePlayPreview}
-                        onBuy={handleBuyTrack}
-                        onDownload={handleDownloadTrack}
-                      />
-                    ))}
-                  </div>
-                )}
+            {/* Edits tab */}
+            {activeTab === 'edits' && (
+              <>
+                <div className="mb-6">
+                  <h2 className="text-2xl font-bold text-white">Edits</h2>
+                  <p className="mt-1 text-sm text-slate-400">Original edits and premium versions.</p>
+                </div>
+                {renderTrackGrid(editTracks, 'No edits added yet.')}
               </>
             )}
 
-            {/* Free Downloads tab */}
+            {/* Remixes tab */}
+            {activeTab === 'remixes' && (
+              <>
+                <div className="mb-6">
+                  <h2 className="text-2xl font-bold text-white">Remixes</h2>
+                  <p className="mt-1 text-sm text-slate-400">Remix catalog with instant preview and checkout.</p>
+                </div>
+                {renderTrackGrid(remixTracks, 'No remixes added yet.')}
+              </>
+            )}
+
+            {/* Free tab */}
             {activeTab === 'free' && (
               <section>
                 <div className="mb-6">
                   <p className="mb-1 inline-flex items-center gap-2 rounded-full bg-emerald-600/20 px-3 py-1 text-xs font-semibold text-emerald-300">
                     <Gift size={12} />
-                    Free Download
+                    Free
                   </p>
-                  <h2 className="mt-2 text-2xl font-bold text-white">Explore Free Tracks</h2>
+                  <h2 className="mt-2 text-2xl font-bold text-white">Free Downloads</h2>
                   <p className="text-slate-400 mt-1 text-sm max-w-xl">
-                    Download selected tracks for free, listen instantly, and use them in your projects.
+                    Browse free remix, simple pack, and VST files.
                   </p>
                 </div>
                 <FreeTracksList tracks={tracks} onPlay={handlePlayPreview} />
-              </section>
-            )}
-
-            {/* About tab */}
-            {activeTab === 'about' && (
-              <section className="pb-32">
-                <AboutSection />
               </section>
             )}
 
@@ -326,6 +419,38 @@ function AppContent() {
         )}
       </main>
 
+      <footer className="border-t border-slate-800 bg-slate-900">
+        <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 sm:px-6 py-6 text-sm text-slate-400 md:flex-row md:items-center md:justify-between">
+          <p>© {new Date().getFullYear()} DJ Bilal Music Store</p>
+          <div className="flex flex-wrap items-center gap-4">
+            <a
+              href="/privacy-policy.html"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-white"
+            >
+              Privacy Policy
+            </a>
+            <a
+              href="/terms-of-use.html"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-white"
+            >
+              Terms of Use
+            </a>
+            <a
+              href="/refund-policy.html"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-white"
+            >
+              Refund Policy
+            </a>
+          </div>
+        </div>
+      </footer>
+
       {/* Player */}
       {currentTrack && (
         <div className="fixed bottom-0 left-0 right-0 bg-slate-800 border-t border-slate-700">
@@ -339,14 +464,6 @@ function AppContent() {
         mode={authModal.mode}
         onClose={() => setAuthModal({ ...authModal, isOpen: false })}
         onSuccess={handleAuthSuccess}
-      />
-      <PurchaseModal
-        isOpen={purchaseModal.isOpen}
-        track={purchaseModal.track}
-        onClose={() => setPurchaseModal({ isOpen: false, track: null })}
-        onConfirm={handleCheckout}
-        loading={checkoutLoading}
-        error={checkoutError}
       />
       <AdminDrawer
         isOpen={menuOpen}

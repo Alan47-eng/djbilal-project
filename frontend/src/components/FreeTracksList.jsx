@@ -4,8 +4,35 @@ import api, { resolveAssetUrl } from '../api';
 
 const FreeTracksList = ({ tracks, onPlay }) => {
   const freeTracks = tracks.filter((t) => t.is_free);
+  const [activeCategory, setActiveCategory] = useState('all');
   const [downloading, setDownloading] = useState(null);
   const [error, setError] = useState(null);
+
+  const belongsToCategory = (track, category) => {
+    if (category === 'all') return true;
+    const normalizedCategory = (track.category || '').toLowerCase();
+    if (normalizedCategory) {
+      if (category === 'remix') return normalizedCategory === 'remix';
+      if (category === 'simple-pack') return normalizedCategory === 'simple-pack';
+      if (category === 'vst') return normalizedCategory === 'vst';
+    }
+    const text = `${track.title} ${track.artist}`.toLowerCase();
+
+    if (category === 'remix') return text.includes('remix');
+    if (category === 'simple-pack') {
+      return (
+        text.includes('simple pack') ||
+        text.includes('simple back') ||
+        text.includes('backing') ||
+        text.includes('back track') ||
+        text.includes('backtrack')
+      );
+    }
+    if (category === 'vst') return text.includes('vst');
+    return true;
+  };
+
+  const filteredTracks = freeTracks.filter((track) => belongsToCategory(track, activeCategory));
 
   const buildDownloadName = (track, sourceUrl) => {
     const fallbackExt = 'mp3';
@@ -26,9 +53,8 @@ const FreeTracksList = ({ tracks, onPlay }) => {
     try {
       setDownloading(track.id);
       setError(null);
-      const res = await api.get(`/tracks/${track.id}/free-download`);
-      const resolvedUrl = resolveAssetUrl(res.data.download_url);
-      const fileResponse = await api.get(resolvedUrl, { responseType: 'blob' });
+      const sourceRef = track.full_file_path || track.preview_url || '';
+      const fileResponse = await api.get(`/tracks/${track.id}/free-download-file`, { responseType: 'blob' });
       const contentType = (fileResponse.headers && fileResponse.headers['content-type']) || '';
       if (contentType.includes('text/html')) {
         throw new Error('Received HTML instead of media file');
@@ -36,7 +62,7 @@ const FreeTracksList = ({ tracks, onPlay }) => {
       const blobUrl = window.URL.createObjectURL(fileResponse.data);
       const link = document.createElement('a');
       link.href = blobUrl;
-      link.download = buildDownloadName(track, resolvedUrl);
+      link.download = buildDownloadName(track, sourceRef);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -60,8 +86,30 @@ const FreeTracksList = ({ tracks, onPlay }) => {
   return (
     <div>
       <p className="mb-4 text-sm text-slate-400">
-        Download the tracks below for free — one click, no signup required.
+        Download the files below for free — one click, no signup required.
       </p>
+
+      <div className="mb-5 flex flex-wrap gap-2">
+        {[
+          { id: 'all', label: 'All' },
+          { id: 'remix', label: 'Remix' },
+          { id: 'simple-pack', label: 'Simple Pack' },
+          { id: 'vst', label: 'VST' },
+        ].map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => setActiveCategory(item.id)}
+            className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors ${
+              activeCategory === item.id
+                ? 'bg-emerald-600 text-white'
+                : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+            }`}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
 
       {error && (
         <div className="mb-4 rounded-lg bg-red-600/20 border border-red-500 text-red-300 px-4 py-2 text-sm">
@@ -69,8 +117,13 @@ const FreeTracksList = ({ tracks, onPlay }) => {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {freeTracks.map((track) => (
+      {filteredTracks.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-900 p-8 text-center text-slate-500">
+          No free files in this category yet.
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {filteredTracks.map((track) => (
           <div
             key={track.id}
             className="flex items-center gap-4 rounded-2xl border border-emerald-700/30 bg-gradient-to-r from-slate-800 to-slate-900 p-4 hover:border-emerald-600/60 transition-all duration-200"
@@ -121,8 +174,9 @@ const FreeTracksList = ({ tracks, onPlay }) => {
               </button>
             </div>
           </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

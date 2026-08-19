@@ -21,10 +21,12 @@ class Track(Base):
     price = Column(Float, nullable=False)
     cover_image_url = Column(String(1024), nullable=True)
     checkout_url = Column(String(1024), nullable=True)
+    lemon_variant_id = Column(Integer, nullable=True)
     preview_url = Column(String(1024), nullable=False)
     full_file_path = Column(String(1024), nullable=False)
     is_free = Column(Boolean, default=False, nullable=False)
     free_download_url = Column(String(1024), nullable=True)
+    category = Column(String(50), nullable=False, default="edit")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 

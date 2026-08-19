@@ -90,10 +90,12 @@ class TrackService:
             price=track_data.price,
             cover_image_url=track_data.cover_image_url,
             checkout_url=track_data.checkout_url,
+            lemon_variant_id=track_data.lemon_variant_id,
             preview_url=track_data.preview_url,
             full_file_path=track_data.full_file_path,
             is_free=track_data.is_free,
             free_download_url=track_data.free_download_url,
+            category=track_data.category,
         )
     
     async def get_track(self, session: AsyncSession, track_id: int) -> Track:

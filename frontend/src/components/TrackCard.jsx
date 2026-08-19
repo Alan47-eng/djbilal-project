@@ -48,7 +48,7 @@ function buildCoverArt(track) {
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
 }
 
-const TrackCard = ({ track, onPlay, onBuy, onDownload, isPurchased }) => {
+const TrackCard = ({ track, onPlay, onBuy, onAddToCart, onDownload, isPurchased, inCart = false }) => {
   const isFree = track.is_free === true;
   const canDownloadDirectly = isFree || isPurchased;
 
@@ -73,11 +73,21 @@ const TrackCard = ({ track, onPlay, onBuy, onDownload, isPurchased }) => {
             <Play size={24} fill="currentColor" />
           </button>
           <button
-            onClick={() => (canDownloadDirectly ? onDownload(track) : onBuy(track))}
+            onClick={() => {
+              if (canDownloadDirectly) {
+                onDownload(track);
+                return;
+              }
+              if (onAddToCart) {
+                onAddToCart(track);
+                return;
+              }
+              onBuy(track);
+            }}
             className={`text-white p-4 rounded-full transition-all duration-200 transform hover:scale-110 ${
               canDownloadDirectly ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-blue-600 hover:bg-blue-700'
             }`}
-            title={canDownloadDirectly ? 'Download track' : 'Buy track'}
+            title={canDownloadDirectly ? 'Download track' : 'Add to cart'}
           >
             {canDownloadDirectly ? <Download size={24} /> : <ShoppingCart size={24} />}
           </button>
@@ -136,11 +146,12 @@ const TrackCard = ({ track, onPlay, onBuy, onDownload, isPurchased }) => {
           ) : (
             <button
               type="button"
-              onClick={() => onBuy(track)}
-              className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-purple-600 px-4 py-3 text-sm font-semibold text-white hover:bg-purple-700"
+              onClick={() => (onAddToCart ? onAddToCart(track) : onBuy(track))}
+              disabled={inCart}
+              className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-purple-600 px-4 py-3 text-sm font-semibold text-white hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <ShoppingCart size={16} />
-              Buy
+              {inCart ? 'In Cart' : 'Add to Cart'}
             </button>
           )}
         </div>

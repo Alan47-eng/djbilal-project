@@ -4,7 +4,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, Depends, HTTPException, status, UploadFile, File, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,6 +17,8 @@ from .utils import (
     TRACK_UPLOAD_DIR, PREVIEW_UPLOAD_DIR, COVER_UPLOAD_DIR,
     UPLOAD_ROOT, build_media_url, build_storage_name,
     save_upload_file, build_checkout_url, extract_custom_data,
+    resolve_uploaded_file_path,
+    create_lemonsqueezy_checkout,
     normalize_media_url,
     validate_upload_file, AUDIO_EXTENSIONS, IMAGE_EXTENSIONS,
     MAX_TRACK_UPLOAD_BYTES, MAX_PREVIEW_UPLOAD_BYTES, MAX_COVER_UPLOAD_BYTES,
@@ -86,10 +88,19 @@ async def startup():
                 "ALTER TABLE tracks ADD COLUMN IF NOT EXISTS checkout_url VARCHAR(1024)"
             ))
             await conn.execute(text(
+                "ALTER TABLE tracks ADD COLUMN IF NOT EXISTS lemon_variant_id INTEGER"
+            ))
+            await conn.execute(text(
                 "ALTER TABLE tracks ADD COLUMN IF NOT EXISTS is_free BOOLEAN NOT NULL DEFAULT FALSE"
             ))
             await conn.execute(text(
                 "ALTER TABLE tracks ADD COLUMN IF NOT EXISTS free_download_url VARCHAR(1024)"
+            ))
+            await conn.execute(text(
+                "ALTER TABLE tracks ADD COLUMN IF NOT EXISTS category VARCHAR(50) NOT NULL DEFAULT 'edit'"
+            ))
+            await conn.execute(text(
+                "UPDATE tracks SET category = CASE WHEN is_free THEN 'remix' ELSE 'edit' END WHERE category IS NULL"
             ))
             await conn.execute(text(
                 "ALTER TABLE purchases ADD COLUMN IF NOT EXISTS license_type VARCHAR(100)"
@@ -114,6 +125,7 @@ async def seed_tracks():
                     checkout_url=None,
                     preview_url="https://example.com/previews/midnight-drive.mp3",
                     full_file_path="/music/midnight-drive.mp3",
+                    category="edit",
                 ),
                 Track(
                     title="Sunset Echoes",
@@ -123,6 +135,7 @@ async def seed_tracks():
                     checkout_url=None,
                     preview_url="https://example.com/previews/sunset-echoes.mp3",
                     full_file_path="/music/sunset-echoes.mp3",
+                    category="edit",
                 ),
                 Track(
                     title="City Lights",
@@ -132,6 +145,7 @@ async def seed_tracks():
                     checkout_url=None,
                     preview_url="https://example.com/previews/city-lights.mp3",
                     full_file_path="/music/city-lights.mp3",
+                    category="remix",
                 ),
             ])
             await session.commit()
@@ -228,8 +242,10 @@ async def upload_track(
     request: Request,
     title: str = Form(...),
     artist: str = Form(...),
+    category: str = Form(...),
     price: float | None = Form(None),
     checkout_url: str | None = Form(None),
+    lemon_variant_id: int | None = Form(None),
     is_free: bool = Form(False),
     free_download_url: str | None = Form(None),
     track_file: UploadFile = File(...),
@@ -244,6 +260,11 @@ async def upload_track(
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Price is required for paid tracks",
+        )
+    if not is_free and lemon_variant_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Lemon variant ID is required for paid tracks",
         )
 
     validate_upload_file(track_file, AUDIO_EXTENSIONS, MAX_TRACK_UPLOAD_BYTES, "Track file")
@@ -269,10 +290,12 @@ async def upload_track(
         price=normalized_price,
         cover_image_url=build_media_url(request, "covers", cover_filename) if cover_filename else None,
         checkout_url=checkout_url_value,
+        lemon_variant_id=None if is_free else lemon_variant_id,
         preview_url=build_media_url(request, "previews", preview_filename),
         full_file_path=track_full_url,
         is_free=is_free,
         free_download_url=free_download_url.strip() if free_download_url else (track_full_url if is_free else None),
+        category=category.strip().lower(),
     )
     return await track_service.create_track(session, track_data)
 
@@ -287,9 +310,11 @@ async def list_tracks(session: AsyncSession = Depends(get_session)):
             "price": track.price,
             "cover_image_url": normalize_media_url(track.cover_image_url),
             "checkout_url": track.checkout_url,
+            "lemon_variant_id": track.lemon_variant_id,
             "preview_url": normalize_media_url(track.preview_url),
             "is_free": track.is_free,
             "free_download_url": normalize_media_url(track.free_download_url),
+            "category": track.category,
             "created_at": track.created_at,
         }
         for track in tracks
@@ -305,9 +330,11 @@ async def get_track(track_id: int, session: AsyncSession = Depends(get_session))
         "price": track.price,
         "cover_image_url": normalize_media_url(track.cover_image_url),
         "checkout_url": track.checkout_url,
+        "lemon_variant_id": track.lemon_variant_id,
         "preview_url": normalize_media_url(track.preview_url),
         "is_free": track.is_free,
         "free_download_url": normalize_media_url(track.free_download_url),
+        "category": track.category,
         "created_at": track.created_at,
     }
 
@@ -330,6 +357,25 @@ async def free_download_track(
     }
 
 
+@app.get("/tracks/{track_id}/free-download-file")
+async def free_download_track_file(
+    track_id: int,
+    session: AsyncSession = Depends(get_session),
+):
+    track = await track_service.get_track(session, track_id)
+    if not track.is_free:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This track is not available for free download",
+        )
+    file_path = resolve_uploaded_file_path(track.full_file_path, "tracks")
+    return FileResponse(
+        path=file_path,
+        filename=file_path.name,
+        media_type="application/octet-stream",
+    )
+
+
 @app.post("/tracks/{track_id}/checkout")
 async def create_checkout(
     track_id: int,
@@ -344,23 +390,89 @@ async def create_checkout(
             detail="This track is free to download",
         )
 
-    if not track.checkout_url:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Checkout URL not configured for this track",
+    if track.lemon_variant_id:
+        checkout_url = await create_lemonsqueezy_checkout(
+            variant_quantities=[{"variant_id": track.lemon_variant_id, "quantity": 1}],
+            custom_data={
+                "track_id": str(track.id),
+                "track_ids": str(track.id),
+                "user_id": str(current_user.id),
+            },
+            email=current_user.email,
+        )
+    else:
+        if not track.checkout_url:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Checkout URL not configured for this track",
+            )
+        checkout_url = build_checkout_url(
+            track.checkout_url,
+            {
+                "track_id": str(track.id),
+                "user_id": str(current_user.id),
+            },
+            email=current_user.email,
         )
 
-    checkout_url = build_checkout_url(
-        track.checkout_url,
-        {
-            "track_id": str(track.id),
+    return {
+        "track_id": track.id,
+        "checkout_url": checkout_url,
+    }
+
+
+@app.post("/checkout/cart")
+async def create_cart_checkout(
+    payload: schemas.CartCheckoutRequest,
+    current_user: User = Depends(auth.get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    tracks_result = await session.execute(
+        select(Track).where(Track.id.in_(payload.track_ids))
+    )
+    tracks_by_id = {track.id: track for track in tracks_result.scalars().all()}
+    missing_ids = [track_id for track_id in payload.track_ids if track_id not in tracks_by_id]
+    if missing_ids:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Tracks not found: {', '.join(str(track_id) for track_id in missing_ids)}",
+        )
+
+    selected_tracks = [tracks_by_id[track_id] for track_id in payload.track_ids]
+    paid_tracks = [track for track in selected_tracks if not track.is_free]
+    if not paid_tracks:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cart must include at least one paid track",
+        )
+
+    missing_variant = [track.title for track in paid_tracks if not track.lemon_variant_id]
+    if missing_variant:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Missing Lemon variant ID for: {', '.join(missing_variant)}",
+        )
+
+    variant_ids = [int(track.lemon_variant_id) for track in paid_tracks]
+    if len(set(variant_ids)) != len(variant_ids):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Each track must have a unique Lemon variant ID for cart checkout",
+        )
+
+    variant_quantities = [{"variant_id": variant_id, "quantity": 1} for variant_id in variant_ids]
+    cart_track_ids = [track.id for track in paid_tracks]
+    checkout_url = await create_lemonsqueezy_checkout(
+        variant_quantities=variant_quantities,
+        custom_data={
+            "track_ids": ",".join(str(track_id) for track_id in cart_track_ids),
             "user_id": str(current_user.id),
         },
         email=current_user.email,
     )
 
     return {
-        "track_id": track.id,
+        "track_ids": cart_track_ids,
         "checkout_url": checkout_url,
     }
 
@@ -392,17 +504,37 @@ async def lemonsqueezy_webhook(request: Request, session: AsyncSession = Depends
 
     custom_data = extract_custom_data(payload)
     track_id = custom_data.get("track_id")
+    track_ids = custom_data.get("track_ids")
     user_id = custom_data.get("user_id")
     license_type = custom_data.get("license_type")
 
-    if not track_id or not user_id:
+    if not user_id or (not track_id and not track_ids):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Missing custom data",
         )
 
-    purchase = await purchase_service.record_purchase(session, int(user_id), int(track_id), license_type)
-    return {"status": "ok", "purchase_id": purchase.id}
+    resolved_track_ids: list[int] = []
+    if track_ids:
+        for raw_id in track_ids.split(","):
+            value = raw_id.strip()
+            if not value:
+                continue
+            resolved_track_ids.append(int(value))
+    elif track_id:
+        resolved_track_ids.append(int(track_id))
+
+    if not resolved_track_ids:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No valid track IDs in custom data",
+        )
+
+    purchase_ids: list[int] = []
+    for resolved_track_id in resolved_track_ids:
+        purchase = await purchase_service.record_purchase(session, int(user_id), resolved_track_id, license_type)
+        purchase_ids.append(purchase.id)
+    return {"status": "ok", "purchase_ids": purchase_ids}
 
 @app.get("/tracks/{track_id}/download", response_model=schemas.DownloadResponse)
 async def download_track(
@@ -423,3 +555,25 @@ async def download_track(
         "full_file_path": normalize_media_url(track.full_file_path),
         "download_url": normalize_media_url(track.full_file_path),
     }
+
+
+@app.get("/tracks/{track_id}/download-file")
+async def download_track_file(
+    track_id: int,
+    current_user: User = Depends(auth.get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    track = await track_service.get_track(session, track_id)
+
+    if not await purchase_service.can_download(session, current_user.id, track_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You must purchase this track before downloading it",
+        )
+
+    file_path = resolve_uploaded_file_path(track.full_file_path, "tracks")
+    return FileResponse(
+        path=file_path,
+        filename=file_path.name,
+        media_type="application/octet-stream",
+    )
