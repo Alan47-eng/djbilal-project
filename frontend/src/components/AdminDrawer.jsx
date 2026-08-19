@@ -288,9 +288,19 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
                     className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
                     required
                   />
+                  <label className="flex cursor-pointer select-none items-center gap-3 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2">
+                    <input
+                      type="checkbox"
+                      checked={form.is_free}
+                      onChange={handleChange('is_free')}
+                      className="h-4 w-4 accent-emerald-500"
+                    />
+                    <span className="text-sm text-slate-300">Free downloadable track (FREE)</span>
+                  </label>
                   <label className="block text-sm text-slate-300">
                     Category
                     <select
+                      key={form.is_free ? 'free-category' : 'paid-category'}
                       value={form.category}
                       onChange={handleChange('category')}
                       className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
@@ -310,6 +320,11 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
                       )}
                     </select>
                   </label>
+                  <p className={`text-xs ${form.is_free ? 'text-emerald-300' : 'text-slate-400'}`}>
+                    {form.is_free
+                      ? 'Free seciliyken kategori: Remix, Simple Pack veya VST.'
+                      : 'Paid seciliyken kategori: Edit veya Remix.'}
+                  </p>
                   <input
                     type="number"
                     step="0.01"
@@ -344,16 +359,6 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
                       </p>
                     </>
                   )}
-
-                  <label className="flex cursor-pointer select-none items-center gap-3 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2">
-                    <input
-                      type="checkbox"
-                      checked={form.is_free}
-                      onChange={handleChange('is_free')}
-                      className="h-4 w-4 accent-emerald-500"
-                    />
-                    <span className="text-sm text-slate-300">Free downloadable track (FREE)</span>
-                  </label>
 
                   {form.is_free && (
                     <p className="text-xs text-emerald-300">
