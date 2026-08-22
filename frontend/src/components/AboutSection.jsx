@@ -1,5 +1,6 @@
 import React from 'react';
 import { Music2, ExternalLink } from 'lucide-react';
+import { useLanguage } from '../context/LanguageContext';
 
 const SOCIAL_LINKS = [
   {
@@ -45,6 +46,25 @@ const SOCIAL_LINKS = [
 ];
 
 const AboutSection = () => {
+  const { lang } = useLanguage();
+  const t = {
+    role: lang === 'ar' ? 'منتج · ميكس وماستر · صانع إيقاعات' : 'Producer · Mixing & Mastering · Beat Maker',
+    tagline: lang === 'ar'
+      ? '🎚️ تراكات مرخصة · حلول مخصصة للميكس والماستر · إيقاعات خالية من حقوق الملكية'
+      : '🎚️ Licensed instrumentals · Custom mixing/mastering solutions · Royalty-free beats',
+    bio: lang === 'ar'
+      ? 'مرحباً! أنا DJ Bilal، منتج موسيقي بخبرة سنوات في العروض الحية والاستوديو. أقدم إيقاعات وتوزيعات احترافية بأنماط متعددة مع ميكس وماستر عالي الجودة.'
+      : 'Hi! I am DJ Bilal — a production artist with years of experience across live stages and studio sessions. I create professional beats and instrumentals across a wide range of styles, from electronic music to hip-hop. Every track is carefully mixed and mastered to deliver top-level quality. Whether you want a ready-to-use beat or a custom offer for your project, you are in the right place.',
+    howWorks: lang === 'ar' ? 'طريقة الشراء' : 'How purchase works',
+    howWorksDesc: lang === 'ar'
+      ? 'اختر التراك، أكمل الدفع عبر Lemon Squeezy، ثم نزّل الملف المرخّص مباشرة.'
+      : 'Choose a track, complete payment via Lemon Squeezy, and instantly download your licensed audio file.',
+    contact: lang === 'ar' ? 'التواصل' : 'Contact',
+    years: lang === 'ar' ? 'سنوات الخبرة' : 'Years of Experience',
+    released: lang === 'ar' ? 'إصدارات الإيقاعات' : 'Released Beats',
+    clients: lang === 'ar' ? 'عملاء سعداء' : 'Happy Clients',
+    follow: lang === 'ar' ? 'تابعني' : 'Follow Me',
+  };
   return (
     <section className="max-w-4xl mx-auto">
       <div className="rounded-3xl border border-slate-700 bg-gradient-to-br from-slate-800 to-slate-900 overflow-hidden shadow-2xl">
@@ -63,32 +83,29 @@ const AboutSection = () => {
             </div>
             <div className="pb-1 sm:pb-2">
               <h2 className="text-2xl sm:text-3xl font-extrabold text-white">DJ Bilal</h2>
-              <p className="text-purple-400 font-medium text-sm">Producer · Mixing & Mastering · Beat Maker</p>
+              <p className="text-purple-400 font-medium text-sm">{t.role}</p>
             </div>
           </div>
 
           {/* Tagline */}
           <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-purple-500/40 bg-purple-600/10 px-3 sm:px-4 py-2 text-xs sm:text-sm font-semibold text-purple-300">
-            🎚️ Licensed instrumentals · Custom mixing/mastering solutions · Royalty-free beats
+            {t.tagline}
           </div>
 
           {/* Bio */}
           <p className="text-slate-300 leading-relaxed text-base mb-8 max-w-2xl">
-            Hi! I am DJ Bilal — a production artist with years of experience across live stages and studio sessions.
-            I create professional beats and instrumentals across a wide range of styles, from electronic music to hip-hop.
-            Every track is carefully mixed and mastered to deliver top-level quality.
-            Whether you want a ready-to-use beat or a custom offer for your project, you are in the right place.
+            {t.bio}
           </p>
 
           <div className="mb-8 grid gap-4 md:grid-cols-2">
             <div className="rounded-xl border border-slate-700 bg-slate-800 p-4">
-              <h3 className="text-sm font-bold uppercase tracking-wide text-slate-200">How purchase works</h3>
+              <h3 className="text-sm font-bold uppercase tracking-wide text-slate-200">{t.howWorks}</h3>
               <p className="mt-2 text-sm text-slate-300">
-                Choose a track, complete payment via Lemon Squeezy, and instantly download your licensed audio file.
+                {t.howWorksDesc}
               </p>
             </div>
             <div className="rounded-xl border border-slate-700 bg-slate-800 p-4">
-              <h3 className="text-sm font-bold uppercase tracking-wide text-slate-200">Contact</h3>
+              <h3 className="text-sm font-bold uppercase tracking-wide text-slate-200">{t.contact}</h3>
               <p className="mt-2 text-sm text-slate-300">
                 Support e-mail: <strong>[E-POSTA-ADRESI-EKLENECEK]</strong>
               </p>
@@ -98,9 +115,9 @@ const AboutSection = () => {
           {/* Stats */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
             {[
-              { label: 'Years of Experience', value: '10+' },
-              { label: 'Released Beats', value: '200+' },
-              { label: 'Happy Clients', value: '500+' },
+              { label: t.years, value: '10+' },
+              { label: t.released, value: '200+' },
+              { label: t.clients, value: '500+' },
             ].map((stat) => (
               <div key={stat.label} className="rounded-xl bg-slate-800 p-4 text-center border border-slate-700">
                 <div className="text-2xl font-extrabold text-purple-400">{stat.value}</div>
@@ -111,7 +128,7 @@ const AboutSection = () => {
 
           {/* Social links */}
           <div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-3">Follow Me</p>
+            <p className="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-3">{t.follow}</p>
             <div className="flex items-center gap-4 flex-wrap">
               {SOCIAL_LINKS.map((link) => (
                 <a

@@ -2,14 +2,27 @@ import React, { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import api from '../api';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 
 const AuthModal = ({ isOpen, initialMode = 'login', onClose, onSuccess }) => {
+  const { lang } = useLanguage();
   const { refreshUser } = useAuth();
   const [activeTab, setActiveTab] = useState(initialMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const t = {
+    signIn: lang === 'ar' ? 'تسجيل الدخول' : 'Sign In',
+    signUp: lang === 'ar' ? 'إنشاء حساب' : 'Sign Up',
+    login: lang === 'ar' ? 'دخول' : 'Login',
+    register: lang === 'ar' ? 'تسجيل' : 'Register',
+    email: lang === 'ar' ? 'البريد الإلكتروني' : 'Email',
+    password: lang === 'ar' ? 'كلمة المرور' : 'Password',
+    authFailed: lang === 'ar' ? 'فشل التحقق. حاول مرة أخرى.' : 'Authentication failed. Please try again.',
+    wait: lang === 'ar' ? 'يرجى الانتظار...' : 'Please wait...',
+    createAccount: lang === 'ar' ? 'إنشاء حساب' : 'Create Account',
+  };
 
   useEffect(() => {
     if (!isOpen) return;
@@ -48,7 +61,7 @@ const AuthModal = ({ isOpen, initialMode = 'login', onClose, onSuccess }) => {
     } catch (err) {
       setError(
         err.response?.data?.detail ||
-        'Authentication failed. Please try again.'
+        t.authFailed
       );
     } finally {
       setLoading(false);
@@ -66,7 +79,7 @@ const AuthModal = ({ isOpen, initialMode = 'login', onClose, onSuccess }) => {
       >
         <div className="mb-6 flex items-center justify-between">
           <h3 className="text-2xl font-bold text-white">
-            {activeTab === 'login' ? 'Sign In' : 'Sign Up'}
+            {activeTab === 'login' ? t.signIn : t.signUp}
           </h3>
           <button
             type="button"
@@ -87,7 +100,7 @@ const AuthModal = ({ isOpen, initialMode = 'login', onClose, onSuccess }) => {
                 : 'text-slate-300 hover:text-white'
             }`}
           >
-            Login
+            {t.login}
           </button>
           <button
             type="button"
@@ -98,7 +111,7 @@ const AuthModal = ({ isOpen, initialMode = 'login', onClose, onSuccess }) => {
                 : 'text-slate-300 hover:text-white'
             }`}
           >
-            Register
+            {t.register}
           </button>
         </div>
 
@@ -107,7 +120,7 @@ const AuthModal = ({ isOpen, initialMode = 'login', onClose, onSuccess }) => {
             type="email"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
-            placeholder="Email"
+            placeholder={t.email}
             className="w-full rounded-lg border border-slate-700 bg-slate-950 px-4 py-3 text-white placeholder-slate-500"
             required
           />
@@ -115,7 +128,7 @@ const AuthModal = ({ isOpen, initialMode = 'login', onClose, onSuccess }) => {
             type="password"
             value={password}
             onChange={(event) => setPassword(event.target.value)}
-            placeholder="Password"
+            placeholder={t.password}
             className="w-full rounded-lg border border-slate-700 bg-slate-950 px-4 py-3 text-white placeholder-slate-500"
             required
           />
@@ -132,10 +145,10 @@ const AuthModal = ({ isOpen, initialMode = 'login', onClose, onSuccess }) => {
             className="w-full rounded-lg bg-purple-600 px-4 py-3 font-semibold text-white hover:bg-purple-700 disabled:opacity-60"
           >
             {loading
-              ? 'Please wait...'
+              ? t.wait
               : activeTab === 'login'
-                ? 'Sign In'
-                : 'Create Account'}
+                ? t.signIn
+                : t.createAccount}
           </button>
         </form>
       </div>

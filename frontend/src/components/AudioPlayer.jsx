@@ -1,14 +1,21 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Play, Pause, Volume2, VolumeX } from 'lucide-react';
 import { resolveAssetUrl } from '../api';
+import { useLanguage } from '../context/LanguageContext';
 
 const AudioPlayer = ({ track, isPlaying, onPlayPause }) => {
+  const { lang } = useLanguage();
   const audioRef = useRef(null);
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [volume, setVolume] = useState(0.7);
   const [isMuted, setIsMuted] = useState(false);
   const [playbackError, setPlaybackError] = useState(null);
+  const t = {
+    playbackError: lang === 'ar' ? 'تعذر تشغيل المعاينة. حاول مرة أخرى.' : 'Preview could not be played. Please try again.',
+    loadError: lang === 'ar' ? 'تعذر تحميل ملف المعاينة.' : 'Preview file could not be loaded.',
+    selectTrack: lang === 'ar' ? 'اختر تراكًا للمعاينة' : 'Select a track to preview',
+  };
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -41,7 +48,7 @@ const AudioPlayer = ({ track, isPlaying, onPlayPause }) => {
 
     if (isPlaying) {
       audio.play().catch(() => {
-        setPlaybackError('Preview could not be played. Please try again.');
+        setPlaybackError(t.playbackError);
         onPlayPause(false);
       });
     } else {
@@ -74,7 +81,7 @@ const AudioPlayer = ({ track, isPlaying, onPlayPause }) => {
   if (!track) {
     return (
       <div className="fixed bottom-0 left-0 right-0 bg-slate-800 border-t border-slate-700 p-4 text-center text-slate-400">
-        Select a track to preview
+        {t.selectTrack}
       </div>
     );
   }
@@ -163,12 +170,12 @@ const AudioPlayer = ({ track, isPlaying, onPlayPause }) => {
         onCanPlay={() => {
           if (!isPlaying || !audioRef.current) return;
           audioRef.current.play().catch(() => {
-            setPlaybackError('Preview could not be played. Please try again.');
+            setPlaybackError(t.playbackError);
             onPlayPause(false);
           });
         }}
         onError={() => {
-          setPlaybackError('Preview file could not be loaded.');
+          setPlaybackError(t.loadError);
           onPlayPause(false);
         }}
         onEnded={() => onPlayPause(false)}

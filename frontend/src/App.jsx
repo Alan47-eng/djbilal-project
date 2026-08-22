@@ -1,19 +1,22 @@
 import React, { useState } from 'react';
-import { LogOut, LogIn, UserPlus, Music, User, Menu, LayoutGrid, ShieldCheck, Gift, Library, ShoppingCart } from 'lucide-react';
+import { LogOut, LogIn, UserPlus, Music, User, Menu, LayoutGrid, ShieldCheck, Gift, Library, ShoppingCart, Info } from 'lucide-react';
 import api from './api';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { TrackProvider, useTracks } from './context/TrackContext';
 import { PurchaseProvider, usePurchases } from './context/PurchaseContext';
+import { LanguageProvider, useLanguage } from './context/LanguageContext';
 import { useCheckout } from './hooks/useTrackOperations';
 import TrackCard from './components/TrackCard';
 import AudioPlayer from './components/AudioPlayer';
 import AuthModal from './components/AuthModal';
 import AdminDrawer from './components/AdminDrawer';
+import AboutSection from './components/AboutSection';
 import FreeTracksList from './components/FreeTracksList';
 import UserPurchases from './components/UserPurchases';
 import './index.css';
 
 function AppContent() {
+  const { lang, setLang, isRTL } = useLanguage();
   const { user, logout, loading: authLoading } = useAuth();
   const { tracks, loading: tracksLoading, error: tracksError } = useTracks();
   const { purchases } = usePurchases();
@@ -25,7 +28,41 @@ function AppContent() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('edits'); // 'edits' | 'remixes' | 'free' | 'library'
   const [cartTrackIds, setCartTrackIds] = useState([]);
+  const [cartOpen, setCartOpen] = useState(false);
   const [downloadError, setDownloadError] = useState(null);
+  const t = {
+    edits: lang === 'ar' ? 'تعديلات' : 'Edits',
+    remixes: lang === 'ar' ? 'ريمكسات' : 'Remixes',
+    free: lang === 'ar' ? 'مجاني' : 'Free',
+    myLibrary: lang === 'ar' ? 'مكتبتي' : 'My Library',
+    signIn: lang === 'ar' ? 'تسجيل الدخول' : 'Sign In',
+    signUp: lang === 'ar' ? 'إنشاء حساب' : 'Sign Up',
+    logout: lang === 'ar' ? 'تسجيل الخروج' : 'Logout',
+    cart: lang === 'ar' ? 'السلة' : 'Cart',
+    total: lang === 'ar' ? 'المجموع' : 'Total',
+    checkoutCart: lang === 'ar' ? 'الدفع من السلة' : 'Checkout Cart',
+    redirecting: lang === 'ar' ? 'جاري التحويل...' : 'Redirecting...',
+    remove: lang === 'ar' ? 'حذف' : 'Remove',
+    openAdmin: lang === 'ar' ? 'فتح لوحة الإدارة' : 'Open Admin Panel',
+    editsDesc: lang === 'ar' ? 'تعديلات أصلية ونسخ مميزة.' : 'Original edits and premium versions.',
+    remixesDesc: lang === 'ar' ? 'قائمة الريمكسات مع المعاينة الفورية والدفع.' : 'Remix catalog with instant preview and checkout.',
+    noEdits: lang === 'ar' ? 'لا توجد تعديلات بعد.' : 'No edits added yet.',
+    noRemixes: lang === 'ar' ? 'لا توجد ريمكسات بعد.' : 'No remixes added yet.',
+    aboutMe: lang === 'ar' ? 'من أنا' : 'About Me',
+    home: lang === 'ar' ? 'الرئيسية' : 'Home',
+    freeDownloads: lang === 'ar' ? 'تنزيلات مجانية' : 'Free Downloads',
+    freeDesc: lang === 'ar' ? 'تصفح ملفات الريمكس والحزم البسيطة وملفات VST المجانية.' : 'Browse free remix, simple pack, and VST files.',
+    myPurchases: lang === 'ar' ? 'مشترياتي' : 'My Purchases',
+    myPurchasesDesc: lang === 'ar' ? 'أعد تنزيل كل التراكات المشتراة في أي وقت.' : 'Re-download all licensed tracks you have purchased anytime from here.',
+    previewMissing: lang === 'ar' ? 'ملف المعاينة غير متوفر لهذا التراك.' : 'Preview file is missing for this track.',
+    fileMissing: lang === 'ar' ? 'الملف غير موجود. يرجى إعادة رفع التراك.' : 'File not found. Please upload the track again.',
+    downloadFailed: lang === 'ar' ? 'فشل التنزيل.' : 'Download failed.',
+    privacy: lang === 'ar' ? 'سياسة الخصوصية' : 'Privacy Policy',
+    terms: lang === 'ar' ? 'شروط الاستخدام' : 'Terms of Use',
+    refund: lang === 'ar' ? 'سياسة الاسترجاع' : 'Refund Policy',
+    cartEmpty: lang === 'ar' ? 'السلة فارغة حالياً.' : 'Your cart is empty right now.',
+    close: lang === 'ar' ? 'إغلاق' : 'Close',
+  };
 
   const isAdmin = user?.is_admin === true;
   const loading = authLoading || tracksLoading;
@@ -105,7 +142,7 @@ function AppContent() {
 
   const handlePlayPreview = (track) => {
     if (!track?.preview_url) {
-      setDownloadError('Preview file is missing for this track.');
+      setDownloadError(t.previewMissing);
       return;
     }
     setDownloadError(null);
@@ -142,7 +179,7 @@ function AppContent() {
       const fileResponse = await api.get(endpoint, { responseType: 'blob' });
       const contentType = (fileResponse.headers && fileResponse.headers['content-type']) || '';
       if (contentType.includes('text/html')) {
-        setDownloadError('File not found. Please upload the track again.');
+        setDownloadError(t.fileMissing);
         return;
       }
       const blobUrl = window.URL.createObjectURL(fileResponse.data);
@@ -154,7 +191,7 @@ function AppContent() {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(blobUrl);
     } catch (err) {
-      setDownloadError(err.response?.data?.detail || 'Download failed.');
+      setDownloadError(err.response?.data?.detail || t.downloadFailed);
     }
   };
 
@@ -164,6 +201,7 @@ function AppContent() {
     setCurrentTrack(null);
     setPendingCartTrackId(null);
     setCartTrackIds([]);
+    setCartOpen(false);
     setDownloadError(null);
     setMenuOpen(false);
   };
@@ -179,7 +217,7 @@ function AppContent() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100">
+    <div className={`min-h-screen bg-slate-900 text-slate-100 ${isRTL ? 'text-right' : ''}`}>
       {/* Header */}
       <header className="sticky top-0 z-40 bg-slate-800/95 backdrop-blur-sm border-b border-slate-700 shadow-lg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-3">
@@ -195,14 +233,37 @@ function AppContent() {
             <div className="bg-gradient-to-br from-purple-600 to-blue-600 p-2 rounded-lg">
               <Music size={28} className="text-white" />
             </div>
-            <div>
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('edits');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className="text-left"
+            >
               <h1 className="text-lg sm:text-2xl font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
                 DJ Bilal Music Store
               </h1>
-            </div>
+            </button>
           </div>
 
           <div className="flex items-center gap-2 sm:gap-4">
+            <div className="flex items-center rounded-lg border border-slate-700 bg-slate-900/80 p-1 text-xs">
+              <button
+                type="button"
+                onClick={() => setLang('en')}
+                className={`rounded px-2 py-1 font-semibold ${lang === 'en' ? 'bg-purple-600 text-white' : 'text-slate-300'}`}
+              >
+                EN
+              </button>
+              <button
+                type="button"
+                onClick={() => setLang('ar')}
+                className={`rounded px-2 py-1 font-semibold ${lang === 'ar' ? 'bg-purple-600 text-white' : 'text-slate-300'}`}
+              >
+                AR
+              </button>
+            </div>
             {user ? (
               <>
                 <div className="hidden md:flex items-center gap-2 text-slate-300">
@@ -219,7 +280,7 @@ function AppContent() {
                   className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-3 sm:px-4 py-2 rounded-lg transition-colors duration-200 font-semibold text-sm sm:text-base"
                 >
                   <LogOut size={18} />
-                  <span className="hidden sm:inline">Logout</span>
+                  <span className="hidden sm:inline">{t.logout}</span>
                 </button>
               </>
             ) : (
@@ -229,14 +290,14 @@ function AppContent() {
                   className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-white px-3 sm:px-4 py-2 rounded-lg transition-colors duration-200 font-semibold text-sm sm:text-base"
                 >
                   <LogIn size={18} />
-                  <span className="hidden sm:inline">Sign In</span>
+                  <span className="hidden sm:inline">{t.signIn}</span>
                 </button>
                 <button
                   onClick={() => setAuthModal({ isOpen: true, mode: 'register' })}
                   className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-3 sm:px-4 py-2 rounded-lg transition-colors duration-200 font-semibold text-sm sm:text-base"
                 >
                   <UserPlus size={18} />
-                  <span className="hidden sm:inline">Sign Up</span>
+                  <span className="hidden sm:inline">{t.signUp}</span>
                 </button>
               </>
             )}
@@ -252,13 +313,56 @@ function AppContent() {
           </div>
         )}
 
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab('edits');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold ${
+              activeTab === 'edits' || activeTab === 'remixes' || activeTab === 'free'
+                ? 'border-slate-700 bg-slate-900 text-slate-200'
+                : 'border-slate-700 bg-slate-900 text-slate-400'
+            }`}
+          >
+            <LayoutGrid size={15} />
+            {t.home}
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('about')}
+            className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold ${
+              activeTab === 'about'
+                ? 'border-purple-500 bg-purple-600/20 text-purple-200'
+                : 'border-slate-700 bg-slate-900 text-slate-300 hover:bg-slate-800'
+            }`}
+          >
+            <Info size={15} />
+            {t.aboutMe}
+          </button>
+          {user && (
+            <button
+              type="button"
+              onClick={() => setActiveTab('library')}
+              className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold ${
+                activeTab === 'library'
+                  ? 'border-purple-500 bg-purple-600/20 text-purple-200'
+                  : 'border-slate-700 bg-slate-900 text-slate-300 hover:bg-slate-800'
+              }`}
+            >
+              <Library size={15} />
+              {t.myLibrary}
+            </button>
+          )}
+        </div>
+
         {/* Tab Navigation */}
         <nav className="mb-6 sm:mb-8 flex max-w-full items-center gap-1 overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900 p-1">
           {[
-            { id: 'edits', label: 'Edits', icon: <LayoutGrid size={15} /> },
-            { id: 'remixes', label: 'Remixes', icon: <Music size={15} /> },
-            { id: 'free', label: 'Free', icon: <Gift size={15} /> },
-            ...(user ? [{ id: 'library', label: 'My Library', icon: <Library size={15} /> }] : []),
+            { id: 'edits', label: t.edits, icon: <LayoutGrid size={15} /> },
+            { id: 'remixes', label: t.remixes, icon: <Music size={15} /> },
+            { id: 'free', label: t.free, icon: <Gift size={15} /> },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -282,59 +386,6 @@ function AppContent() {
           ))}
         </nav>
 
-        {user && (
-          <section className="mb-8 rounded-2xl border border-slate-800 bg-slate-900 p-4">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-              <div>
-                <p className="inline-flex items-center gap-2 text-sm font-semibold text-purple-300">
-                  <ShoppingCart size={16} />
-                  Cart ({cartTracks.length})
-                </p>
-                <p className="mt-1 text-sm text-slate-400">
-                  Total: ${cartTotal.toFixed(2)}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={handleCheckout}
-                disabled={checkoutLoading || cartTracks.length === 0}
-                className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
-              >
-                <ShoppingCart size={16} />
-                {checkoutLoading ? 'Redirecting...' : 'Checkout Cart'}
-              </button>
-            </div>
-
-            {checkoutError && (
-              <div className="mt-3 rounded-lg border border-red-600 bg-red-900/20 px-3 py-2 text-sm text-red-300">
-                {checkoutError}
-              </div>
-            )}
-
-            {cartTracks.length > 0 && (
-              <div className="mt-4 space-y-2">
-                {cartTracks.map((track) => (
-                  <div key={track.id} className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm">
-                    <span className="text-slate-200 break-words">
-                      {track.title} • {track.artist}
-                    </span>
-                    <div className="flex items-center justify-between sm:justify-end gap-3">
-                      <span className="font-semibold text-purple-300">${track.price.toFixed(2)}</span>
-                      <button
-                        type="button"
-                        onClick={() => removeFromCart(track.id)}
-                        className="text-xs font-semibold text-slate-300 hover:text-white"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-        )}
-
         {loading ? (
           <div className="flex justify-center items-center h-96">
             <div className="animate-spin">
@@ -347,7 +398,7 @@ function AppContent() {
           </div>
         ) : (
           <>
-            {isAdmin && activeTab !== 'library' && (
+            {isAdmin && activeTab !== 'library' && activeTab !== 'about' && (
               <section className="mb-8 flex justify-end">
                 <button
                   type="button"
@@ -355,7 +406,7 @@ function AppContent() {
                   className="inline-flex items-center gap-2 rounded-xl bg-purple-600 px-4 py-3 font-semibold text-white hover:bg-purple-700"
                 >
                   <ShieldCheck size={16} />
-                  Open Admin Panel
+                  {t.openAdmin}
                 </button>
               </section>
             )}
@@ -364,10 +415,10 @@ function AppContent() {
             {activeTab === 'edits' && (
               <>
                 <div className="mb-6">
-                  <h2 className="text-2xl font-bold text-white">Edits</h2>
-                  <p className="mt-1 text-sm text-slate-400">Original edits and premium versions.</p>
+                  <h2 className="text-2xl font-bold text-white">{t.edits}</h2>
+                  <p className="mt-1 text-sm text-slate-400">{t.editsDesc}</p>
                 </div>
-                {renderTrackGrid(editTracks, 'No edits added yet.')}
+                {renderTrackGrid(editTracks, t.noEdits)}
               </>
             )}
 
@@ -375,10 +426,10 @@ function AppContent() {
             {activeTab === 'remixes' && (
               <>
                 <div className="mb-6">
-                  <h2 className="text-2xl font-bold text-white">Remixes</h2>
-                  <p className="mt-1 text-sm text-slate-400">Remix catalog with instant preview and checkout.</p>
+                  <h2 className="text-2xl font-bold text-white">{t.remixes}</h2>
+                  <p className="mt-1 text-sm text-slate-400">{t.remixesDesc}</p>
                 </div>
-                {renderTrackGrid(remixTracks, 'No remixes added yet.')}
+                {renderTrackGrid(remixTracks, t.noRemixes)}
               </>
             )}
 
@@ -388,14 +439,21 @@ function AppContent() {
                 <div className="mb-6">
                   <p className="mb-1 inline-flex items-center gap-2 rounded-full bg-emerald-600/20 px-3 py-1 text-xs font-semibold text-emerald-300">
                     <Gift size={12} />
-                    Free
+                    {t.free}
                   </p>
-                  <h2 className="mt-2 text-2xl font-bold text-white">Free Downloads</h2>
+                  <h2 className="mt-2 text-2xl font-bold text-white">{t.freeDownloads}</h2>
                   <p className="text-slate-400 mt-1 text-sm max-w-xl">
-                    Browse free remix, simple pack, and VST files.
+                    {t.freeDesc}
                   </p>
                 </div>
                 <FreeTracksList tracks={tracks} onPlay={handlePlayPreview} />
+              </section>
+            )}
+
+            {/* About tab */}
+            {activeTab === 'about' && (
+              <section className="pb-32">
+                <AboutSection />
               </section>
             )}
 
@@ -405,11 +463,11 @@ function AppContent() {
                 <div className="mb-6">
                   <p className="mb-1 inline-flex items-center gap-2 rounded-full bg-purple-600/20 px-3 py-1 text-xs font-semibold text-purple-300">
                     <Library size={12} />
-                    My Library
+                    {t.myLibrary}
                   </p>
-                  <h2 className="mt-2 text-2xl font-bold text-white">My Purchases</h2>
+                  <h2 className="mt-2 text-2xl font-bold text-white">{t.myPurchases}</h2>
                   <p className="text-slate-400 mt-1 text-sm max-w-xl">
-                    Re-download all licensed tracks you have purchased anytime from here.
+                    {t.myPurchasesDesc}
                   </p>
                 </div>
                 <UserPurchases />
@@ -429,7 +487,7 @@ function AppContent() {
               rel="noopener noreferrer"
               className="hover:text-white"
             >
-              Privacy Policy
+              {t.privacy}
             </a>
             <a
               href="/terms-of-use.html"
@@ -437,7 +495,7 @@ function AppContent() {
               rel="noopener noreferrer"
               className="hover:text-white"
             >
-              Terms of Use
+              {t.terms}
             </a>
             <a
               href="/refund-policy.html"
@@ -445,7 +503,7 @@ function AppContent() {
               rel="noopener noreferrer"
               className="hover:text-white"
             >
-              Refund Policy
+              {t.refund}
             </a>
           </div>
         </div>
@@ -456,6 +514,82 @@ function AppContent() {
         <div className="fixed bottom-0 left-0 right-0 bg-slate-800 border-t border-slate-700">
           <AudioPlayer track={currentTrack} isPlaying={isPlaying} onPlayPause={setIsPlaying} />
         </div>
+      )}
+
+      {user && (
+        <>
+          <button
+            type="button"
+            onClick={() => setCartOpen(true)}
+            className="fixed bottom-24 right-4 z-40 inline-flex items-center gap-2 rounded-full bg-purple-600 px-4 py-3 text-sm font-semibold text-white shadow-lg hover:bg-purple-700"
+          >
+            <ShoppingCart size={16} />
+            {t.cart} ({cartTracks.length})
+          </button>
+
+          {cartOpen && (
+            <div className="fixed inset-0 z-50 bg-black/60" onClick={() => setCartOpen(false)}>
+              <aside
+                className="absolute right-0 top-0 h-full w-full max-w-sm border-l border-slate-700 bg-slate-900 p-4"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <div className="mb-4 flex items-center justify-between">
+                  <h3 className="text-lg font-bold text-white">{t.cart}</h3>
+                  <button
+                    type="button"
+                    onClick={() => setCartOpen(false)}
+                    className="rounded-lg bg-slate-800 px-3 py-1.5 text-xs text-slate-200 hover:bg-slate-700"
+                  >
+                    {t.close}
+                  </button>
+                </div>
+
+                <p className="mb-3 text-sm text-slate-400">{t.total}: ${cartTotal.toFixed(2)}</p>
+
+                {checkoutError && (
+                  <div className="mb-3 rounded-lg border border-red-600 bg-red-900/20 px-3 py-2 text-sm text-red-300">
+                    {checkoutError}
+                  </div>
+                )}
+
+                {cartTracks.length === 0 ? (
+                  <div className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-4 text-sm text-slate-300">
+                    {t.cartEmpty}
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {cartTracks.map((track) => (
+                      <div key={track.id} className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm">
+                        <p className="text-slate-100">{track.title}</p>
+                        <p className="text-xs text-slate-400">{track.artist}</p>
+                        <div className="mt-2 flex items-center justify-between">
+                          <span className="font-semibold text-purple-300">${track.price.toFixed(2)}</span>
+                          <button
+                            type="button"
+                            onClick={() => removeFromCart(track.id)}
+                            className="text-xs font-semibold text-slate-300 hover:text-white"
+                          >
+                            {t.remove}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  onClick={handleCheckout}
+                  disabled={checkoutLoading || cartTracks.length === 0}
+                  className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
+                >
+                  <ShoppingCart size={16} />
+                  {checkoutLoading ? t.redirecting : t.checkoutCart}
+                </button>
+              </aside>
+            </div>
+          )}
+        </>
       )}
 
       {/* Modals */}
@@ -485,12 +619,14 @@ function AppContent() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <TrackProvider>
-        <PurchaseProvider>
-          <AppContent />
-        </PurchaseProvider>
-      </TrackProvider>
-    </AuthProvider>
+    <LanguageProvider>
+      <AuthProvider>
+        <TrackProvider>
+          <PurchaseProvider>
+            <AppContent />
+          </PurchaseProvider>
+        </TrackProvider>
+      </AuthProvider>
+    </LanguageProvider>
   );
 }

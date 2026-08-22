@@ -1,6 +1,7 @@
 import React from 'react';
 import { Play, ShoppingCart, Download, BadgeCheck, Gift } from 'lucide-react';
 import { resolveAssetUrl } from '../api';
+import { useLanguage } from '../context/LanguageContext';
 
 function hashString(value) {
   let hash = 0;
@@ -49,8 +50,18 @@ function buildCoverArt(track) {
 }
 
 const TrackCard = ({ track, onPlay, onBuy, onAddToCart, onDownload, isPurchased, inCart = false }) => {
+  const { lang } = useLanguage();
   const isFree = track.is_free === true;
   const canDownloadDirectly = isFree || isPurchased;
+  const t = {
+    playPreview: lang === 'ar' ? 'تشغيل المعاينة' : 'Play preview',
+    downloadTrack: lang === 'ar' ? 'تنزيل التراك' : 'Download track',
+    addToCart: lang === 'ar' ? 'أضف إلى السلة' : 'Add to cart',
+    free: lang === 'ar' ? 'مجاني' : 'Free',
+    purchased: lang === 'ar' ? 'تم الشراء' : 'Purchased',
+    download: lang === 'ar' ? 'تنزيل' : 'Download',
+    inCart: lang === 'ar' ? 'في السلة' : 'In Cart',
+  };
 
   return (
     <div className="bg-slate-800 rounded-lg overflow-hidden hover:bg-slate-700 transition-colors duration-300 group cursor-pointer">
@@ -68,7 +79,7 @@ const TrackCard = ({ track, onPlay, onBuy, onAddToCart, onDownload, isPurchased,
           <button
             onClick={() => onPlay(track)}
             className="bg-purple-600 hover:bg-purple-700 text-white p-4 rounded-full transition-all duration-200 transform hover:scale-110"
-            title="Play preview"
+            title={t.playPreview}
           >
             <Play size={24} fill="currentColor" />
           </button>
@@ -87,7 +98,7 @@ const TrackCard = ({ track, onPlay, onBuy, onAddToCart, onDownload, isPurchased,
             className={`text-white p-4 rounded-full transition-all duration-200 transform hover:scale-110 ${
               canDownloadDirectly ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-blue-600 hover:bg-blue-700'
             }`}
-            title={canDownloadDirectly ? 'Download track' : 'Add to cart'}
+            title={canDownloadDirectly ? t.downloadTrack : t.addToCart}
           >
             {canDownloadDirectly ? <Download size={24} /> : <ShoppingCart size={24} />}
           </button>
@@ -98,7 +109,7 @@ const TrackCard = ({ track, onPlay, onBuy, onAddToCart, onDownload, isPurchased,
           <div className="absolute top-3 left-3">
             <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-500 px-2.5 py-1 text-xs font-extrabold text-white shadow-lg">
               <Gift size={12} />
-              FREE
+              {t.free.toUpperCase()}
             </span>
           </div>
         )}
@@ -119,12 +130,12 @@ const TrackCard = ({ track, onPlay, onBuy, onAddToCart, onDownload, isPurchased,
           {isFree ? (
             <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600/20 px-3 py-1 text-sm font-semibold text-emerald-400">
               <Gift size={16} />
-              Free
+              {t.free}
             </span>
           ) : isPurchased ? (
             <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600/20 px-3 py-1 text-sm font-semibold text-emerald-400">
               <BadgeCheck size={16} />
-              Purchased
+              {t.purchased}
             </span>
           ) : (
             <span className="text-xl font-bold text-purple-400">
@@ -141,7 +152,7 @@ const TrackCard = ({ track, onPlay, onBuy, onAddToCart, onDownload, isPurchased,
               className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-700"
             >
               <Download size={16} />
-              Download
+              {t.download}
             </button>
           ) : (
             <button
@@ -151,7 +162,7 @@ const TrackCard = ({ track, onPlay, onBuy, onAddToCart, onDownload, isPurchased,
               className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-purple-600 px-4 py-3 text-sm font-semibold text-white hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <ShoppingCart size={16} />
-              {inCart ? 'In Cart' : 'Add to Cart'}
+              {inCart ? t.inCart : t.addToCart}
             </button>
           )}
         </div>

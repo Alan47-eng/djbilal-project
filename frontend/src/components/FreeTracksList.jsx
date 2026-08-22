@@ -1,12 +1,29 @@
 import React, { useState } from 'react';
 import { Download, Play, Gift } from 'lucide-react';
 import api, { resolveAssetUrl } from '../api';
+import { useLanguage } from '../context/LanguageContext';
 
 const FreeTracksList = ({ tracks, onPlay }) => {
+  const { lang } = useLanguage();
   const freeTracks = tracks.filter((t) => t.is_free);
   const [activeCategory, setActiveCategory] = useState('all');
   const [downloading, setDownloading] = useState(null);
   const [error, setError] = useState(null);
+  const t = {
+    noFreeTracks: lang === 'ar' ? 'لا توجد تراكات مجانية بعد.' : 'No free tracks have been added yet.',
+    intro: lang === 'ar' ? 'نزّل الملفات المجانية بالأسفل بضغطة واحدة وبدون تسجيل.' : 'Download the files below for free — one click, no signup required.',
+    all: lang === 'ar' ? 'الكل' : 'All',
+    remix: lang === 'ar' ? 'ريمكس' : 'Remix',
+    simplePack: lang === 'ar' ? 'حزمة بسيطة' : 'Simple Pack',
+    noCategory: lang === 'ar' ? 'لا توجد ملفات مجانية في هذا التصنيف بعد.' : 'No free files in this category yet.',
+    preview: lang === 'ar' ? 'معاينة' : 'Preview',
+    downloading: lang === 'ar' ? 'جاري التنزيل...' : 'Downloading...',
+    download: lang === 'ar' ? 'تنزيل' : 'Download',
+    downloadFailed: lang === 'ar' ? 'فشل التنزيل.' : 'Download failed.',
+    invalidFile: lang === 'ar' ? 'تم استلام ملف غير صالح.' : 'Received HTML instead of media file',
+    free: lang === 'ar' ? 'مجاني' : 'FREE',
+    vst: 'VST',
+  };
 
   const belongsToCategory = (track, category) => {
     if (category === 'all') return true;
@@ -57,7 +74,7 @@ const FreeTracksList = ({ tracks, onPlay }) => {
       const fileResponse = await api.get(`/tracks/${track.id}/free-download-file`, { responseType: 'blob' });
       const contentType = (fileResponse.headers && fileResponse.headers['content-type']) || '';
       if (contentType.includes('text/html')) {
-        throw new Error('Received HTML instead of media file');
+        throw new Error(t.invalidFile);
       }
       const blobUrl = window.URL.createObjectURL(fileResponse.data);
       const link = document.createElement('a');
@@ -68,7 +85,7 @@ const FreeTracksList = ({ tracks, onPlay }) => {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(blobUrl);
     } catch (err) {
-      setError(err.response?.data?.detail || 'Download failed.');
+      setError(err.response?.data?.detail || t.downloadFailed);
     } finally {
       setDownloading(null);
     }
@@ -78,7 +95,7 @@ const FreeTracksList = ({ tracks, onPlay }) => {
     return (
       <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-900 p-10 text-center text-slate-500">
         <Gift size={36} className="mx-auto mb-3 opacity-40" />
-        <p>No free tracks have been added yet.</p>
+        <p>{t.noFreeTracks}</p>
       </div>
     );
   }
@@ -86,15 +103,15 @@ const FreeTracksList = ({ tracks, onPlay }) => {
   return (
     <div>
       <p className="mb-4 text-sm text-slate-400">
-        Download the files below for free — one click, no signup required.
+        {t.intro}
       </p>
 
       <div className="mb-5 flex flex-wrap gap-2">
         {[
-          { id: 'all', label: 'All' },
-          { id: 'remix', label: 'Remix' },
-          { id: 'simple-pack', label: 'Simple Pack' },
-          { id: 'vst', label: 'VST' },
+          { id: 'all', label: t.all },
+          { id: 'remix', label: t.remix },
+          { id: 'simple-pack', label: t.simplePack },
+          { id: 'vst', label: t.vst },
         ].map((item) => (
           <button
             key={item.id}
@@ -119,7 +136,7 @@ const FreeTracksList = ({ tracks, onPlay }) => {
 
       {filteredTracks.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-900 p-8 text-center text-slate-500">
-          No free files in this category yet.
+          {t.noCategory}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -143,7 +160,7 @@ const FreeTracksList = ({ tracks, onPlay }) => {
               )}
               {/* FREE badge */}
               <span className="absolute top-1 left-1 rounded-md bg-emerald-500 px-1.5 py-0.5 text-[10px] font-extrabold text-white leading-none shadow">
-                FREE
+                {t.free}
               </span>
             </div>
 
@@ -159,7 +176,7 @@ const FreeTracksList = ({ tracks, onPlay }) => {
                 type="button"
                 onClick={() => onPlay(track)}
                 className="rounded-lg border border-slate-700 bg-slate-800 p-2 text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
-                title="Preview"
+                title={t.preview}
               >
                 <Play size={16} fill="currentColor" />
               </button>
@@ -170,7 +187,7 @@ const FreeTracksList = ({ tracks, onPlay }) => {
                 className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60 transition-colors"
               >
                 <Download size={15} />
-                {downloading === track.id ? 'Downloading...' : 'Download'}
+                {downloading === track.id ? t.downloading : t.download}
               </button>
             </div>
           </div>

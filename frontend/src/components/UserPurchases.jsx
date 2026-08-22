@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Download, ShoppingBag, BadgeCheck, RefreshCw } from 'lucide-react';
 import api, { resolveAssetUrl } from '../api';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 
 const LICENSE_COLORS = {
   'MP3 Lease': 'bg-blue-600/20 text-blue-300 border-blue-600/40',
@@ -10,11 +11,26 @@ const LICENSE_COLORS = {
 };
 
 const UserPurchases = () => {
+  const { lang } = useLanguage();
   const { user } = useAuth();
   const [purchases, setPurchases] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [downloading, setDownloading] = useState(null);
+  const t = {
+    couldNotLoad: lang === 'ar' ? 'تعذر تحميل المشتريات.' : 'Could not load purchases.',
+    downloadFailed: lang === 'ar' ? 'فشل التنزيل.' : 'Download failed.',
+    signInToView: lang === 'ar' ? 'سجّل الدخول لعرض مشترياتك.' : 'Sign in to view your purchases.',
+    loading: lang === 'ar' ? 'جاري التحميل...' : 'Loading...',
+    reDownload: lang === 'ar' ? 'أعد تنزيل كل التراكات المشتراة من هنا.' : 'Re-download all purchased tracks from here.',
+    refresh: lang === 'ar' ? 'تحديث' : 'Refresh',
+    noPurchases: lang === 'ar' ? 'لم تقم بشراء أي تراك بعد.' : 'You have not purchased any tracks yet.',
+    track: lang === 'ar' ? 'التراك' : 'Track',
+    purchaseDate: lang === 'ar' ? 'تاريخ الشراء' : 'Purchase Date',
+    license: lang === 'ar' ? 'الرخصة' : 'License',
+    download: lang === 'ar' ? 'تنزيل' : 'Download',
+    standard: lang === 'ar' ? 'قياسي' : 'Standard',
+  };
 
   const fetchDetails = async () => {
     try {
@@ -23,7 +39,7 @@ const UserPurchases = () => {
       const res = await api.get('/purchases/details');
       setPurchases(res.data);
     } catch (err) {
-      setError(err.response?.data?.detail || 'Could not load purchases.');
+      setError(err.response?.data?.detail || t.couldNotLoad);
     } finally {
       setLoading(false);
     }
@@ -65,7 +81,7 @@ const UserPurchases = () => {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(blobUrl);
     } catch (err) {
-      setError(err.response?.data?.detail || 'Download failed.');
+      setError(err.response?.data?.detail || t.downloadFailed);
     } finally {
       setDownloading(null);
     }
@@ -75,7 +91,7 @@ const UserPurchases = () => {
     return (
       <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-900 p-12 text-center text-slate-500">
         <ShoppingBag size={40} className="mx-auto mb-4 opacity-40" />
-        <p className="font-medium">Sign in to view your purchases.</p>
+        <p className="font-medium">{t.signInToView}</p>
       </div>
     );
   }
@@ -84,7 +100,7 @@ const UserPurchases = () => {
     return (
       <div className="flex items-center justify-center py-20 text-slate-400">
         <RefreshCw size={28} className="animate-spin mr-3" />
-        Loading...
+        {t.loading}
       </div>
     );
   }
@@ -93,7 +109,7 @@ const UserPurchases = () => {
     <div>
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-slate-400">
-          Re-download all purchased tracks from here.
+          {t.reDownload}
         </p>
         <button
           type="button"
@@ -101,7 +117,7 @@ const UserPurchases = () => {
           className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-700 transition-colors"
         >
           <RefreshCw size={14} />
-          Refresh
+          {t.refresh}
         </button>
       </div>
 
@@ -114,7 +130,7 @@ const UserPurchases = () => {
       {purchases.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-900 p-12 text-center text-slate-500">
           <ShoppingBag size={40} className="mx-auto mb-4 opacity-40" />
-          <p className="font-medium">You have not purchased any tracks yet.</p>
+          <p className="font-medium">{t.noPurchases}</p>
         </div>
       ) : (
         <>
@@ -155,7 +171,7 @@ const UserPurchases = () => {
                     <span
                       className={`inline-block rounded-full border px-2.5 py-0.5 text-xs font-semibold ${licenseClass}`}
                     >
-                      {purchase.license_type || 'Standard'}
+                      {purchase.license_type || t.standard}
                     </span>
                     <button
                       type="button"
@@ -164,7 +180,7 @@ const UserPurchases = () => {
                       className="inline-flex items-center gap-1.5 rounded-lg bg-purple-600 px-3 py-2 text-xs font-semibold text-white hover:bg-purple-700 disabled:opacity-60 transition-colors"
                     >
                       <Download size={13} />
-                      {downloading === purchase.track_id ? '...' : 'Download'}
+                      {downloading === purchase.track_id ? '...' : t.download}
                     </button>
                   </div>
                 </div>
@@ -174,10 +190,10 @@ const UserPurchases = () => {
 
           <div className="hidden rounded-2xl border border-slate-700 bg-slate-900 overflow-hidden md:block">
             <div className="grid grid-cols-12 gap-4 px-6 py-3 text-xs font-semibold uppercase tracking-widest text-slate-500 border-b border-slate-800 bg-slate-950">
-              <div className="col-span-5">Track</div>
-              <div className="col-span-3">Purchase Date</div>
-              <div className="col-span-2">License</div>
-              <div className="col-span-2 text-right">Download</div>
+              <div className="col-span-5">{t.track}</div>
+              <div className="col-span-3">{t.purchaseDate}</div>
+              <div className="col-span-2">{t.license}</div>
+              <div className="col-span-2 text-right">{t.download}</div>
             </div>
 
             {purchases.map((purchase) => {
@@ -221,7 +237,7 @@ const UserPurchases = () => {
                     <span
                       className={`inline-block rounded-full border px-2.5 py-0.5 text-xs font-semibold ${licenseClass}`}
                     >
-                      {purchase.license_type || 'Standard'}
+                      {purchase.license_type || t.standard}
                     </span>
                   </div>
 
@@ -233,7 +249,7 @@ const UserPurchases = () => {
                       className="inline-flex items-center gap-1.5 rounded-lg bg-purple-600 px-3 py-2 text-xs font-semibold text-white hover:bg-purple-700 disabled:opacity-60 transition-colors"
                     >
                       <Download size={13} />
-                      {downloading === purchase.track_id ? '...' : 'Download'}
+                      {downloading === purchase.track_id ? '...' : t.download}
                     </button>
                   </div>
                 </div>
