@@ -2,8 +2,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi import Depends, HTTPException, status, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 import os
@@ -23,10 +22,6 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-# OAuth2 scheme
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
-
 
 def hash_password(password: str) -> str:
     """Hash a password using bcrypt."""
@@ -90,14 +85,33 @@ def decode_token(token: str) -> Optional[dict]:
         )
 
 
+def get_bearer_token_from_request(request: Request) -> str:
+    """Extract bearer token from Authorization header or access_token cookie."""
+    authorization = request.headers.get("Authorization", "")
+    if authorization.startswith("Bearer "):
+        token = authorization[7:].strip()
+        if token:
+            return token
+
+    cookie_token = request.cookies.get("access_token")
+    if cookie_token:
+        return cookie_token
+
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Not authenticated",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+
 async def get_current_user(
-    token: str = Depends(oauth2_scheme),
+    request: Request,
     session: AsyncSession = Depends(get_session)
 ) -> User:
     """Get the current authenticated user from JWT token.
     
     Args:
-        token: JWT token from OAuth2 scheme
+        request: FastAPI request with Authorization header and/or auth cookie
         session: Database session
         
     Returns:
@@ -106,6 +120,7 @@ async def get_current_user(
     Raises:
         HTTPException: If token is invalid or user not found
     """
+    token = get_bearer_token_from_request(request)
     payload = decode_token(token)
     email: str = payload.get("sub")
     

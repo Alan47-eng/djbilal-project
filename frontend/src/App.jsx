@@ -58,8 +58,9 @@ function AppContent() {
     fileMissing: lang === 'ar' ? 'الملف غير موجود. يرجى إعادة رفع التراك.' : 'File not found. Please upload the track again.',
     downloadFailed: lang === 'ar' ? 'فشل التنزيل.' : 'Download failed.',
     privacy: lang === 'ar' ? 'سياسة الخصوصية' : 'Privacy Policy',
-    terms: lang === 'ar' ? 'شروط الاستخدام' : 'Terms of Use',
+    terms: lang === 'ar' ? 'شروط الاستخدام' : 'Terms of Service',
     refund: lang === 'ar' ? 'سياسة الاسترجاع' : 'Refund Policy',
+    contact: lang === 'ar' ? 'اتصل بنا' : 'Contact Us',
     cartEmpty: lang === 'ar' ? 'السلة فارغة حالياً.' : 'Your cart is empty right now.',
     close: lang === 'ar' ? 'إغلاق' : 'Close',
   };
@@ -504,6 +505,14 @@ function AppContent() {
               className="hover:text-white"
             >
               {t.refund}
+            </a>
+            <a
+              href="/contact-us.html"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-white"
+            >
+              {t.contact}
             </a>
           </div>
         </div>

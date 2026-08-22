@@ -4,6 +4,7 @@ import hmac
 import json
 import hashlib
 import re
+from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlencode, urlparse, parse_qsl, urlunparse
 from uuid import uuid4
@@ -26,9 +27,6 @@ IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
 TRACK_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 PREVIEW_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 COVER_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-
-ENVIRONMENT = os.getenv("ENVIRONMENT", "development").lower()
-
 
 def build_storage_name(filename: str) -> str:
     """Generate unique filename for uploaded file."""
@@ -224,7 +222,7 @@ def verify_webhook_signature(raw_body: bytes, signature: str | None) -> bool:
     secret = os.getenv("LEMON_SQUEEZY_WEBHOOK_SECRET", "").strip()
     
     if not secret:
-        return ENVIRONMENT != "production"
+        return False
     
     if not signature:
         return False
@@ -324,3 +322,73 @@ async def create_lemonsqueezy_checkout(
             detail="Lemon Squeezy response did not include checkout URL",
         )
     return str(checkout_url)
+
+
+def _pdf_escape(value: str) -> str:
+    return value.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+
+
+def generate_license_pdf(
+    *,
+    purchase_id: int,
+    buyer_name: str,
+    buyer_email: str,
+    track_title: str,
+    track_artist: str,
+    license_type: str,
+    purchased_at: datetime,
+) -> bytes:
+    """Generate a simple one-page PDF license document."""
+    purchased_at_str = purchased_at.strftime("%Y-%m-%d %H:%M:%S UTC")
+    lines = [
+        "DJ Bilal Music Store - Lisans Belgesi",
+        "",
+        f"Belge No: LIC-{purchase_id}",
+        f"Musteri: {buyer_name}",
+        f"E-posta: {buyer_email}",
+        f"Eser: {track_title}",
+        f"Sanatci: {track_artist}",
+        f"Lisans Turu: {license_type}",
+        f"Satin Alma Tarihi: {purchased_at_str}",
+        "",
+        "Bu belge satin alma kaydina bagli dijital lisans kanitidir.",
+    ]
+
+    content_lines = ["BT", "/F1 12 Tf", "50 780 Td"]
+    first_text = _pdf_escape(lines[0])
+    content_lines.append(f"({first_text}) Tj")
+    for line in lines[1:]:
+        content_lines.append("0 -18 Td")
+        content_lines.append(f"({_pdf_escape(line)}) Tj")
+    content_lines.append("ET")
+    content_stream = "\n".join(content_lines).encode("latin-1", errors="replace")
+
+    objects = [
+        b"1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n",
+        b"2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n",
+        b"3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>\nendobj\n",
+        b"4 0 obj\n<< /Length " + str(len(content_stream)).encode("ascii") + b" >>\nstream\n" + content_stream + b"\nendstream\nendobj\n",
+        b"5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n",
+    ]
+
+    pdf = bytearray(b"%PDF-1.4\n")
+    offsets = [0]
+    for obj in objects:
+        offsets.append(len(pdf))
+        pdf.extend(obj)
+
+    xref_start = len(pdf)
+    pdf.extend(f"xref\n0 {len(objects) + 1}\n".encode("ascii"))
+    pdf.extend(b"0000000000 65535 f \n")
+    for offset in offsets[1:]:
+        pdf.extend(f"{offset:010d} 00000 n \n".encode("ascii"))
+    pdf.extend(
+        (
+            "trailer\n"
+            f"<< /Size {len(objects) + 1} /Root 1 0 R >>\n"
+            "startxref\n"
+            f"{xref_start}\n"
+            "%%EOF\n"
+        ).encode("ascii")
+    )
+    return bytes(pdf)

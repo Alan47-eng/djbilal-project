@@ -1,8 +1,7 @@
 import os
 import json
-from pathlib import Path
 
-from fastapi import FastAPI, Depends, HTTPException, status, UploadFile, File, Form, Request
+from fastapi import FastAPI, Depends, HTTPException, status, UploadFile, File, Form, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -10,19 +9,14 @@ from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .database import test_connection, engine, get_session, async_session
-from .models import Base, User, Track, Purchase
+from .models import Base, User, Track
 from . import schemas, auth
 from .services import UserService, TrackService, PurchaseService
 from .utils import (
-    TRACK_UPLOAD_DIR, PREVIEW_UPLOAD_DIR, COVER_UPLOAD_DIR,
-    UPLOAD_ROOT, build_media_url, build_storage_name,
-    save_upload_file, build_checkout_url, extract_custom_data,
+    UPLOAD_ROOT,
     resolve_uploaded_file_path,
-    create_lemonsqueezy_checkout,
     normalize_media_url,
-    validate_upload_file, AUDIO_EXTENSIONS, IMAGE_EXTENSIONS,
-    MAX_TRACK_UPLOAD_BYTES, MAX_PREVIEW_UPLOAD_BYTES, MAX_COVER_UPLOAD_BYTES,
-    is_successful_payment_event, verify_webhook_signature
+    verify_webhook_signature,
 )
 
 app = FastAPI()
@@ -45,14 +39,14 @@ def parse_frontend_origins(raw_value: str | None) -> list[str]:
 
 FRONTEND_ORIGINS = parse_frontend_origins(os.getenv("FRONTEND_ORIGINS"))
 ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "admin@djbilal.com")
-DEFAULT_ADMIN_PASSWORD = "V9!qL3#tX7@pN2$zR8^mW5&cH1"
-ADMIN_PASSWORD = DEFAULT_ADMIN_PASSWORD
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
+IS_PRODUCTION = os.getenv("ENVIRONMENT", "development").lower() == "production"
 
 # CORS middleware MUST be first (before mount)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
+    allow_origins=FRONTEND_ORIGINS,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -80,6 +74,9 @@ async def startup():
         if conn.dialect.name == "postgresql":
             await conn.execute(text(
                 "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT FALSE"
+            ))
+            await conn.execute(text(
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS full_name VARCHAR(255)"
             ))
             await conn.execute(text(
                 "ALTER TABLE tracks ADD COLUMN IF NOT EXISTS cover_image_url VARCHAR(1024)"
@@ -159,20 +156,21 @@ async def seed_admin_user():
     async with async_session() as session:
         result = await session.execute(select(User).where(User.email == ADMIN_EMAIL))
         admin_user = result.scalars().first()
-        admin_password_hash = auth.hash_password(ADMIN_PASSWORD)
 
         if admin_user:
             if not admin_user.is_admin:
                 admin_user.is_admin = True
-            admin_user.hashed_password = admin_password_hash
-        else:
-            admin_user = User(
-                email=ADMIN_EMAIL,
-                hashed_password=admin_password_hash,
-                is_admin=True,
-            )
-            session.add(admin_user)
-        
+                await session.commit()
+            return
+
+        admin_password_hash = auth.hash_password(ADMIN_PASSWORD)
+        admin_user = User(
+            email=ADMIN_EMAIL,
+            full_name="DJ Bilal Admin",
+            hashed_password=admin_password_hash,
+            is_admin=True,
+        )
+        session.add(admin_user)
         await session.commit()
 
 
@@ -193,10 +191,28 @@ async def register(user: schemas.UserCreate, session: AsyncSession = Depends(get
     return await user_service.register(session, user)
 
 @app.post("/login", response_model=schemas.TokenResponse)
-async def login(credentials: schemas.LoginRequest, session: AsyncSession = Depends(get_session)):
+async def login(
+    credentials: schemas.LoginRequest,
+    response: Response,
+    session: AsyncSession = Depends(get_session),
+):
     user = await user_service.authenticate(session, credentials)
     access_token = auth.create_access_token(data={"sub": user.email})
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        secure=IS_PRODUCTION,
+        samesite="lax",
+        max_age=auth.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+    )
     return {"access_token": access_token, "token_type": "bearer"}
+
+
+@app.post("/logout")
+async def logout(response: Response):
+    response.delete_cookie("access_token")
+    return {"status": "ok"}
 
 @app.get("/me", response_model=schemas.UserRead)
 async def get_profile(current_user: User = Depends(auth.get_current_user)):
@@ -255,49 +271,21 @@ async def upload_track(
     session: AsyncSession = Depends(get_session),
 ):
     require_admin(current_user)
-
-    if not is_free and price is None:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Price is required for paid tracks",
-        )
-    if not is_free and lemon_variant_id is None:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Lemon variant ID is required for paid tracks",
-        )
-
-    validate_upload_file(track_file, AUDIO_EXTENSIONS, MAX_TRACK_UPLOAD_BYTES, "Track file")
-    validate_upload_file(preview_file, AUDIO_EXTENSIONS, MAX_PREVIEW_UPLOAD_BYTES, "Preview file")
-    if cover_file is not None:
-        validate_upload_file(cover_file, IMAGE_EXTENSIONS, MAX_COVER_UPLOAD_BYTES, "Cover image")
-
-    track_filename = build_storage_name(track_file.filename)
-    preview_filename = build_storage_name(preview_file.filename)
-    cover_filename = build_storage_name(cover_file.filename) if cover_file else None
-
-    await save_upload_file(track_file, TRACK_UPLOAD_DIR / track_filename, MAX_TRACK_UPLOAD_BYTES)
-    await save_upload_file(preview_file, PREVIEW_UPLOAD_DIR / preview_filename, MAX_PREVIEW_UPLOAD_BYTES)
-    if cover_file and cover_filename:
-        await save_upload_file(cover_file, COVER_UPLOAD_DIR / cover_filename, MAX_COVER_UPLOAD_BYTES)
-
-    track_full_url = build_media_url(request, "tracks", track_filename)
-    normalized_price = 0.0 if is_free and price is None else (price or 0.0)
-    checkout_url_value = None if is_free else (checkout_url.strip() if checkout_url else None)
-    track_data = schemas.TrackCreate(
-        title=title.strip(),
-        artist=artist.strip(),
-        price=normalized_price,
-        cover_image_url=build_media_url(request, "covers", cover_filename) if cover_filename else None,
-        checkout_url=checkout_url_value,
-        lemon_variant_id=None if is_free else lemon_variant_id,
-        preview_url=build_media_url(request, "previews", preview_filename),
-        full_file_path=track_full_url,
+    return await track_service.upload_track(
+        session=session,
+        request=request,
+        title=title,
+        artist=artist,
+        category=category,
+        price=price,
+        checkout_url=checkout_url,
+        lemon_variant_id=lemon_variant_id,
         is_free=is_free,
-        free_download_url=free_download_url.strip() if free_download_url else (track_full_url if is_free else None),
-        category=category.strip().lower(),
+        free_download_url=free_download_url,
+        track_file=track_file,
+        preview_file=preview_file,
+        cover_file=cover_file,
     )
-    return await track_service.create_track(session, track_data)
 
 @app.get("/tracks", response_model=list[schemas.TrackResponse])
 async def list_tracks(session: AsyncSession = Depends(get_session)):
@@ -382,43 +370,7 @@ async def create_checkout(
     current_user: User = Depends(auth.get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
-    track = await track_service.get_track(session, track_id)
-
-    if track.is_free:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="This track is free to download",
-        )
-
-    if track.lemon_variant_id:
-        checkout_url = await create_lemonsqueezy_checkout(
-            variant_quantities=[{"variant_id": track.lemon_variant_id, "quantity": 1}],
-            custom_data={
-                "track_id": str(track.id),
-                "track_ids": str(track.id),
-                "user_id": str(current_user.id),
-            },
-            email=current_user.email,
-        )
-    else:
-        if not track.checkout_url:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Checkout URL not configured for this track",
-            )
-        checkout_url = build_checkout_url(
-            track.checkout_url,
-            {
-                "track_id": str(track.id),
-                "user_id": str(current_user.id),
-            },
-            email=current_user.email,
-        )
-
-    return {
-        "track_id": track.id,
-        "checkout_url": checkout_url,
-    }
+    return await track_service.create_checkout(session, track_id, current_user)
 
 
 @app.post("/checkout/cart")
@@ -427,54 +379,7 @@ async def create_cart_checkout(
     current_user: User = Depends(auth.get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
-    tracks_result = await session.execute(
-        select(Track).where(Track.id.in_(payload.track_ids))
-    )
-    tracks_by_id = {track.id: track for track in tracks_result.scalars().all()}
-    missing_ids = [track_id for track_id in payload.track_ids if track_id not in tracks_by_id]
-    if missing_ids:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Tracks not found: {', '.join(str(track_id) for track_id in missing_ids)}",
-        )
-
-    selected_tracks = [tracks_by_id[track_id] for track_id in payload.track_ids]
-    paid_tracks = [track for track in selected_tracks if not track.is_free]
-    if not paid_tracks:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cart must include at least one paid track",
-        )
-
-    missing_variant = [track.title for track in paid_tracks if not track.lemon_variant_id]
-    if missing_variant:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Missing Lemon variant ID for: {', '.join(missing_variant)}",
-        )
-
-    variant_ids = [int(track.lemon_variant_id) for track in paid_tracks]
-    if len(set(variant_ids)) != len(variant_ids):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Each track must have a unique Lemon variant ID for cart checkout",
-        )
-
-    variant_quantities = [{"variant_id": variant_id, "quantity": 1} for variant_id in variant_ids]
-    cart_track_ids = [track.id for track in paid_tracks]
-    checkout_url = await create_lemonsqueezy_checkout(
-        variant_quantities=variant_quantities,
-        custom_data={
-            "track_ids": ",".join(str(track_id) for track_id in cart_track_ids),
-            "user_id": str(current_user.id),
-        },
-        email=current_user.email,
-    )
-
-    return {
-        "track_ids": cart_track_ids,
-        "checkout_url": checkout_url,
-    }
+    return await track_service.create_cart_checkout(session, payload.track_ids, current_user)
 
 @app.get("/purchases", response_model=list[int])
 async def list_purchases(
@@ -490,6 +395,19 @@ async def list_purchases_detailed(
 ):
     return await purchase_service.get_user_purchases_detailed(session, current_user.id)
 
+
+@app.get("/purchases/{purchase_id}/license-pdf")
+async def download_purchase_license_pdf(
+    purchase_id: int,
+    current_user: User = Depends(auth.get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    pdf_bytes, filename = await purchase_service.generate_license_document(
+        session, current_user, purchase_id
+    )
+    headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
+    return Response(content=pdf_bytes, media_type="application/pdf", headers=headers)
+
 @app.post("/webhooks/lemonsqueezy")
 async def lemonsqueezy_webhook(request: Request, session: AsyncSession = Depends(get_session)):
     raw_body = await request.body()
@@ -499,42 +417,7 @@ async def lemonsqueezy_webhook(request: Request, session: AsyncSession = Depends
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid webhook signature")
 
     payload = json.loads(raw_body.decode("utf-8"))
-    if not is_successful_payment_event(payload):
-        return {"status": "ignored"}
-
-    custom_data = extract_custom_data(payload)
-    track_id = custom_data.get("track_id")
-    track_ids = custom_data.get("track_ids")
-    user_id = custom_data.get("user_id")
-    license_type = custom_data.get("license_type")
-
-    if not user_id or (not track_id and not track_ids):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Missing custom data",
-        )
-
-    resolved_track_ids: list[int] = []
-    if track_ids:
-        for raw_id in track_ids.split(","):
-            value = raw_id.strip()
-            if not value:
-                continue
-            resolved_track_ids.append(int(value))
-    elif track_id:
-        resolved_track_ids.append(int(track_id))
-
-    if not resolved_track_ids:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No valid track IDs in custom data",
-        )
-
-    purchase_ids: list[int] = []
-    for resolved_track_id in resolved_track_ids:
-        purchase = await purchase_service.record_purchase(session, int(user_id), resolved_track_id, license_type)
-        purchase_ids.append(purchase.id)
-    return {"status": "ok", "purchase_ids": purchase_ids}
+    return await purchase_service.process_successful_payment_payload(session, payload)
 
 @app.get("/tracks/{track_id}/download", response_model=schemas.DownloadResponse)
 async def download_track(

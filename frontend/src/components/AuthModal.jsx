@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
-import api from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 
 const AuthModal = ({ isOpen, initialMode = 'login', onClose, onSuccess }) => {
   const { lang } = useLanguage();
-  const { refreshUser } = useAuth();
+  const { login, register } = useAuth();
   const [activeTab, setActiveTab] = useState(initialMode);
+  const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -17,6 +17,7 @@ const AuthModal = ({ isOpen, initialMode = 'login', onClose, onSuccess }) => {
     signUp: lang === 'ar' ? 'إنشاء حساب' : 'Sign Up',
     login: lang === 'ar' ? 'دخول' : 'Login',
     register: lang === 'ar' ? 'تسجيل' : 'Register',
+    fullName: lang === 'ar' ? 'الاسم الكامل' : 'Full Name',
     email: lang === 'ar' ? 'البريد الإلكتروني' : 'Email',
     password: lang === 'ar' ? 'كلمة المرور' : 'Password',
     authFailed: lang === 'ar' ? 'فشل التحقق. حاول مرة أخرى.' : 'Authentication failed. Please try again.',
@@ -27,6 +28,7 @@ const AuthModal = ({ isOpen, initialMode = 'login', onClose, onSuccess }) => {
   useEffect(() => {
     if (!isOpen) return;
     setActiveTab(initialMode);
+    setFullName('');
     setEmail('');
     setPassword('');
     setError(null);
@@ -42,20 +44,21 @@ const AuthModal = ({ isOpen, initialMode = 'login', onClose, onSuccess }) => {
 
     try {
       if (activeTab === 'login') {
-        const response = await api.post('/login', { email, password });
-        localStorage.setItem('access_token', response.data.access_token);
-        localStorage.setItem('userEmail', email);
-        await refreshUser();
+        const success = await login(email, password);
+        if (!success) {
+          setError(t.authFailed);
+          return;
+        }
         onSuccess(email);
         onClose();
         return;
       }
 
-      await api.post('/register', { email, password });
-      const loginResponse = await api.post('/login', { email, password });
-      localStorage.setItem('access_token', loginResponse.data.access_token);
-      localStorage.setItem('userEmail', email);
-      await refreshUser();
+      const success = await register(email, password, fullName);
+      if (!success) {
+        setError(t.authFailed);
+        return;
+      }
       onSuccess(email);
       onClose();
     } catch (err) {
@@ -116,6 +119,16 @@ const AuthModal = ({ isOpen, initialMode = 'login', onClose, onSuccess }) => {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {activeTab === 'register' && (
+            <input
+              type="text"
+              value={fullName}
+              onChange={(event) => setFullName(event.target.value)}
+              placeholder={t.fullName}
+              className="w-full rounded-lg border border-slate-700 bg-slate-950 px-4 py-3 text-white placeholder-slate-500"
+              required
+            />
+          )}
           <input
             type="email"
             value={email}

@@ -1,3 +1,6 @@
+import hashlib
+import hmac
+import json
 import pytest
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
@@ -48,9 +51,10 @@ async def client(test_db):
         yield client
 
 
-async def create_user_record(session, email, password, is_admin=False):
+async def create_user_record(session, email, password, is_admin=False, full_name=None):
     user = User(
         email=email,
+        full_name=full_name,
         hashed_password=auth.hash_password(password),
         is_admin=is_admin,
     )
@@ -185,6 +189,16 @@ class TestRegisterEndpoint:
         assert data["email"] == "user@example.com"
         assert data["id"] > 0
         assert "created_at" in data
+
+    @pytest.mark.asyncio
+    async def test_register_with_full_name(self, client):
+        response = await client.post(
+            "/register",
+            json={"email": "fullname@example.com", "password": "password123", "full_name": "Ali Veli"}
+        )
+
+        assert response.status_code == 200
+        assert response.json()["full_name"] == "Ali Veli"
     
     @pytest.mark.asyncio
     async def test_register_duplicate_email(self, client):
@@ -202,7 +216,7 @@ class TestRegisterEndpoint:
         # Second registration with same email
         response2 = await client.post(
             "/register",
-            json={"email": email, "password": "different_password"}
+            json={"email": email, "password": "different_password1"}
         )
         assert response2.status_code == 400
         assert "already registered" in response2.json()["detail"]
@@ -505,7 +519,7 @@ class TestCheckoutAndWebhook:
         assert query["checkout[custom][user_id]"][0] == str(user.id)
 
     @pytest.mark.asyncio
-    async def test_webhook_grants_purchase(self, client, test_db):
+    async def test_webhook_grants_purchase(self, client, test_db, monkeypatch):
         _, AsyncSessionLocal = test_db
 
         async with AsyncSessionLocal() as session:
@@ -531,7 +545,23 @@ class TestCheckoutAndWebhook:
             }
         }
 
-        response = await client.post("/webhooks/lemonsqueezy", json=payload)
+        raw_body = json.dumps(payload).encode("utf-8")
+        secret = "test-webhook-secret"
+        monkeypatch.setenv("LEMON_SQUEEZY_WEBHOOK_SECRET", secret)
+        signature = hmac.new(
+            secret.encode("utf-8"),
+            raw_body,
+            hashlib.sha256,
+        ).hexdigest()
+
+        response = await client.post(
+            "/webhooks/lemonsqueezy",
+            content=raw_body,
+            headers={
+                "Content-Type": "application/json",
+                "X-Signature": signature,
+            },
+        )
         assert response.status_code == 200
 
         login_response = await client.post(
@@ -575,6 +605,78 @@ class TestCheckoutAndWebhook:
         assert "free to download" in response.json()["detail"]
 
     @pytest.mark.asyncio
+    async def test_webhook_rejects_missing_signature(self, client, monkeypatch):
+        monkeypatch.setenv("LEMON_SQUEEZY_WEBHOOK_SECRET", "test-webhook-secret")
+        payload = {
+            "type": "order_created",
+            "data": {"attributes": {"status": "paid"}},
+            "meta": {"event_name": "order_created", "custom_data": {"track_id": "1", "user_id": "1"}},
+        }
+
+        response = await client.post("/webhooks/lemonsqueezy", json=payload)
+        assert response.status_code == 401
+
+    @pytest.mark.asyncio
+    async def test_license_pdf_available_in_purchase_details(self, client, test_db, monkeypatch):
+        _, AsyncSessionLocal = test_db
+
+        async with AsyncSessionLocal() as session:
+            user = await create_user_record(
+                session,
+                "license@example.com",
+                "password123",
+                full_name="Test User",
+            )
+            track = await create_track_record(
+                session,
+                "https://buy.lemonsqueezy.com/checkout/buy/abc123",
+            )
+
+        payload = {
+            "type": "order_created",
+            "data": {"attributes": {"status": "paid"}},
+            "meta": {
+                "event_name": "order_created",
+                "custom_data": {"track_id": str(track.id), "user_id": str(user.id)},
+            },
+        }
+        raw_body = json.dumps(payload).encode("utf-8")
+        secret = "test-webhook-secret"
+        monkeypatch.setenv("LEMON_SQUEEZY_WEBHOOK_SECRET", secret)
+        signature = hmac.new(secret.encode("utf-8"), raw_body, hashlib.sha256).hexdigest()
+
+        webhook_response = await client.post(
+            "/webhooks/lemonsqueezy",
+            content=raw_body,
+            headers={"Content-Type": "application/json", "X-Signature": signature},
+        )
+        assert webhook_response.status_code == 200
+
+        login_response = await client.post(
+            "/login",
+            json={"email": user.email, "password": "password123"}
+        )
+        token = login_response.json()["access_token"]
+
+        details_response = await client.get(
+            "/purchases/details",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert details_response.status_code == 200
+        details = details_response.json()
+        assert len(details) == 1
+        assert details[0]["license_pdf_url"].startswith("/purchases/")
+
+        purchase_id = details[0]["id"]
+        pdf_response = await client.get(
+            f"/purchases/{purchase_id}/license-pdf",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert pdf_response.status_code == 200
+        assert pdf_response.headers["content-type"].startswith("application/pdf")
+        assert pdf_response.content.startswith(b"%PDF-")
+
+    @pytest.mark.asyncio
     async def test_free_download_normalizes_legacy_http_media_url(self, client, test_db):
         _, AsyncSessionLocal = test_db
 
@@ -605,9 +707,16 @@ class TestEdgeCases:
             json={"email": "user@example.com", "password": ""}
         )
         
-        # Empty password is technically valid input, server should accept it
-        # This tests that validation doesn't reject empty string
-        assert response.status_code in [200, 422]
+        assert response.status_code == 422
+
+    @pytest.mark.asyncio
+    async def test_register_weak_password_missing_number(self, client):
+        response = await client.post(
+            "/register",
+            json={"email": "weak@example.com", "password": "password"}
+        )
+
+        assert response.status_code == 422
     
     @pytest.mark.asyncio
     async def test_login_case_sensitive_email(self, client):

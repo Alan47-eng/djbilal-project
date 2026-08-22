@@ -1,11 +1,32 @@
 """Business logic layer - Service classes for domain operations."""
 from typing import Optional
 from fastapi import HTTPException, status
+from fastapi import Request, UploadFile
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from . import auth, schemas
 from .models import User, Track, Purchase
 from .repositories import UserRepository, TrackRepository, PurchaseRepository
+from .utils import (
+    TRACK_UPLOAD_DIR,
+    PREVIEW_UPLOAD_DIR,
+    COVER_UPLOAD_DIR,
+    build_media_url,
+    build_storage_name,
+    save_upload_file,
+    build_checkout_url,
+    extract_custom_data,
+    create_lemonsqueezy_checkout,
+    validate_upload_file,
+    AUDIO_EXTENSIONS,
+    IMAGE_EXTENSIONS,
+    MAX_TRACK_UPLOAD_BYTES,
+    MAX_PREVIEW_UPLOAD_BYTES,
+    MAX_COVER_UPLOAD_BYTES,
+    is_successful_payment_event,
+    generate_license_pdf,
+)
 
 
 class UserService:
@@ -26,6 +47,7 @@ class UserService:
         return await self.repo.create(
             session,
             email=user_data.email,
+            full_name=user_data.full_name,
             hashed_password=hashed_password
         )
     
@@ -112,6 +134,162 @@ class TrackService:
         """Get all tracks."""
         return await self.repo.get_all(session)
 
+    async def upload_track(
+        self,
+        *,
+        session: AsyncSession,
+        request: Request,
+        title: str,
+        artist: str,
+        category: str,
+        price: float | None,
+        checkout_url: str | None,
+        lemon_variant_id: int | None,
+        is_free: bool,
+        free_download_url: str | None,
+        track_file: UploadFile,
+        preview_file: UploadFile,
+        cover_file: UploadFile | None,
+    ) -> Track:
+        """Validate, persist files, and create a track record."""
+        if not is_free and price is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Price is required for paid tracks",
+            )
+        if not is_free and lemon_variant_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Lemon variant ID is required for paid tracks",
+            )
+
+        validate_upload_file(track_file, AUDIO_EXTENSIONS, MAX_TRACK_UPLOAD_BYTES, "Track file")
+        validate_upload_file(preview_file, AUDIO_EXTENSIONS, MAX_PREVIEW_UPLOAD_BYTES, "Preview file")
+        if cover_file is not None:
+            validate_upload_file(cover_file, IMAGE_EXTENSIONS, MAX_COVER_UPLOAD_BYTES, "Cover image")
+
+        track_filename = build_storage_name(track_file.filename)
+        preview_filename = build_storage_name(preview_file.filename)
+        cover_filename = build_storage_name(cover_file.filename) if cover_file else None
+
+        await save_upload_file(track_file, TRACK_UPLOAD_DIR / track_filename, MAX_TRACK_UPLOAD_BYTES)
+        await save_upload_file(preview_file, PREVIEW_UPLOAD_DIR / preview_filename, MAX_PREVIEW_UPLOAD_BYTES)
+        if cover_file and cover_filename:
+            await save_upload_file(cover_file, COVER_UPLOAD_DIR / cover_filename, MAX_COVER_UPLOAD_BYTES)
+
+        track_full_url = build_media_url(request, "tracks", track_filename)
+        normalized_price = 0.0 if is_free and price is None else (price or 0.0)
+        checkout_url_value = None if is_free else (checkout_url.strip() if checkout_url else None)
+        track_data = schemas.TrackCreate(
+            title=title.strip(),
+            artist=artist.strip(),
+            price=normalized_price,
+            cover_image_url=build_media_url(request, "covers", cover_filename) if cover_filename else None,
+            checkout_url=checkout_url_value,
+            lemon_variant_id=None if is_free else lemon_variant_id,
+            preview_url=build_media_url(request, "previews", preview_filename),
+            full_file_path=track_full_url,
+            is_free=is_free,
+            free_download_url=free_download_url.strip() if free_download_url else (track_full_url if is_free else None),
+            category=category.strip().lower(),
+        )
+        return await self.create_track(session, track_data)
+
+    async def create_checkout(self, session: AsyncSession, track_id: int, current_user: User) -> dict:
+        """Create checkout URL for one paid track."""
+        track = await self.get_track(session, track_id)
+        if track.is_free:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="This track is free to download",
+            )
+
+        if track.lemon_variant_id:
+            checkout_url = await create_lemonsqueezy_checkout(
+                variant_quantities=[{"variant_id": track.lemon_variant_id, "quantity": 1}],
+                custom_data={
+                    "track_id": str(track.id),
+                    "track_ids": str(track.id),
+                    "user_id": str(current_user.id),
+                },
+                email=current_user.email,
+            )
+        else:
+            if not track.checkout_url:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Checkout URL not configured for this track",
+                )
+            checkout_url = build_checkout_url(
+                track.checkout_url,
+                {
+                    "track_id": str(track.id),
+                    "user_id": str(current_user.id),
+                },
+                email=current_user.email,
+            )
+
+        return {
+            "track_id": track.id,
+            "checkout_url": checkout_url,
+        }
+
+    async def create_cart_checkout(
+        self,
+        session: AsyncSession,
+        track_ids: list[int],
+        current_user: User,
+    ) -> dict:
+        """Create checkout URL for paid tracks in cart."""
+        tracks_result = await session.execute(
+            select(Track).where(Track.id.in_(track_ids))
+        )
+        tracks_by_id = {track.id: track for track in tracks_result.scalars().all()}
+        missing_ids = [track_id for track_id in track_ids if track_id not in tracks_by_id]
+        if missing_ids:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Tracks not found: {', '.join(str(track_id) for track_id in missing_ids)}",
+            )
+
+        selected_tracks = [tracks_by_id[track_id] for track_id in track_ids]
+        paid_tracks = [track for track in selected_tracks if not track.is_free]
+        if not paid_tracks:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cart must include at least one paid track",
+            )
+
+        missing_variant = [track.title for track in paid_tracks if not track.lemon_variant_id]
+        if missing_variant:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Missing Lemon variant ID for: {', '.join(missing_variant)}",
+            )
+
+        variant_ids = [int(track.lemon_variant_id) for track in paid_tracks]
+        if len(set(variant_ids)) != len(variant_ids):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Each track must have a unique Lemon variant ID for cart checkout",
+            )
+
+        variant_quantities = [{"variant_id": variant_id, "quantity": 1} for variant_id in variant_ids]
+        cart_track_ids = [track.id for track in paid_tracks]
+        checkout_url = await create_lemonsqueezy_checkout(
+            variant_quantities=variant_quantities,
+            custom_data={
+                "track_ids": ",".join(str(track_id) for track_id in cart_track_ids),
+                "user_id": str(current_user.id),
+            },
+            email=current_user.email,
+        )
+
+        return {
+            "track_ids": cart_track_ids,
+            "checkout_url": checkout_url,
+        }
+
 
 class PurchaseService:
     """Handle purchase-related business logic."""
@@ -153,3 +331,74 @@ class PurchaseService:
     ) -> bool:
         """Check if user can download track."""
         return await self.repo.has_purchased(session, user_id, track_id)
+
+    async def process_successful_payment_payload(
+        self,
+        session: AsyncSession,
+        payload: dict,
+    ) -> dict:
+        """Persist purchases for successful Lemon Squeezy webhook payload."""
+        if not is_successful_payment_event(payload):
+            return {"status": "ignored"}
+
+        custom_data = extract_custom_data(payload)
+        track_id = custom_data.get("track_id")
+        track_ids = custom_data.get("track_ids")
+        user_id = custom_data.get("user_id")
+        license_type = custom_data.get("license_type")
+
+        if not user_id or (not track_id and not track_ids):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Missing custom data",
+            )
+
+        resolved_track_ids: list[int] = []
+        if track_ids:
+            for raw_id in track_ids.split(","):
+                value = raw_id.strip()
+                if not value:
+                    continue
+                resolved_track_ids.append(int(value))
+        elif track_id:
+            resolved_track_ids.append(int(track_id))
+
+        if not resolved_track_ids:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No valid track IDs in custom data",
+            )
+
+        purchase_ids: list[int] = []
+        for resolved_track_id in resolved_track_ids:
+            purchase = await self.record_purchase(session, int(user_id), resolved_track_id, license_type)
+            purchase_ids.append(purchase.id)
+        return {"status": "ok", "purchase_ids": purchase_ids}
+
+    async def generate_license_document(
+        self,
+        session: AsyncSession,
+        current_user: User,
+        purchase_id: int,
+    ) -> tuple[bytes, str]:
+        """Generate PDF license file for a user's purchase."""
+        row = await self.repo.get_purchase_with_track_for_user(session, current_user.id, purchase_id)
+        if not row:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Purchase not found",
+            )
+
+        purchase, track = row
+        buyer_name = (current_user.full_name or "").strip() or current_user.email
+        pdf_bytes = generate_license_pdf(
+            purchase_id=purchase.id,
+            buyer_name=buyer_name,
+            buyer_email=current_user.email,
+            track_title=track.title,
+            track_artist=track.artist,
+            license_type=purchase.license_type or "Standard",
+            purchased_at=purchase.created_at,
+        )
+        filename = f"license-{purchase.id}.pdf"
+        return pdf_bytes, filename

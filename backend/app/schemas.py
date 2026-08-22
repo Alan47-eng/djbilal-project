@@ -1,3 +1,4 @@
+import re
 from pydantic import BaseModel, EmailStr, field_validator, model_validator, ConfigDict
 from datetime import datetime
 
@@ -8,10 +9,33 @@ ALL_TRACK_CATEGORIES = PAID_TRACK_CATEGORIES | FREE_TRACK_CATEGORIES
 class UserCreate(BaseModel):
     email: EmailStr
     password: str
+    full_name: str | None = None
+
+    @field_validator("password")
+    @classmethod
+    def validate_password_strength(cls, value: str):
+        if len(value) < 8:
+            raise ValueError("Password must be at least 8 characters long")
+        if not re.search(r"[A-Za-z]", value) or not re.search(r"\d", value):
+            raise ValueError("Password must contain at least one letter and one number")
+        return value
+
+    @field_validator("full_name")
+    @classmethod
+    def validate_full_name(cls, value: str | None):
+        if value is None:
+            return value
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("Full name cannot be empty")
+        if len(normalized) > 255:
+            raise ValueError("Full name is too long")
+        return normalized
 
 class UserRead(BaseModel):
     id: int
     email: EmailStr
+    full_name: str | None = None
     is_admin: bool
     created_at: datetime
 
@@ -120,6 +144,7 @@ class PurchaseDetail(BaseModel):
     track_artist: str
     cover_image_url: str | None = None
     download_url: str
+    license_pdf_url: str
     license_type: str | None = None
     purchased_at: datetime
 

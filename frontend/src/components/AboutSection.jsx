@@ -60,6 +60,10 @@ const AboutSection = () => {
       ? 'اختر التراك، أكمل الدفع عبر Lemon Squeezy، ثم نزّل الملف المرخّص مباشرة.'
       : 'Choose a track, complete payment via Lemon Squeezy, and instantly download your licensed audio file.',
     contact: lang === 'ar' ? 'التواصل' : 'Contact',
+    seoFocus: lang === 'ar' ? 'كلمات البحث الأساسية' : 'Search Focus',
+    seoKeywords: lang === 'ar'
+      ? 'ديجي ريمكسات · ريمكس اغاني · ريمكس اغاتي · حفل اعراس · دي جي اعراس · اغاني اعراس · ديجي حفلات'
+      : 'Arabic DJ remix · wedding remix · remix tracks · licensed remix download',
     years: lang === 'ar' ? 'سنوات الخبرة' : 'Years of Experience',
     released: lang === 'ar' ? 'إصدارات الإيقاعات' : 'Released Beats',
     clients: lang === 'ar' ? 'عملاء سعداء' : 'Happy Clients',
@@ -107,9 +111,14 @@ const AboutSection = () => {
             <div className="rounded-xl border border-slate-700 bg-slate-800 p-4">
               <h3 className="text-sm font-bold uppercase tracking-wide text-slate-200">{t.contact}</h3>
               <p className="mt-2 text-sm text-slate-300">
-                Support e-mail: <strong>[E-POSTA-ADRESI-EKLENECEK]</strong>
+                Support e-mail: <strong>support@djbilal.com</strong>
               </p>
             </div>
+          </div>
+
+          <div className="mb-8 rounded-xl border border-slate-700 bg-slate-800 p-4">
+            <h3 className="text-sm font-bold uppercase tracking-wide text-slate-200">{t.seoFocus}</h3>
+            <p className="mt-2 text-sm text-slate-300">{t.seoKeywords}</p>
           </div>
 
           {/* Stats */}

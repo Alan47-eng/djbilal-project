@@ -11,6 +11,8 @@ services:
         sync: false
       - key: FRONTEND_ORIGINS
         sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
       - key: LEMON_SQUEEZY_WEBHOOK_SECRET
         sync: false
 

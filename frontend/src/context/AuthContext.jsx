@@ -9,12 +9,7 @@ export function AuthProvider({ children }) {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    const token = localStorage.getItem('access_token');
-    if (token) {
-      fetchUser();
-    } else {
-      setLoading(false);
-    }
+    fetchUser();
   }, []);
 
   const fetchUser = async () => {
@@ -23,9 +18,12 @@ export function AuthProvider({ children }) {
       setUser(response.data);
       setError(null);
     } catch (err) {
-      localStorage.removeItem('access_token');
       setUser(null);
-      setError(err.response?.data?.detail || 'Failed to fetch user');
+      if (err.response?.status !== 401) {
+        setError(err.response?.data?.detail || 'Failed to fetch user');
+      } else {
+        setError(null);
+      }
     } finally {
       setLoading(false);
     }
@@ -38,7 +36,6 @@ export function AuthProvider({ children }) {
   const login = async (email, password) => {
     try {
       const response = await api.post('/login', { email, password });
-      localStorage.setItem('access_token', response.data.access_token);
       await fetchUser();
       setError(null);
       return true;
@@ -49,9 +46,13 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const register = async (email, password) => {
+  const register = async (email, password, fullName) => {
     try {
-      await api.post('/register', { email, password });
+      await api.post('/register', {
+        email,
+        password,
+        full_name: fullName?.trim() || null,
+      });
       await login(email, password);
       return true;
     } catch (err) {
@@ -62,7 +63,7 @@ export function AuthProvider({ children }) {
   };
 
   const logout = () => {
-    localStorage.removeItem('access_token');
+    api.post('/logout').catch(() => {});
     setUser(null);
     setError(null);
   };

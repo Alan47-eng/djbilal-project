@@ -11,6 +11,7 @@ const apiBaseUrl = rawBaseUrl.replace(/\/+$/, '');
 // Create Axios instance with base URL pointing to backend
 const api = axios.create({
   baseURL: apiBaseUrl,
+  withCredentials: true,
 });
 
 export const resolveAssetUrl = (url) => {
@@ -31,31 +32,9 @@ export const resolveAssetUrl = (url) => {
   }
 };
 
-// Interceptor: Add JWT token from localStorage to every request
-api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('access_token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
-
-// Interceptor: Handle 401 responses (token expired/invalid)
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      // Clear token and redirect to login (could be handled by component)
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('userEmail');
-    }
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
 export default api;

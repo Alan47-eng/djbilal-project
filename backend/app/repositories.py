@@ -88,6 +88,20 @@ class PurchaseRepository(BaseRepository):
             )
         )
         return result.scalars().first()
+
+    async def get_purchase_with_track_for_user(
+        self, session: AsyncSession, user_id: int, purchase_id: int
+    ) -> Optional[tuple[Purchase, Track]]:
+        """Get one purchase (owned by user) with its track."""
+        result = await session.execute(
+            select(Purchase, Track)
+            .join(Track, Purchase.track_id == Track.id)
+            .where(
+                Purchase.id == purchase_id,
+                Purchase.user_id == user_id,
+            )
+        )
+        return result.first()
     
     async def has_purchased(self, session: AsyncSession, user_id: int, track_id: int) -> bool:
         """Check if user has purchased track."""
@@ -117,6 +131,7 @@ class PurchaseRepository(BaseRepository):
                 "track_artist": track.artist,
                 "cover_image_url": track.cover_image_url,
                 "download_url": track.full_file_path,
+                "license_pdf_url": f"/purchases/{purchase.id}/license-pdf",
                 "license_type": purchase.license_type,
                 "purchased_at": purchase.created_at,
             })

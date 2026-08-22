@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Download, ShoppingBag, BadgeCheck, RefreshCw } from 'lucide-react';
+import { Download, FileText, ShoppingBag, BadgeCheck, RefreshCw } from 'lucide-react';
 import api, { resolveAssetUrl } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -17,6 +17,7 @@ const UserPurchases = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [downloading, setDownloading] = useState(null);
+  const [downloadingLicense, setDownloadingLicense] = useState(null);
   const t = {
     couldNotLoad: lang === 'ar' ? 'تعذر تحميل المشتريات.' : 'Could not load purchases.',
     downloadFailed: lang === 'ar' ? 'فشل التنزيل.' : 'Download failed.',
@@ -27,8 +28,9 @@ const UserPurchases = () => {
     noPurchases: lang === 'ar' ? 'لم تقم بشراء أي تراك بعد.' : 'You have not purchased any tracks yet.',
     track: lang === 'ar' ? 'التراك' : 'Track',
     purchaseDate: lang === 'ar' ? 'تاريخ الشراء' : 'Purchase Date',
-    license: lang === 'ar' ? 'الرخصة' : 'License',
+    license: lang === 'ar' ? 'الرخصة' : 'Lisans',
     download: lang === 'ar' ? 'تنزيل' : 'Download',
+    licensePdf: lang === 'ar' ? 'ملف ترخيص PDF' : 'License PDF',
     standard: lang === 'ar' ? 'قياسي' : 'Standard',
   };
 
@@ -84,6 +86,25 @@ const UserPurchases = () => {
       setError(err.response?.data?.detail || t.downloadFailed);
     } finally {
       setDownloading(null);
+    }
+  };
+
+  const handleDownloadLicense = async (purchase) => {
+    try {
+      setDownloadingLicense(purchase.id);
+      const fileResponse = await api.get(`/purchases/${purchase.id}/license-pdf`, { responseType: 'blob' });
+      const blobUrl = window.URL.createObjectURL(fileResponse.data);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = `license-${purchase.id}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      setError(err.response?.data?.detail || t.downloadFailed);
+    } finally {
+      setDownloadingLicense(null);
     }
   };
 
@@ -167,21 +188,32 @@ const UserPurchases = () => {
                       day: 'numeric',
                     })}
                   </div>
-                  <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center justify-between gap-2">
                     <span
                       className={`inline-block rounded-full border px-2.5 py-0.5 text-xs font-semibold ${licenseClass}`}
                     >
                       {purchase.license_type || t.standard}
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => handleDownload(purchase)}
-                      disabled={downloading === purchase.track_id}
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-purple-600 px-3 py-2 text-xs font-semibold text-white hover:bg-purple-700 disabled:opacity-60 transition-colors"
-                    >
-                      <Download size={13} />
-                      {downloading === purchase.track_id ? '...' : t.download}
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleDownloadLicense(purchase)}
+                        disabled={downloadingLicense === purchase.id}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-xs font-semibold text-slate-200 hover:bg-slate-700 disabled:opacity-60 transition-colors"
+                      >
+                        <FileText size={13} />
+                        {downloadingLicense === purchase.id ? '...' : t.licensePdf}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDownload(purchase)}
+                        disabled={downloading === purchase.track_id}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-purple-600 px-3 py-2 text-xs font-semibold text-white hover:bg-purple-700 disabled:opacity-60 transition-colors"
+                      >
+                        <Download size={13} />
+                        {downloading === purchase.track_id ? '...' : t.download}
+                      </button>
+                    </div>
                   </div>
                 </div>
               );
@@ -241,7 +273,16 @@ const UserPurchases = () => {
                     </span>
                   </div>
 
-                  <div className="col-span-2 flex justify-end">
+                  <div className="col-span-2 flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleDownloadLicense(purchase)}
+                      disabled={downloadingLicense === purchase.id}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-xs font-semibold text-slate-200 hover:bg-slate-700 disabled:opacity-60 transition-colors"
+                    >
+                      <FileText size={13} />
+                      {downloadingLicense === purchase.id ? '...' : t.licensePdf}
+                    </button>
                     <button
                       type="button"
                       onClick={() => handleDownload(purchase)}
