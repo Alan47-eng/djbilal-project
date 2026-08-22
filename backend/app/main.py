@@ -43,11 +43,20 @@ FRONTEND_ORIGINS = parse_frontend_origins(os.getenv("FRONTEND_ORIGINS"))
 ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "admin@djbilal.com")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
 IS_PRODUCTION = os.getenv("ENVIRONMENT", "development").lower() == "production"
+LOCAL_DEV_ORIGIN_REGEX = (
+    r"^https?://("
+    r"(localhost|127\.0\.0\.1|0\.0\.0\.0)"
+    r"|192\.168\.\d{1,3}\.\d{1,3}"
+    r"|10\.\d{1,3}\.\d{1,3}\.\d{1,3}"
+    r"|172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}"
+    r")(:\d+)?$"
+)
 
 # CORS middleware MUST be first (before mount)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=FRONTEND_ORIGINS,
+    allow_origin_regex=None if IS_PRODUCTION else LOCAL_DEV_ORIGIN_REGEX,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

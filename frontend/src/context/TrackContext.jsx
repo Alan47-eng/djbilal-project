@@ -19,7 +19,11 @@ export function TrackProvider({ children }) {
       setTracks(response.data);
       setError(null);
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to load tracks');
+      if (!err.response) {
+        setError(`Failed to load tracks (API unreachable: ${api.defaults.baseURL})`);
+      } else {
+        setError(err.response?.data?.detail || 'Failed to load tracks');
+      }
     } finally {
       setLoading(false);
     }

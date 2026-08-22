@@ -1,11 +1,27 @@
 import axios from 'axios';
 
+const inferLocalBackendUrl = () => {
+  if (typeof window === 'undefined') return 'http://localhost:8000';
+
+  const hostname = window.location.hostname;
+  const isPrivateHost =
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    hostname === '0.0.0.0' ||
+    /^192\.168\.\d{1,3}\.\d{1,3}$/.test(hostname) ||
+    /^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname) ||
+    /^172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}$/.test(hostname);
+
+  const protocol = isPrivateHost ? 'http:' : window.location.protocol;
+  return `${protocol}//${hostname}:8000`;
+};
+
 const runtimeBaseUrl =
   typeof window !== 'undefined' && window.__ENV__ && window.__ENV__.VITE_API_BASE_URL
     ? window.__ENV__.VITE_API_BASE_URL
     : null;
 
-const rawBaseUrl = runtimeBaseUrl || import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+const rawBaseUrl = runtimeBaseUrl || import.meta.env.VITE_API_BASE_URL || inferLocalBackendUrl();
 const apiBaseUrl = rawBaseUrl.replace(/\/+$/, '');
 
 // Create Axios instance with base URL pointing to backend
