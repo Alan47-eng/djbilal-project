@@ -51,12 +51,18 @@ LOCAL_DEV_ORIGIN_REGEX = (
     r"|172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}"
     r")(:\d+)?$"
 )
+PRODUCTION_ORIGIN_REGEX = (
+    r"^https://("
+    r"([a-z0-9-]+\.)?dj-bilal\.com"
+    r"|djbilal-frontend-production\.up\.railway\.app"
+    r")$"
+)
 
 # CORS middleware MUST be first (before mount)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=FRONTEND_ORIGINS,
-    allow_origin_regex=None if IS_PRODUCTION else LOCAL_DEV_ORIGIN_REGEX,
+    allow_origin_regex=PRODUCTION_ORIGIN_REGEX if IS_PRODUCTION else LOCAL_DEV_ORIGIN_REGEX,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
