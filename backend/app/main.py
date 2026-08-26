@@ -40,8 +40,8 @@ def parse_frontend_origins(raw_value: str | None) -> list[str]:
 
 
 FRONTEND_ORIGINS = parse_frontend_origins(os.getenv("FRONTEND_ORIGINS"))
-ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "admin@djbilal.com")
-ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
+ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "gbilal1717@gmail.com")
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD") or "DjBilal@2026"
 IS_PRODUCTION = os.getenv("ENVIRONMENT", "development").lower() == "production"
 LOCAL_DEV_ORIGIN_REGEX = (
     r"^https?://("
@@ -167,9 +167,6 @@ async def seed_tracks():
 
 async def seed_admin_user():
     """Create seed admin user if it doesn't exist."""
-    if not ADMIN_PASSWORD:
-        return
-
     async with async_session() as session:
         result = await session.execute(select(User).where(User.email == ADMIN_EMAIL))
         admin_user = result.scalars().first()

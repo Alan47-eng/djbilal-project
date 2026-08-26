@@ -53,7 +53,19 @@ const AboutSection = () => {
       ? '🎚️ تراكات مرخصة · حلول مخصصة للميكس والماستر · إيقاعات خالية من حقوق الملكية'
       : '🎚️ Licensed instrumentals · Custom mixing/mastering solutions · Royalty-free beats',
     bio: lang === 'ar'
-      ? `DJ Bilal Hamsho (دي جي بلال حمشو) هو دي جي ومنتج موسيقي سوري يتمتع بخبرة تتجاوز 20 عاماً في مجال الـDJ والـMusic Production. يتميز بأسلوبه الخاص في تقديم الريمكسات والماش أب والمكسات، مع دمج الموسيقى الشرقية والعربية مع أنماط إلكترونية حديثة مثل Afro House وHouse وEDM، إلى جانب المهرجانات والدبكات السورية واللبنانية. حقق مئات الملايين من المشاهدات على منصات مثل YouTube وSpotify وAnghami وApple Music وSoundCloud، وكان أول DJ سوري يحصل على الدرع الفضي من YouTube. بالإضافة إلى الأداء والإنتاج، يقدم دورات تعليمية في الـDJ والـMixing والـMusic Production، ويقدّم عروضاً للحفلات والأعراس مع حلول مخصّصة للميكس والماستر.`
+      ? `DJ Bilal Hamsho (دي جي بلال حمشو) هو دي جي ومنتج موسيقي سوري يتمتع بخبرة تتجاوز 20 عاماً في مجال الـDJ والـMusic Production، ويُعد من الأسماء البارزة في مجال الموسيقى الإلكترونية والـDJing في سوريا.
+
+يتميز بلال حمشو بأسلوبه الخاص في تقديم الـRemixes والـMashups والـMixes، مع تركيز على دمج الموسيقى الشرقية والعربية مع أنماط الموسيقى الإلكترونية الحديثة، وخاصة Afro House وHouse وEDM، إلى جانب الموسيقى العربية والمهرجانات والدبكات السورية واللبنانية.
+
+حقق DJ Bilal Hamsho مئات الملايين من المشاهدات والاستماعات عبر مختلف المنصات الرقمية، ويمتلك حضوراً واسعاً على منصات التواصل الاجتماعي والمنصات الموسيقية العالمية، حيث تتوفر أعماله وMixes الخاصة به عبر YouTube وSpotify وAnghami وApple Music وSoundCloud وغيرها.
+
+ويُعد بلال حمشو أول DJ سوري يحصل على الدرع الفضي من YouTube (Silver Creator Award)، كإنجاز يعكس حجم حضوره وانتشاره على المنصة.
+
+ولا يقتصر نشاط بلال حمشو على الأداء والإنتاج الموسيقي، بل يعمل أيضاً في مجال التعليم والتدريب الموسيقي، حيث يقدم دورات متخصصة في تعليم الـDJ والـMixing، بالإضافة إلى دورات Music Production وتعليم صناعة وإنتاج الموسيقى، مع تدريب عملي على تقنيات الـMixing والـMastering وبرامج الإنتاج الموسيقي.
+
+كما يمتد نشاطه إلى الحفلات والأعراس والمناسبات الخاصة، حيث يقدم عروضاً موسيقية تجمع بين الخبرة الطويلة في مجال الـDJ والأفكار الحديثة في الإنتاج والأداء، مع القدرة على التعامل مع مختلف أنواع الجمهور والمناسبات.
+
+DJ Bilal Hamsho هو مشروع موسيقي متكامل يجمع بين DJing، Music Production، Remixing، Performance والتعليم الموسيقي، بخبرة تتجاوز عقدين من الزمن وحضور رقمي واسع، مع توجه مستمر نحو تطوير الموسيقى العربية وتقديمها بأسلوب إلكتروني عصري.`
       : 'Hi! I am DJ Bilal — a production artist with years of experience across live stages and studio sessions. I create professional beats and instrumentals across a wide range of styles, from electronic music to hip-hop. Every track is carefully mixed and mastered to deliver top-level quality. Whether you want a ready-to-use beat or a custom offer for your project, you are in the right place.',
     howWorks: lang === 'ar' ? 'طريقة الشراء' : 'How purchase works',
     howWorksDesc: lang === 'ar'
@@ -107,7 +119,7 @@ const AboutSection = () => {
             <div className="rounded-xl border border-slate-700 bg-slate-800 p-4">
               <h3 className="text-sm font-bold uppercase tracking-wide text-slate-200">{t.contact}</h3>
               <p className="mt-2 text-sm text-slate-300">
-                Support e-mail: <strong>support@djbilal.com</strong>
+                Support e-mail: <strong>gbilal1717@gmail.com</strong>
               </p>
             </div>
           </div>
