@@ -53,7 +53,7 @@ const AboutSection = () => {
       ? '🎚️ تراكات مرخصة · حلول مخصصة للميكس والماستر · إيقاعات خالية من حقوق الملكية'
       : '🎚️ Licensed instrumentals · Custom mixing/mastering solutions · Royalty-free beats',
     bio: lang === 'ar'
-      ? 'مرحباً! أنا DJ Bilal، منتج موسيقي بخبرة سنوات في العروض الحية والاستوديو. أقدم إيقاعات وتوزيعات احترافية بأنماط متعددة مع ميكس وماستر عالي الجودة.'
+      ? `DJ Bilal Hamsho (دي جي بلال حمشو) هو دي جي ومنتج موسيقي سوري يتمتع بخبرة تتجاوز 20 عاماً في مجال الـDJ والـMusic Production. يتميز بأسلوبه الخاص في تقديم الريمكسات والماش أب والمكسات، مع دمج الموسيقى الشرقية والعربية مع أنماط إلكترونية حديثة مثل Afro House وHouse وEDM، إلى جانب المهرجانات والدبكات السورية واللبنانية. حقق مئات الملايين من المشاهدات على منصات مثل YouTube وSpotify وAnghami وApple Music وSoundCloud، وكان أول DJ سوري يحصل على الدرع الفضي من YouTube. بالإضافة إلى الأداء والإنتاج، يقدم دورات تعليمية في الـDJ والـMixing والـMusic Production، ويقدّم عروضاً للحفلات والأعراس مع حلول مخصّصة للميكس والماستر.`
       : 'Hi! I am DJ Bilal — a production artist with years of experience across live stages and studio sessions. I create professional beats and instrumentals across a wide range of styles, from electronic music to hip-hop. Every track is carefully mixed and mastered to deliver top-level quality. Whether you want a ready-to-use beat or a custom offer for your project, you are in the right place.',
     howWorks: lang === 'ar' ? 'طريقة الشراء' : 'How purchase works',
     howWorksDesc: lang === 'ar'
