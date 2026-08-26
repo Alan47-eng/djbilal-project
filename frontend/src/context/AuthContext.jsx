@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import api, { setAuthToken } from '../api';
+import api, { getAuthToken, setAuthToken } from '../api';
 
 const AuthContext = createContext(null);
 
@@ -9,6 +9,13 @@ export function AuthProvider({ children }) {
   const [error, setError] = useState(null);
 
   useEffect(() => {
+    const token = getAuthToken();
+    if (!token) {
+      setUser(null);
+      setError(null);
+      setLoading(false);
+      return;
+    }
     fetchUser();
   }, []);
 
