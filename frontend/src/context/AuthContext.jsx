@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import api from '../api';
+import api, { setAuthToken } from '../api';
 
 const AuthContext = createContext(null);
 
@@ -24,6 +24,7 @@ export function AuthProvider({ children }) {
       } else {
         setError(null);
       }
+      setAuthToken(null);
     } finally {
       setLoading(false);
     }
@@ -36,12 +37,17 @@ export function AuthProvider({ children }) {
   const login = async (email, password) => {
     try {
       const response = await api.post('/login', { email, password });
+      const token = response.data?.access_token;
+      if (token) {
+        setAuthToken(token);
+      }
       await fetchUser();
       setError(null);
       return true;
     } catch (err) {
       const errorMsg = err.response?.data?.detail || 'Login failed';
       setError(errorMsg);
+      setAuthToken(null);
       return false;
     }
   };
@@ -64,6 +70,7 @@ export function AuthProvider({ children }) {
 
   const logout = () => {
     api.post('/logout').catch(() => {});
+    setAuthToken(null);
     setUser(null);
     setError(null);
   };

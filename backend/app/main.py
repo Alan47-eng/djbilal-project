@@ -217,7 +217,7 @@ async def login(
         value=access_token,
         httponly=True,
         secure=IS_PRODUCTION,
-        samesite="lax",
+        samesite="none" if IS_PRODUCTION else "lax",
         max_age=auth.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
     )
     return {"access_token": access_token, "token_type": "bearer"}

@@ -1,4 +1,20 @@
-import axios from 'axios';
+﻿import axios from 'axios';
+
+const AUTH_TOKEN_KEY = 'djbilal_auth_token';
+
+export const getAuthToken = () => {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem(AUTH_TOKEN_KEY);
+};
+
+export const setAuthToken = (token) => {
+  if (typeof window === 'undefined') return;
+  if (token) {
+    localStorage.setItem(AUTH_TOKEN_KEY, token);
+    return;
+  }
+  localStorage.removeItem(AUTH_TOKEN_KEY);
+};
 
 const inferLocalBackendUrl = () => {
   if (typeof window === 'undefined') return 'http://localhost:8000';
@@ -24,11 +40,29 @@ const runtimeBaseUrl =
 const rawBaseUrl = runtimeBaseUrl || import.meta.env.VITE_API_BASE_URL || inferLocalBackendUrl();
 const apiBaseUrl = rawBaseUrl.replace(/\/+$/, '');
 
-// Create Axios instance with base URL pointing to backend
 const api = axios.create({
   baseURL: apiBaseUrl,
   withCredentials: true,
 });
+
+api.interceptors.request.use((config) => {
+  const token = getAuthToken();
+  if (token) {
+    config.headers = config.headers || {};
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      setAuthToken(null);
+    }
+    return Promise.reject(error);
+  }
+);
 
 export const resolveAssetUrl = (url) => {
   if (!url) return url;
@@ -47,10 +81,5 @@ export const resolveAssetUrl = (url) => {
     return url;
   }
 };
-
-api.interceptors.response.use(
-  (response) => response,
-  (error) => Promise.reject(error)
-);
 
 export default api;
