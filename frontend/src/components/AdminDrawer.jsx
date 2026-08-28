@@ -150,7 +150,10 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
     }
   };
 
-  const handleTrackDelete = async (trackId) => {
+  const handleTrackDelete = async (trackId, trackTitle) => {
+    const confirmed = window.confirm(`Are you sure you want to delete "${trackTitle || 'this track'}"?`);
+    if (!confirmed) return;
+
     try {
       setMessage(null);
       setError(null);
@@ -453,7 +456,7 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
                           </div>
                           <button
                             type="button"
-                            onClick={() => handleTrackDelete(track.id)}
+                            onClick={() => handleTrackDelete(track.id, track.title)}
                             className="inline-flex items-center gap-1 rounded-lg border border-red-700 bg-red-500/10 px-2 py-1 text-[11px] font-semibold text-red-300 hover:bg-red-500/20"
                           >
                             <Trash2 size={12} />
