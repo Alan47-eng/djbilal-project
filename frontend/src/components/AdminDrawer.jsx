@@ -12,6 +12,8 @@ import {
   LogIn,
   UserPlus,
   LogOut,
+  PencilLine,
+  Trash2,
 } from 'lucide-react';
 import api from '../api';
 import { useAuth } from '../context/AuthContext';
@@ -32,10 +34,12 @@ const emptyForm = {
 
 const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLogout }) => {
   const { user } = useAuth();
-  const { fetchTracks } = useTracks();
+  const { tracks, fetchTracks, updateTrack, removeTrack } = useTracks();
   const [users, setUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [updatingTrackId, setUpdatingTrackId] = useState(null);
+  const [trackPriceDrafts, setTrackPriceDrafts] = useState({});
   const [message, setMessage] = useState(null);
   const [error, setError] = useState(null);
   const [form, setForm] = useState(emptyForm);
@@ -121,6 +125,45 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
       setMessage(`${email} was promoted to admin`);
     } catch (err) {
       setError(err.response?.data?.detail || 'Could not promote user');
+    }
+  };
+
+  const handleTrackPriceUpdate = async (trackId) => {
+    const rawPrice = trackPriceDrafts[trackId];
+    const priceValue = Number(rawPrice);
+    if (!Number.isFinite(priceValue) || priceValue < 0) {
+      setError('Price must be a valid non-negative number');
+      return;
+    }
+
+    try {
+      setUpdatingTrackId(trackId);
+      setMessage(null);
+      setError(null);
+      const response = await api.put(`/tracks/${trackId}`, { price: Number(priceValue.toFixed(2)) });
+      updateTrack(response.data);
+      setMessage('Track price updated');
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Could not update track price');
+    } finally {
+      setUpdatingTrackId(null);
+    }
+  };
+
+  const handleTrackDelete = async (trackId) => {
+    try {
+      setMessage(null);
+      setError(null);
+      await api.delete(`/tracks/${trackId}`);
+      removeTrack(trackId);
+      setTrackPriceDrafts((prev) => {
+        const next = { ...prev };
+        delete next[trackId];
+        return next;
+      });
+      setMessage('Track deleted');
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Could not delete track');
     }
   };
 
@@ -390,6 +433,58 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
                     {uploading ? 'Adding...' : 'Add Track'}
                   </button>
                 </form>
+              </section>
+
+              <section className="rounded-2xl border border-slate-800 bg-slate-950 p-4">
+                <div className="mb-4 flex items-center gap-2">
+                  <PencilLine size={18} className="text-purple-400" />
+                  <h3 className="font-semibold">Manage Tracks</h3>
+                </div>
+                <div className="max-h-64 space-y-3 overflow-y-auto">
+                  {tracks.length === 0 ? (
+                    <p className="text-sm text-slate-400">No tracks yet.</p>
+                  ) : (
+                    tracks.map((track) => (
+                      <div key={track.id} className="rounded-lg border border-slate-800 bg-slate-900 p-3">
+                        <div className="mb-2 flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium text-white">{track.title}</p>
+                            <p className="text-xs text-slate-400">{track.category} • ${Number(track.price).toFixed(2)}</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleTrackDelete(track.id)}
+                            className="inline-flex items-center gap-1 rounded-lg border border-red-700 bg-red-500/10 px-2 py-1 text-[11px] font-semibold text-red-300 hover:bg-red-500/20"
+                          >
+                            <Trash2 size={12} />
+                            Delete
+                          </button>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={trackPriceDrafts[track.id] ?? track.price}
+                            onChange={(event) =>
+                              setTrackPriceDrafts((prev) => ({ ...prev, [track.id]: event.target.value }))
+                            }
+                            className="w-24 rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-sm text-white"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleTrackPriceUpdate(track.id)}
+                            disabled={updatingTrackId === track.id}
+                            className="inline-flex items-center gap-1 rounded-lg bg-purple-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-purple-700 disabled:opacity-60"
+                          >
+                            <PencilLine size={12} />
+                            {updatingTrackId === track.id ? 'Saving...' : 'Save price'}
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
               </section>
 
               <section className="rounded-2xl border border-slate-800 bg-slate-950 p-4">

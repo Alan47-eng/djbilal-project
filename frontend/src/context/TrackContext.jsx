@@ -33,8 +33,16 @@ export function TrackProvider({ children }) {
     setTracks(prev => [newTrack, ...prev]);
   };
 
+  const updateTrack = (updatedTrack) => {
+    setTracks(prev => prev.map(track => track.id === updatedTrack.id ? updatedTrack : track));
+  };
+
+  const removeTrack = (trackId) => {
+    setTracks(prev => prev.filter(track => track.id !== trackId));
+  };
+
   return (
-    <TrackContext.Provider value={{ tracks, loading, error, fetchTracks, addTrack }}>
+    <TrackContext.Provider value={{ tracks, loading, error, fetchTracks, addTrack, updateTrack, removeTrack }}>
       {children}
     </TrackContext.Provider>
   );

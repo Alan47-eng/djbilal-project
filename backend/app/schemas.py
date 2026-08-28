@@ -120,6 +120,67 @@ class TrackCreate(BaseModel):
             raise ValueError('URLs cannot be empty')
         return v.strip()
 
+class TrackUpdate(BaseModel):
+    title: str | None = None
+    artist: str | None = None
+    price: float | None = None
+    cover_image_url: str | None = None
+    checkout_url: str | None = None
+    lemon_variant_id: int | None = None
+    preview_url: str | None = None
+    is_free: bool | None = None
+    free_download_url: str | None = None
+    category: str | None = None
+
+    @field_validator('title', 'artist')
+    @classmethod
+    def title_artist_not_empty(cls, v):
+        if v is None:
+            return v
+        if not v or not v.strip():
+            raise ValueError('Title and artist cannot be empty')
+        return v.strip()
+
+    @field_validator('price')
+    @classmethod
+    def price_must_be_valid(cls, v):
+        if v is None:
+            return v
+        if v < 0:
+            raise ValueError('Price must be greater than 0')
+        if v > 999999.99:
+            raise ValueError('Price cannot exceed 999999.99')
+        return v
+
+    @field_validator('category')
+    @classmethod
+    def validate_category(cls, v: str | None):
+        if v is None:
+            return v
+        normalized = v.strip().lower()
+        if normalized not in ALL_TRACK_CATEGORIES:
+            raise ValueError('Category must be one of: edit, remix, simple-pack, vst')
+        return normalized
+
+    @field_validator('lemon_variant_id')
+    @classmethod
+    def validate_lemon_variant_id(cls, value):
+        if value is None:
+            return value
+        if value <= 0:
+            raise ValueError('Lemon variant ID must be a positive integer')
+        return value
+
+    @field_validator('cover_image_url', 'checkout_url', 'preview_url', 'free_download_url')
+    @classmethod
+    def urls_not_empty(cls, v):
+        if v is None:
+            return v
+        if not v.strip():
+            raise ValueError('URLs cannot be empty')
+        return v.strip()
+
+
 class TrackResponse(BaseModel):
     id: int
     title: str

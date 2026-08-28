@@ -2,7 +2,7 @@ import pytest
 from datetime import datetime
 from pydantic import ValidationError
 
-from app.schemas import TrackCreate, TrackResponse, calculate_discounted_price
+from app.schemas import TrackCreate, TrackResponse, TrackUpdate, calculate_discounted_price
 
 
 class TestTrackCreate:
@@ -229,6 +229,22 @@ class TestTrackResponse:
         
         assert "full_file_path" not in response_dict
         assert "preview_url" in response_dict
+
+
+class TestTrackUpdate:
+    """Test suite for TrackUpdate schema"""
+
+    def test_track_update_accepts_price_only(self):
+        track = TrackUpdate(price=12.5)
+        assert track.price == 12.5
+
+    def test_track_update_rejects_invalid_category(self):
+        with pytest.raises(ValueError):
+            TrackUpdate(category="invalid")
+
+    def test_track_update_rejects_negative_price(self):
+        with pytest.raises(ValueError):
+            TrackUpdate(price=-1)
 
 
 class TestCalculateDiscountedPrice:

@@ -301,6 +301,40 @@ async def upload_track(
         cover_file=cover_file,
     )
 
+@app.put("/tracks/{track_id}", response_model=schemas.TrackResponse)
+async def update_track(
+    track_id: int,
+    track_update: schemas.TrackUpdate,
+    current_user: User = Depends(auth.get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    require_admin(current_user)
+    updated_track = await track_service.update_track(session, track_id, track_update)
+    return {
+        "id": updated_track.id,
+        "title": updated_track.title,
+        "artist": updated_track.artist,
+        "price": updated_track.price,
+        "cover_image_url": normalize_media_url(updated_track.cover_image_url),
+        "checkout_url": updated_track.checkout_url,
+        "lemon_variant_id": updated_track.lemon_variant_id,
+        "preview_url": normalize_media_url(updated_track.preview_url),
+        "is_free": updated_track.is_free,
+        "free_download_url": normalize_media_url(updated_track.free_download_url),
+        "category": updated_track.category,
+        "created_at": updated_track.created_at,
+    }
+
+@app.delete("/tracks/{track_id}")
+async def delete_track(
+    track_id: int,
+    current_user: User = Depends(auth.get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    require_admin(current_user)
+    await track_service.delete_track(session, track_id)
+    return {"status": "deleted", "track_id": track_id}
+
 @app.get("/tracks", response_model=list[schemas.TrackResponse])
 async def list_tracks(session: AsyncSession = Depends(get_session)):
     tracks = await track_service.get_all_tracks(session)

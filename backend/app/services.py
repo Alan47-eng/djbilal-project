@@ -134,6 +134,71 @@ class TrackService:
         """Get all tracks."""
         return await self.repo.get_all(session)
 
+    async def update_track(
+        self,
+        session: AsyncSession,
+        track_id: int,
+        track_data: schemas.TrackUpdate,
+    ) -> Track:
+        """Update a track record."""
+        track = await self.get_track(session, track_id)
+        update_values = track_data.model_dump(exclude_unset=True)
+        if not update_values:
+            return track
+
+        if "category" in update_values:
+            update_values["category"] = update_values["category"].strip().lower()
+
+        effective_is_free = update_values.get("is_free", track.is_free)
+        effective_category = update_values.get("category", track.category)
+        effective_price = update_values.get("price", track.price)
+
+        if effective_is_free and effective_category == "edit":
+            effective_category = "remix"
+            update_values["category"] = effective_category
+
+        if effective_is_free and effective_category not in schemas.FREE_TRACK_CATEGORIES:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Free tracks must use category: remix, simple-pack, or vst",
+            )
+
+        if not effective_is_free and effective_category not in schemas.PAID_TRACK_CATEGORIES:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Paid tracks must use category: edit or remix",
+            )
+
+        if effective_price is not None and effective_price < 0:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Price must be greater than 0",
+            )
+
+        if not effective_is_free and effective_price is not None and effective_price <= 0:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Price must be greater than 0 for paid tracks",
+            )
+
+        if effective_is_free and effective_price is not None and effective_price != 0:
+            update_values["price"] = 0.0
+
+        if effective_is_free and "price" not in update_values:
+            update_values["price"] = 0.0
+
+        for field, value in update_values.items():
+            setattr(track, field, value)
+
+        await session.commit()
+        await session.refresh(track)
+        return track
+
+    async def delete_track(self, session: AsyncSession, track_id: int) -> None:
+        """Delete a track and its purchase records via cascade."""
+        track = await self.get_track(session, track_id)
+        await self.repo.delete(session, track)
+
     async def upload_track(
         self,
         *,
