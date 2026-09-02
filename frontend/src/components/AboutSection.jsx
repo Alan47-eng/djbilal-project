@@ -15,7 +15,7 @@ const SOCIAL_LINKS = [
   },
   {
     label: 'Spotify',
-    href: 'https://open.spotify.com/artist/djbilal',
+    href: 'https://open.spotify.com/intl-ar/artist/2ahpkP0xfNEH9PBREdhI79',
     color: 'hover:text-green-400',
     icon: (
       <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
@@ -24,8 +24,19 @@ const SOCIAL_LINKS = [
     ),
   },
   {
+    label: 'Anghami',
+    href: 'https://play.anghami.com/artist/1491788',
+    color: 'hover:text-yellow-400',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
+        <path d="M12 2a10 10 0 100 20 10 10 0 000-20zm3.5 10.5a3.5 3.5 0 11-7 0 3.5 3.5 0 017 0z" />
+      </svg>
+    ),
+  },
+
+  {
     label: 'Instagram',
-    href: 'https://instagram.com/djbilal',
+    href: 'https://www.instagram.com/djbilalhamsho',
     color: 'hover:text-pink-400',
     icon: (
       <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
@@ -35,7 +46,7 @@ const SOCIAL_LINKS = [
   },
   {
     label: 'YouTube',
-    href: 'https://youtube.com/@djbilal',
+    href: 'https://youtube.com/@djbilalhamshoo',
     color: 'hover:text-red-400',
     icon: (
       <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
