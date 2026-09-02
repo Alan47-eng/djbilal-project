@@ -267,19 +267,33 @@ async def create_lemonsqueezy_checkout(
     if email:
         checkout_data["email"] = email
 
-    payload = {
-        "data": {
-            "type": "checkouts",
-            "attributes": {
-                "product_options": {"enabled_variants": enabled_variants},
-                "checkout_data": checkout_data,
-            },
-            "relationships": {
-                "store": {"data": {"type": "stores", "id": store_id}},
-                "variant": {"data": {"type": "variants", "id": first_variant_id}},
-            },
-        }
-    }
+    payloads = [
+        {
+            "data": {
+                "type": "checkouts",
+                "attributes": {
+                    "product_options": {"enabled_variants": enabled_variants},
+                    "checkout_data": checkout_data,
+                },
+                "relationships": {
+                    "store": {"data": {"type": "stores", "id": store_id}},
+                    "variant": {"data": {"type": "variants", "id": first_variant_id}},
+                },
+            }
+        },
+        {
+            "data": {
+                "type": "checkouts",
+                "attributes": {
+                    "product_options": {"enabled_variants": enabled_variants},
+                    "checkout_data": checkout_data,
+                },
+                "relationships": {
+                    "store": {"data": {"type": "stores", "id": store_id}},
+                },
+            }
+        },
+    ]
 
     headers = {
         "Accept": "application/vnd.api+json",
@@ -287,41 +301,52 @@ async def create_lemonsqueezy_checkout(
         "Authorization": f"Bearer {api_key}",
     }
 
-    try:
-        async with httpx.AsyncClient(timeout=20.0) as client:
-            response = await client.post(
-                "https://api.lemonsqueezy.com/v1/checkouts",
-                headers=headers,
-                json=payload,
-            )
-    except httpx.HTTPError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Lemon Squeezy request failed: {exc}",
-        ) from exc
+    last_detail = None
+    last_response = None
 
-    if response.status_code >= 400:
+    for payload in payloads:
+        try:
+            async with httpx.AsyncClient(timeout=20.0) as client:
+                response = await client.post(
+                    "https://api.lemonsqueezy.com/v1/checkouts",
+                    headers=headers,
+                    json=payload,
+                )
+        except httpx.HTTPError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"Lemon Squeezy request failed: {exc}",
+            ) from exc
+
+        last_response = response
+        if response.status_code < 400:
+            body = response.json()
+            checkout_url = (
+                body.get("data", {}).get("attributes", {}).get("url")
+                or body.get("data", {}).get("attributes", {}).get("checkout_url")
+            )
+            if checkout_url:
+                return str(checkout_url)
+            last_detail = "Lemon Squeezy response did not include checkout URL"
+            continue
+
         detail = response.text
         try:
             detail = response.json()
         except json.JSONDecodeError:
             pass
+        last_detail = detail
+
+    if last_detail is not None:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail={"message": "Lemon Squeezy checkout creation failed", "provider_error": detail},
+            detail={"message": "Lemon Squeezy checkout creation failed", "provider_error": last_detail},
         )
 
-    body = response.json()
-    checkout_url = (
-        body.get("data", {}).get("attributes", {}).get("url")
-        or body.get("data", {}).get("attributes", {}).get("checkout_url")
+    raise HTTPException(
+        status_code=status.HTTP_502_BAD_GATEWAY,
+        detail="Lemon Squeezy response did not include checkout URL",
     )
-    if not checkout_url:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Lemon Squeezy response did not include checkout URL",
-        )
-    return str(checkout_url)
 
 
 def _pdf_escape(value: str) -> str:

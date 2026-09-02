@@ -12,6 +12,7 @@ from app.models import Base
 from app.database import get_session
 from app.models import User, Track
 from app import auth, schemas
+from app.utils import create_lemonsqueezy_checkout
 
 
 # Test database setup
@@ -523,6 +524,53 @@ class TestCheckoutAndWebhook:
         query = parse_qs(parsed.query)
         assert query["checkout[custom][track_ids]"][0] == f"{track_one.id},{track_two.id}"
         assert query["checkout[custom][user_id]"][0] == str(user.id)
+
+    @pytest.mark.asyncio
+    async def test_checkout_retries_without_variant_relationship_when_api_rejects(self, monkeypatch):
+        monkeypatch.setenv("LEMON_SQUEEZY_API_KEY", "test-api-key")
+        monkeypatch.setenv("LEMON_SQUEEZY_STORE_ID", "store-123")
+
+        payloads = []
+
+        class FakeResponse:
+            def __init__(self, status_code, payload):
+                self.status_code = status_code
+                self._payload = payload
+                self.text = json.dumps(payload)
+
+            def json(self):
+                return self._payload
+
+        class FakeAsyncClient:
+            def __init__(self, *args, **kwargs):
+                pass
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, exc_type, exc, tb):
+                return False
+
+            async def post(self, url, headers, json):
+                payloads.append(json)
+                if len(payloads) == 1:
+                    return FakeResponse(400, {"errors": [{"detail": "variant relationship is invalid"}]})
+                return FakeResponse(200, {"data": {"attributes": {"url": "https://example.com/fallback-checkout"}}})
+
+        monkeypatch.setattr("app.utils.httpx.AsyncClient", FakeAsyncClient)
+
+        checkout_url = await create_lemonsqueezy_checkout(
+            variant_quantities=[
+                {"variant_id": 101, "quantity": 1},
+                {"variant_id": 202, "quantity": 1},
+            ],
+            custom_data={"track_ids": "1,2", "user_id": "42"},
+            email="buyer@example.com",
+        )
+
+        assert checkout_url == "https://example.com/fallback-checkout"
+        assert "variant" in payloads[0]["data"]["relationships"]
+        assert "variant" not in payloads[1]["data"]["relationships"]
 
     @pytest.mark.asyncio
     async def test_checkout_endpoint_builds_payment_url(self, client, test_db):
