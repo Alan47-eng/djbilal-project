@@ -392,8 +392,3 @@ def generate_license_pdf(
         ).encode("ascii")
     )
     return bytes(pdf)
-
-
-
-
-
