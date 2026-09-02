@@ -257,7 +257,6 @@ async def create_lemonsqueezy_checkout(
             detail="variant_quantities cannot be empty",
         )
 
-    first_variant_id = str(variant_quantities[0]["variant_id"])
     enabled_variants = [int(item["variant_id"]) for item in variant_quantities]
 
     checkout_data: dict[str, object] = {
@@ -267,6 +266,14 @@ async def create_lemonsqueezy_checkout(
     if email:
         checkout_data["email"] = email
 
+    relationships: dict[str, dict[str, dict[str, str]]] = {
+        "store": {"data": {"type": "stores", "id": store_id}},
+    }
+    if len(enabled_variants) == 1:
+        relationships["variant"] = {
+            "data": {"type": "variants", "id": str(enabled_variants[0])},
+        }
+
     payload = {
         "data": {
             "type": "checkouts",
@@ -274,10 +281,7 @@ async def create_lemonsqueezy_checkout(
                 "product_options": {"enabled_variants": enabled_variants},
                 "checkout_data": checkout_data,
             },
-            "relationships": {
-                "store": {"data": {"type": "stores", "id": store_id}},
-                "variant": {"data": {"type": "variants", "id": first_variant_id}},
-            },
+            "relationships": relationships,
         }
     }
 

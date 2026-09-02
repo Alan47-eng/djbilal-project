@@ -12,6 +12,7 @@ from app.models import Base
 from app.database import get_session
 from app.models import User, Track
 from app import auth, schemas
+from app.utils import create_lemonsqueezy_checkout
 
 
 # Test database setup
@@ -486,6 +487,51 @@ class TestUserAdminEndpoints:
 
 class TestCheckoutAndWebhook:
     """Test Lemon Squeezy checkout flow"""
+
+    @pytest.mark.asyncio
+    async def test_multi_variant_checkout_omits_single_variant_relationship(self, monkeypatch):
+        monkeypatch.setenv("LEMON_SQUEEZY_API_KEY", "test-api-key")
+        monkeypatch.setenv("LEMON_SQUEEZY_STORE_ID", "store-123")
+
+        captured = {}
+
+        class FakeResponse:
+            status_code = 200
+            text = '{"data":{"attributes":{"url":"https://example.com/cart-checkout"}}}'
+
+            def json(self):
+                return {"data": {"attributes": {"url": "https://example.com/cart-checkout"}}}
+
+        class FakeAsyncClient:
+            def __init__(self, *args, **kwargs):
+                pass
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, exc_type, exc, tb):
+                return False
+
+            async def post(self, url, headers, json):
+                captured["url"] = url
+                captured["headers"] = headers
+                captured["json"] = json
+                return FakeResponse()
+
+        monkeypatch.setattr("app.utils.httpx.AsyncClient", FakeAsyncClient)
+
+        checkout_url = await create_lemonsqueezy_checkout(
+            variant_quantities=[
+                {"variant_id": 101, "quantity": 1},
+                {"variant_id": 202, "quantity": 1},
+            ],
+            custom_data={"track_ids": "1,2", "user_id": "42"},
+            email="buyer@example.com",
+        )
+
+        assert checkout_url == "https://example.com/cart-checkout"
+        assert captured["json"]["data"]["relationships"]["store"]["data"]["id"] == "store-123"
+        assert "variant" not in captured["json"]["data"]["relationships"]
 
     @pytest.mark.asyncio
     async def test_checkout_endpoint_builds_payment_url(self, client, test_db):
