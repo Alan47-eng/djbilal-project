@@ -12,7 +12,6 @@ from app.models import Base
 from app.database import get_session
 from app.models import User, Track
 from app import auth, schemas
-from app.utils import create_lemonsqueezy_checkout
 
 
 # Test database setup
@@ -489,49 +488,41 @@ class TestCheckoutAndWebhook:
     """Test Lemon Squeezy checkout flow"""
 
     @pytest.mark.asyncio
-    async def test_multi_variant_checkout_omits_single_variant_relationship(self, monkeypatch):
-        monkeypatch.setenv("LEMON_SQUEEZY_API_KEY", "test-api-key")
-        monkeypatch.setenv("LEMON_SQUEEZY_STORE_ID", "store-123")
+    async def test_cart_checkout_falls_back_to_track_checkout_url(self, client, test_db):
+        _, AsyncSessionLocal = test_db
 
-        captured = {}
+        async with AsyncSessionLocal() as session:
+            user = await create_user_record(session, "cartbuyer@example.com", "password123")
+            track_one = await create_track_record(
+                session,
+                checkout_url="https://buy.lemonsqueezy.com/checkout/buy/first",
+                price=0.5,
+            )
+            track_two = await create_track_record(
+                session,
+                checkout_url="https://buy.lemonsqueezy.com/checkout/buy/second",
+                price=0.5,
+            )
 
-        class FakeResponse:
-            status_code = 200
-            text = '{"data":{"attributes":{"url":"https://example.com/cart-checkout"}}}'
+        login_response = await client.post(
+            "/login",
+            json={"email": user.email, "password": "password123"},
+        )
+        token = login_response.json()["access_token"]
 
-            def json(self):
-                return {"data": {"attributes": {"url": "https://example.com/cart-checkout"}}}
-
-        class FakeAsyncClient:
-            def __init__(self, *args, **kwargs):
-                pass
-
-            async def __aenter__(self):
-                return self
-
-            async def __aexit__(self, exc_type, exc, tb):
-                return False
-
-            async def post(self, url, headers, json):
-                captured["url"] = url
-                captured["headers"] = headers
-                captured["json"] = json
-                return FakeResponse()
-
-        monkeypatch.setattr("app.utils.httpx.AsyncClient", FakeAsyncClient)
-
-        checkout_url = await create_lemonsqueezy_checkout(
-            variant_quantities=[
-                {"variant_id": 101, "quantity": 1},
-                {"variant_id": 202, "quantity": 1},
-            ],
-            custom_data={"track_ids": "1,2", "user_id": "42"},
-            email="buyer@example.com",
+        response = await client.post(
+            "/checkout/cart",
+            json={"track_ids": [track_one.id, track_two.id]},
+            headers={"Authorization": f"Bearer {token}"},
         )
 
-        assert checkout_url == "https://example.com/cart-checkout"
-        assert captured["json"]["data"]["relationships"]["store"]["data"]["id"] == "store-123"
-        assert "variant" not in captured["json"]["data"]["relationships"]
+        assert response.status_code == 200
+        data = response.json()
+        assert set(data["track_ids"]) == {track_one.id, track_two.id}
+        parsed = urlparse(data["checkout_url"])
+        query = parse_qs(parsed.query)
+        assert query["checkout[custom][track_ids]"][0] == f"{track_one.id},{track_two.id}"
+        assert query["checkout[custom][user_id]"][0] == str(user.id)
 
     @pytest.mark.asyncio
     async def test_checkout_endpoint_builds_payment_url(self, client, test_db):

@@ -19,7 +19,10 @@ export function useCheckout() {
       const response = await api.post(`/tracks/${trackId}/checkout`);
       return response.data.checkout_url;
     } catch (err) {
-      const errorMsg = err.response?.data?.detail || 'Checkout failed';
+      const detail = err.response?.data?.detail;
+      const errorMsg = typeof detail === 'string'
+        ? detail
+        : detail?.message || detail?.detail || 'Checkout failed';
       setError(errorMsg);
       return null;
     } finally {
@@ -43,8 +46,11 @@ export function useCheckout() {
       const response = await api.post('/checkout/cart', { track_ids: trackIds });
       return response.data.checkout_url;
     } catch (err) {
-      const errorMsg = err.response?.data?.detail || 'Checkout failed';
-      setError(typeof errorMsg === 'string' ? errorMsg : 'Checkout failed');
+      const detail = err.response?.data?.detail;
+      const errorMsg = typeof detail === 'string'
+        ? detail
+        : detail?.message || detail?.detail || 'Checkout failed';
+      setError(errorMsg);
       return null;
     } finally {
       setLoading(false);

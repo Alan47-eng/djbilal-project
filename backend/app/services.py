@@ -325,12 +325,36 @@ class TrackService:
                 detail="Cart must include at least one paid track",
             )
 
-        missing_variant = [track.title for track in paid_tracks if not track.lemon_variant_id]
-        if missing_variant:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Missing Lemon variant ID for: {', '.join(missing_variant)}",
+        cart_track_ids = [track.id for track in paid_tracks]
+        fallback_checkout_url = next(
+            (track.checkout_url for track in paid_tracks if track.checkout_url),
+            None,
+        )
+
+        if any(not track.lemon_variant_id for track in paid_tracks):
+            if not fallback_checkout_url:
+                missing_variant = [track.title for track in paid_tracks if not track.lemon_variant_id]
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=(
+                        "Missing Lemon variant ID for: "
+                        f"{', '.join(missing_variant)}. Add Lemon variant IDs or checkout URLs for cart items."
+                    ),
+                )
+
+            checkout_url = build_checkout_url(
+                fallback_checkout_url,
+                {
+                    "track_ids": ",".join(str(track_id) for track_id in cart_track_ids),
+                    "track_id": str(cart_track_ids[0]),
+                    "user_id": str(current_user.id),
+                },
+                email=current_user.email,
             )
+            return {
+                "track_ids": cart_track_ids,
+                "checkout_url": checkout_url,
+            }
 
         variant_ids = [int(track.lemon_variant_id) for track in paid_tracks]
         if len(set(variant_ids)) != len(variant_ids):
@@ -340,7 +364,6 @@ class TrackService:
             )
 
         variant_quantities = [{"variant_id": variant_id, "quantity": 1} for variant_id in variant_ids]
-        cart_track_ids = [track.id for track in paid_tracks]
         checkout_url = await create_lemonsqueezy_checkout(
             variant_quantities=variant_quantities,
             custom_data={
