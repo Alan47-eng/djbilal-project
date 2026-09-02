@@ -101,8 +101,8 @@ DJ Bilal Hamsho هو مشروع موسيقي متكامل يجمع بين DJing�
         <div className="px-4 sm:px-8 pb-8 sm:pb-10">
           {/* Avatar */}
           <div className="flex flex-col sm:flex-row sm:items-end gap-4 sm:gap-6 -mt-12 sm:-mt-14 mb-6">
-            <div className="w-20 h-20 sm:w-28 sm:h-28 rounded-2xl border-4 border-slate-800 bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center shadow-xl flex-shrink-0">
-              <Music2 size={48} className="text-white" />
+            <div className="w-20 h-20 sm:w-28 sm:h-28 rounded-2xl border-4 border-slate-800 bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center shadow-xl flex-shrink-0 overflow-hidden">
+              <img src="/images/profile.jpg" alt="DJ Bilal" className="w-full h-full object-cover" />
             </div>
             <div className="pb-1 sm:pb-2">
               <h2 className="text-2xl sm:text-3xl font-extrabold text-white">DJ Bilal</h2>
