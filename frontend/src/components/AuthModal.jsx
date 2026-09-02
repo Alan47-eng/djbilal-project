@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
+import api from '../api';
 
 const AuthModal = ({ isOpen, initialMode = 'login', onClose, onSuccess }) => {
   const { lang } = useLanguage();
@@ -12,6 +13,8 @@ const AuthModal = ({ isOpen, initialMode = 'login', onClose, onSuccess }) => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [resetMessage, setResetMessage] = useState(null);
+  const [resetLoading, setResetLoading] = useState(false);
   const t = {
     signIn: lang === 'ar' ? 'تسجيل الدخول' : 'Sign In',
     signUp: lang === 'ar' ? 'إنشاء حساب' : 'Sign Up',
@@ -68,6 +71,23 @@ const AuthModal = ({ isOpen, initialMode = 'login', onClose, onSuccess }) => {
       );
     } finally {
       setLoading(false);
+    }
+  };
+
+  const requestReset = async () => {
+    setResetMessage(null);
+    if (!email) {
+      setResetMessage(lang === 'ar' ? 'Lütfen önce e-posta girin.' : 'Please enter your email first.');
+      return;
+    }
+    try {
+      setResetLoading(true);
+      await api.post('/password/request', { email });
+      setResetMessage(lang === 'ar' ? 'Sıfırlama bağlantısı e-posta gönderildi.' : 'Reset link sent to your email.');
+    } catch (err) {
+      setResetMessage(lang === 'ar' ? 'E-posta gönderilemedi. Tekrar deneyin.' : 'Failed to send reset email. Try again.');
+    } finally {
+      setResetLoading(false);
     }
   };
 
@@ -145,6 +165,25 @@ const AuthModal = ({ isOpen, initialMode = 'login', onClose, onSuccess }) => {
             className="w-full rounded-lg border border-slate-700 bg-slate-950 px-4 py-3 text-white placeholder-slate-500"
             required
           />
+
+          {activeTab === 'login' && (
+            <div className="flex justify-end mt-2">
+              <button
+                type="button"
+                onClick={requestReset}
+                className="text-sm text-slate-300 hover:text-white underline"
+                disabled={resetLoading}
+              >
+                {resetLoading ? (lang === 'ar' ? 'Gönderiliyor...' : 'Sending...') : (lang === 'ar' ? 'Şifremi Unuttum?' : 'Forgot password?')}
+              </button>
+            </div>
+          )}
+
+          {resetMessage && (
+            <div className="rounded-lg border border-green-600 bg-green-900/10 p-3 text-sm text-green-300 mt-3">
+              {resetMessage}
+            </div>
+          )}
 
           {error && (
             <div className="rounded-lg border border-red-600 bg-red-900/20 p-3 text-sm text-red-300">

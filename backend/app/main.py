@@ -12,6 +12,7 @@ from .database import test_connection, engine, get_session, async_session
 from .models import Base, User, Track
 from . import schemas, auth
 from .services import UserService, TrackService, PurchaseService
+from .password_reset import router as password_reset_router
 from .utils import (
     UPLOAD_ROOT,
     resolve_uploaded_file_path,
@@ -73,6 +74,9 @@ app.mount("/media", StaticFiles(directory=str(UPLOAD_ROOT)), name="media")
 user_service = UserService()
 track_service = TrackService()
 purchase_service = PurchaseService()
+
+# Include password reset router (provides /password/request and /password/confirm)
+app.include_router(password_reset_router)
 
 
 def require_admin(current_user: User) -> None:

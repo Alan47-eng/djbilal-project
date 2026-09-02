@@ -14,3 +14,5 @@ python-multipart
 pytest
 pytest-asyncio
 httpx
+resend
+python-jose
