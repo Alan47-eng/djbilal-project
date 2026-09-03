@@ -267,6 +267,12 @@ async def create_lemonsqueezy_checkout(
     if email:
         checkout_data["email"] = email
 
+    relationships_with_variant = {
+        "store": {"data": {"type": "stores", "id": store_id}},
+    }
+    if len(enabled_variants) == 1:
+        relationships_with_variant["variant"] = {"data": {"type": "variants", "id": str(enabled_variants[0])}}
+
     payloads = [
         {
             "data": {
@@ -275,10 +281,7 @@ async def create_lemonsqueezy_checkout(
                     "product_options": {"enabled_variants": enabled_variants},
                     "checkout_data": checkout_data,
                 },
-                "relationships": {
-                    "store": {"data": {"type": "stores", "id": store_id}},
-                    "variant": {"data": {"type": "variants", "id": first_variant_id}},
-                },
+                "relationships": relationships_with_variant,
             }
         },
         {
