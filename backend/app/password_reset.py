@@ -34,9 +34,10 @@ async def request_password_reset(
     # Send email (no await since send_password_reset_email is sync)
     try:
         send_password_reset_email(user.email, token)
-    except Exception:
-        # Do not reveal email sending errors to client
-        pass
+    except Exception as exc:
+        # Log the actual failure so it can be diagnosed in Railway logs.
+        import logging
+        logging.getLogger(__name__).warning("Password reset email failed for %s: %s", user.email, exc)
 
     return {"status": "ok"}
 

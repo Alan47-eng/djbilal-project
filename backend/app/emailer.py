@@ -1,10 +1,13 @@
 import json
+import logging
 import os
 from urllib import request, error
 
+logger = logging.getLogger(__name__)
+
 RESEND_API_KEY = os.getenv("RESEND_API_KEY")
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
-FROM_EMAIL = os.getenv("FROM_EMAIL", "no-reply@djbilal.com")
+FROM_EMAIL = os.getenv("FROM_EMAIL", "onboarding@resend.dev")
 
 
 def send_password_reset_email(email: str, token: str) -> None:
@@ -47,6 +50,7 @@ def send_password_reset_email(email: str, token: str) -> None:
         with request.urlopen(req, timeout=20) as response:
             response.read()
     except error.HTTPError as exc:
-        # Intentionally swallow the exception so the app does not crash when email
-        # fails to send. The reset endpoint already returns a neutral success response.
-        _ = exc
+        body = exc.read().decode("utf-8", errors="replace")
+        logger.warning("Resend email send failed for %s: %s %s", email, exc.code, body)
+    except Exception as exc:
+        logger.warning("Resend email send exception for %s: %s", email, exc)
