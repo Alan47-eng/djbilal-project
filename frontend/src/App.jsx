@@ -13,6 +13,7 @@ import AdminDrawer from './components/AdminDrawer';
 import AboutSection from './components/AboutSection';
 import FreeTracksList from './components/FreeTracksList';
 import UserPurchases from './components/UserPurchases';
+import ResetPassword from './components/ResetPassword';
 import './index.css';
 
 function AppContent() {
@@ -627,6 +628,17 @@ function AppContent() {
 }
 
 export default function App() {
+  // If user opened /reset-password, render just the reset page within providers
+  if (typeof window !== 'undefined' && window.location.pathname.startsWith('/reset-password')) {
+    return (
+      <LanguageProvider>
+        <AuthProvider>
+          <ResetPassword />
+        </AuthProvider>
+      </LanguageProvider>
+    );
+  }
+
   return (
     <LanguageProvider>
       <AuthProvider>
