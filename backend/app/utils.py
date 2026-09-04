@@ -268,15 +268,24 @@ async def create_lemonsqueezy_checkout(
     if email:
         checkout_data["email"] = email
 
+    # custom_price'ı hem attributes'e hem checkout_data'ya veriyoruz
+    if custom_price is not None:
+        checkout_data["custom_price"] = custom_price
+
     checkout_attributes: dict[str, object] = {
-        "product_options": {"enabled_variants": enabled_variants},
+        "product_options": {
+            "enabled_variants": enabled_variants,
+        },
+        "checkout_options": {
+            "embed": False,
+            "media": False,
+            "logo": True,
+        },
         "checkout_data": checkout_data,
     }
 
-    # Joker ürün için sepet toplam fiyatı aktarılıyor (cent cinsinden)
     if custom_price is not None:
         checkout_attributes["custom_price"] = custom_price
-
     payloads = [
         {
             "data": {
