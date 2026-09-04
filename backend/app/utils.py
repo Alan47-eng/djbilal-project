@@ -258,55 +258,32 @@ async def create_lemonsqueezy_checkout(
             detail="variant_quantities cannot be empty",
         )
 
-    first_variant_id = str(variant_quantities[0]["variant_id"])
-    enabled_variants = [int(item["variant_id"]) for item in variant_quantities]
+    target_variant_id = str(variant_quantities[0]["variant_id"])
 
     checkout_data: dict[str, object] = {
         "custom": custom_data,
-        "variant_quantities": variant_quantities,
     }
     if email:
         checkout_data["email"] = email
 
-    # custom_price'ı hem attributes'e hem checkout_data'ya veriyoruz
-    if custom_price is not None:
-        checkout_data["custom_price"] = custom_price
-
-    checkout_attributes: dict[str, object] = {
-        "product_options": {
-            "enabled_variants": enabled_variants,
-        },
-        "checkout_options": {
-            "embed": False,
-            "media": False,
-            "logo": True,
-        },
+    attributes: dict[str, object] = {
         "checkout_data": checkout_data,
     }
 
+    # Lemon Squeezy API v1 custom_price parametresi (cent cinsinden int)
     if custom_price is not None:
-        checkout_attributes["custom_price"] = custom_price
-    payloads = [
-        {
-            "data": {
-                "type": "checkouts",
-                "attributes": checkout_attributes,
-                "relationships": {
-                    "store": {"data": {"type": "stores", "id": store_id}},
-                    "variant": {"data": {"type": "variants", "id": first_variant_id}},
-                },
-            }
-        },
-        {
-            "data": {
-                "type": "checkouts",
-                "attributes": checkout_attributes,
-                "relationships": {
-                    "store": {"data": {"type": "stores", "id": store_id}},
-                },
-            }
-        },
-    ]
+        attributes["custom_price"] = int(custom_price)
+
+    payload = {
+        "data": {
+            "type": "checkouts",
+            "attributes": attributes,
+            "relationships": {
+                "store": {"data": {"type": "stores", "id": str(store_id)}},
+                "variant": {"data": {"type": "variants", "id": str(target_variant_id)}},
+            },
+        }
+    }
 
     headers = {
         "Accept": "application/vnd.api+json",
@@ -314,52 +291,43 @@ async def create_lemonsqueezy_checkout(
         "Authorization": f"Bearer {api_key}",
     }
 
-    last_detail = None
-    last_response = None
-
-    for payload in payloads:
+    async with httpx.AsyncClient(timeout=20.0) as client:
         try:
-            async with httpx.AsyncClient(timeout=20.0) as client:
-                response = await client.post(
-                    "https://api.lemonsqueezy.com/v1/checkouts",
-                    headers=headers,
-                    json=payload,
-                )
+            response = await client.post(
+                "https://api.lemonsqueezy.com/v1/checkouts",
+                headers=headers,
+                json=payload,
+            )
         except httpx.HTTPError as exc:
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
                 detail=f"Lemon Squeezy request failed: {exc}",
             ) from exc
 
-        last_response = response
-        if response.status_code < 400:
-            body = response.json()
-            checkout_url = (
-                body.get("data", {}).get("attributes", {}).get("url")
-                or body.get("data", {}).get("attributes", {}).get("checkout_url")
-            )
-            if checkout_url:
-                return str(checkout_url)
-            last_detail = "Lemon Squeezy response did not include checkout URL"
-            continue
-
-        detail = response.text
+    if response.status_code >= 400:
+        error_detail = response.text
         try:
-            detail = response.json()
-        except json.JSONDecodeError:
+            error_detail = response.json()
+        except Exception:
             pass
-        last_detail = detail
-
-    if last_detail is not None:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail={"message": "Lemon Squeezy checkout creation failed", "provider_error": last_detail},
+            detail={"message": "Lemon Squeezy checkout creation failed", "provider_error": error_detail},
         )
 
-    raise HTTPException(
-        status_code=status.HTTP_502_BAD_GATEWAY,
-        detail="Lemon Squeezy response did not include checkout URL",
+    body = response.json()
+    checkout_url = (
+        body.get("data", {}).get("attributes", {}).get("url")
+        or body.get("data", {}).get("attributes", {}).get("checkout_url")
     )
+    if not checkout_url:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Lemon Squeezy response did not include checkout URL",
+        )
+
+    return str(checkout_url)
+
 
 def _pdf_escape(value: str) -> str:
     return value.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
