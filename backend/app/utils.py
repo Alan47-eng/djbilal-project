@@ -241,6 +241,7 @@ async def create_lemonsqueezy_checkout(
     variant_quantities: list[dict[str, int]],
     custom_data: dict[str, str],
     email: str | None = None,
+    custom_price: int | None = None,
 ) -> str:
     """Create a hosted Lemon Squeezy checkout and return redirect URL."""
     api_key = os.getenv("LEMON_SQUEEZY_API_KEY", "").strip()
@@ -267,30 +268,30 @@ async def create_lemonsqueezy_checkout(
     if email:
         checkout_data["email"] = email
 
-    relationships_with_variant = {
-        "store": {"data": {"type": "stores", "id": store_id}},
+    checkout_attributes: dict[str, object] = {
+        "product_options": {"enabled_variants": enabled_variants},
+        "checkout_data": checkout_data,
     }
-    if enabled_variants:
-        relationships_with_variant["variant"] = {"data": {"type": "variants", "id": str(enabled_variants[0])}}
+
+    # Joker ürün için sepet toplam fiyatı aktarılıyor (cent cinsinden)
+    if custom_price is not None:
+        checkout_attributes["custom_price"] = custom_price
 
     payloads = [
         {
             "data": {
                 "type": "checkouts",
-                "attributes": {
-                    "product_options": {"enabled_variants": enabled_variants},
-                    "checkout_data": checkout_data,
+                "attributes": checkout_attributes,
+                "relationships": {
+                    "store": {"data": {"type": "stores", "id": store_id}},
+                    "variant": {"data": {"type": "variants", "id": first_variant_id}},
                 },
-                "relationships": relationships_with_variant,
             }
         },
         {
             "data": {
                 "type": "checkouts",
-                "attributes": {
-                    "product_options": {"enabled_variants": enabled_variants},
-                    "checkout_data": checkout_data,
-                },
+                "attributes": checkout_attributes,
                 "relationships": {
                     "store": {"data": {"type": "stores", "id": store_id}},
                 },
@@ -350,7 +351,6 @@ async def create_lemonsqueezy_checkout(
         status_code=status.HTTP_502_BAD_GATEWAY,
         detail="Lemon Squeezy response did not include checkout URL",
     )
-
 
 def _pdf_escape(value: str) -> str:
     return value.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")

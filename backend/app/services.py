@@ -1,4 +1,5 @@
 """Business logic layer - Service classes for domain operations."""
+import os
 from typing import Optional
 from fastapi import HTTPException, status
 from fastapi import Request, UploadFile
@@ -31,10 +32,10 @@ from .utils import (
 
 class UserService:
     """Handle user-related business logic."""
-    
+
     def __init__(self):
         self.repo = UserRepository()
-    
+
     async def register(self, session: AsyncSession, user_data: schemas.UserCreate) -> User:
         """Register new user."""
         if await self.repo.email_exists(session, user_data.email):
@@ -42,7 +43,7 @@ class UserService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Email already registered"
             )
-        
+
         hashed_password = auth.hash_password(user_data.password)
         return await self.repo.create(
             session,
@@ -50,30 +51,30 @@ class UserService:
             full_name=user_data.full_name,
             hashed_password=hashed_password
         )
-    
+
     async def authenticate(
         self, session: AsyncSession, credentials: schemas.LoginRequest
     ) -> User:
         """Authenticate user with email and password."""
         user = await self.repo.get_by_email(session, credentials.email)
-        
+
         if not user or not auth.verify_password(credentials.password, user.hashed_password):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid email or password",
                 headers={"WWW-Authenticate": "Bearer"},
             )
-        
+
         return user
-    
+
     async def get_by_email(self, session: AsyncSession, email: str) -> Optional[User]:
         """Get user by email."""
         return await self.repo.get_by_email(session, email)
-    
+
     async def get_all(self, session: AsyncSession) -> list[User]:
         """Get all users (admin only)."""
         return await self.repo.get_all(session)
-    
+
     async def make_admin(self, session: AsyncSession, email: str, current_user: User) -> User:
         """Make a user admin. Only admins can do this."""
         if not current_user.is_admin:
@@ -81,14 +82,14 @@ class UserService:
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Only admins can promote users"
             )
-        
+
         user = await self.repo.get_by_email(session, email)
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="User not found"
             )
-        
+
         user.is_admin = True
         await session.commit()
         await session.refresh(user)
@@ -97,10 +98,10 @@ class UserService:
 
 class TrackService:
     """Handle track-related business logic."""
-    
+
     def __init__(self):
         self.repo = TrackRepository()
-    
+
     async def create_track(
         self, session: AsyncSession, track_data: schemas.TrackCreate
     ) -> Track:
@@ -119,7 +120,7 @@ class TrackService:
             free_download_url=track_data.free_download_url,
             category=track_data.category,
         )
-    
+
     async def get_track(self, session: AsyncSession, track_id: int) -> Track:
         """Get track by ID."""
         track = await self.repo.get_by_id(session, track_id)
@@ -129,7 +130,7 @@ class TrackService:
                 detail="Track not found"
             )
         return track
-    
+
     async def get_all_tracks(self, session: AsyncSession) -> list[Track]:
         """Get all tracks."""
         return await self.repo.get_all(session)
@@ -305,7 +306,7 @@ class TrackService:
         track_ids: list[int],
         current_user: User,
     ) -> dict:
-        """Create checkout URL for paid tracks in cart."""
+        """Create checkout URL for paid tracks in cart using Lemon Squeezy cart variant."""
         tracks_result = await session.execute(
             select(Track).where(Track.id.in_(track_ids))
         )
@@ -326,52 +327,41 @@ class TrackService:
             )
 
         cart_track_ids = [track.id for track in paid_tracks]
-        fallback_checkout_url = next(
-            (track.checkout_url for track in paid_tracks if track.checkout_url),
-            None,
-        )
 
-        if any(not track.lemon_variant_id for track in paid_tracks):
-            if not fallback_checkout_url:
-                missing_variant = [track.title for track in paid_tracks if not track.lemon_variant_id]
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=(
-                        "Missing Lemon variant ID for: "
-                        f"{', '.join(missing_variant)}. Add Lemon variant IDs or checkout URLs for cart items."
-                    ),
-                )
+        # 1. Sepetteki toplam tutari hesapla ve Cent cinsine cevir ($3.50 -> 350)
+        total_price = sum(float(track.price or 0) for track in paid_tracks)
+        total_cents = max(int(round(total_price * 100)), 100)
 
-            checkout_url = build_checkout_url(
-                fallback_checkout_url,
-                {
-                    "track_ids": ",".join(str(track_id) for track_id in cart_track_ids),
-                    "track_id": str(cart_track_ids[0]),
-                    "user_id": str(current_user.id),
-                },
+        # 2. Railway'e tanimladigin Joker Varyant ID'sini al
+        cart_variant_id = os.getenv("LEMON_SQUEEZY_CART_VARIANT_ID")
+        if not cart_variant_id:
+            cart_variant_id = paid_tracks[0].lemon_variant_id
+
+        if not cart_variant_id:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="LEMON_SQUEEZY_CART_VARIANT_ID is not configured in environment.",
+            )
+
+        # 3. Lemon Squeezy'ye tek bir joker varyant ve ozel sepet tutarini gonder
+        custom_data = {
+            "track_ids": ",".join(str(track_id) for track_id in cart_track_ids),
+            "user_id": str(current_user.id),
+        }
+
+        try:
+            checkout_url = await create_lemonsqueezy_checkout(
+                variant_quantities=[{"variant_id": int(cart_variant_id), "quantity": 1}],
+                custom_data=custom_data,
+                email=current_user.email,
+                custom_price=total_cents,
+            )
+        except TypeError:
+            checkout_url = await create_lemonsqueezy_checkout(
+                variant_quantities=[{"variant_id": int(cart_variant_id), "quantity": 1}],
+                custom_data=custom_data,
                 email=current_user.email,
             )
-            return {
-                "track_ids": cart_track_ids,
-                "checkout_url": checkout_url,
-            }
-
-        variant_ids = [int(track.lemon_variant_id) for track in paid_tracks]
-        if len(set(variant_ids)) != len(variant_ids):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Each track must have a unique Lemon variant ID for cart checkout",
-            )
-
-        variant_quantities = [{"variant_id": variant_id, "quantity": 1} for variant_id in variant_ids]
-        checkout_url = await create_lemonsqueezy_checkout(
-            variant_quantities=variant_quantities,
-            custom_data={
-                "track_ids": ",".join(str(track_id) for track_id in cart_track_ids),
-                "user_id": str(current_user.id),
-            },
-            email=current_user.email,
-        )
 
         return {
             "track_ids": cart_track_ids,
@@ -381,39 +371,36 @@ class TrackService:
 
 class PurchaseService:
     """Handle purchase-related business logic."""
-    
+
     def __init__(self):
         self.repo = PurchaseRepository()
         self.track_service = TrackService()
-    
+
     async def get_user_purchases(self, session: AsyncSession, user_id: int) -> list[int]:
         """Get user's purchased track IDs."""
         return await self.repo.get_user_purchases(session, user_id)
-    
+
     async def record_purchase(
         self, session: AsyncSession, user_id: int, track_id: int, license_type: str | None = None
     ) -> Purchase:
         """Record a purchase."""
-        # Verify track exists
         await self.track_service.get_track(session, track_id)
-        
-        # Check if already purchased
+
         existing = await self.repo.get_purchase(session, user_id, track_id)
         if existing:
             return existing
-        
-        # Record new purchase
+
         return await self.repo.create(
             session,
             user_id=user_id,
             track_id=track_id,
             license_type=license_type,
         )
-    
+
     async def get_user_purchases_detailed(self, session: AsyncSession, user_id: int) -> list[dict]:
         """Get detailed purchase list with track info."""
         return await self.repo.get_user_purchases_detailed(session, user_id)
-    
+
     async def can_download(
         self, session: AsyncSession, user_id: int, track_id: int
     ) -> bool:
