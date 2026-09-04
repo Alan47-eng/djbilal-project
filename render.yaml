@@ -5,13 +5,28 @@ services:
     rootDir: backend
     plan: starter
     envVars:
+      - key: ENVIRONMENT
+        value: production
+        sync: false
       - key: DATABASE_URL
         sync: false
       - key: SECRET_KEY
         sync: false
       - key: FRONTEND_ORIGINS
         sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: ADMIN_EMAIL
+        sync: false
       - key: ADMIN_PASSWORD
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: FROM_EMAIL
+        sync: false
+      - key: LEMON_SQUEEZY_API_KEY
+        sync: false
+      - key: LEMON_SQUEEZY_STORE_ID
         sync: false
       - key: LEMON_SQUEEZY_WEBHOOK_SECRET
         sync: false
@@ -23,4 +38,7 @@ services:
     plan: starter
     envVars:
       - key: VITE_API_BASE_URL
+        sync: false
+      - key: PORT
+        value: "4173"
         sync: false

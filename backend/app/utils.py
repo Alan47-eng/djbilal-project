@@ -270,7 +270,7 @@ async def create_lemonsqueezy_checkout(
     relationships_with_variant = {
         "store": {"data": {"type": "stores", "id": store_id}},
     }
-    if len(enabled_variants) == 1:
+    if enabled_variants:
         relationships_with_variant["variant"] = {"data": {"type": "variants", "id": str(enabled_variants[0])}}
 
     payloads = [

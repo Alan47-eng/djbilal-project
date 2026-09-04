@@ -42,7 +42,9 @@ def parse_frontend_origins(raw_value: str | None) -> list[str]:
 
 FRONTEND_ORIGINS = parse_frontend_origins(os.getenv("FRONTEND_ORIGINS"))
 ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "gbilal1717@gmail.com")
-ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD") or "DjBilal@2026"
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
+if not ADMIN_PASSWORD:
+    raise RuntimeError("ADMIN_PASSWORD must be set in the environment before starting the app")
 IS_PRODUCTION = os.getenv("ENVIRONMENT", "development").lower() == "production"
 LOCAL_DEV_ORIGIN_REGEX = (
     r"^https?://("
