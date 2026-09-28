@@ -349,6 +349,7 @@ class TrackService:
         custom_data = {
             "track_ids": ",".join(str(track_id) for track_id in cart_track_ids),
             "user_id": str(current_user.id),
+            "expected_total_cents": str(total_cents),
         }
 
         try:
@@ -423,6 +424,19 @@ class PurchaseService:
         track_ids = custom_data.get("track_ids")
         user_id = custom_data.get("user_id")
         license_type = custom_data.get("license_type")
+
+        expected_total_cents = custom_data.get("expected_total_cents")
+        if expected_total_cents:
+            paid_cents = (
+                payload.get("data", {}).get("attributes", {}).get("total")
+                or payload.get("data", {}).get("attributes", {}).get("subtotal")
+                or 0
+            )
+            if int(paid_cents) < int(expected_total_cents):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Paid amount is less than expected cart total",
+                )
 
         if not user_id or (not track_id and not track_ids):
             raise HTTPException(
