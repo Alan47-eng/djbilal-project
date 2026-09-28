@@ -1,7 +1,8 @@
 fastapi
 uvicorn[standard]
-sqlalchemy
+sqlalchemy[asyncio]
 asyncpg
+greenlet
 aiosqlite
 python-dotenv
 pydantic-settings
