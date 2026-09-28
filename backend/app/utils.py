@@ -9,6 +9,8 @@ from pathlib import Path
 from urllib.parse import urlencode, urlparse, parse_qsl, urlunparse
 from uuid import uuid4
 import httpx
+import boto3
+from botocore.exceptions import BotoCoreError, ClientError
 from fastapi import Request, HTTPException, status
 
 
@@ -64,6 +66,141 @@ def validate_upload_file(upload_file, allowed_extensions: set[str], max_bytes: i
 def build_media_url(request: Request, folder: str, filename: str) -> str:
     """Build media path to avoid proxy scheme/domain mismatches."""
     return f"/media/{folder}/{filename}"
+
+
+def get_r2_config() -> dict[str, str | None]:
+    """Read Cloudflare R2 config from environment and return safe values."""
+    return {
+        "account_id": os.getenv("R2_ACCOUNT_ID", "").strip() or None,
+        "access_key_id": os.getenv("R2_ACCESS_KEY_ID", "").strip() or None,
+        "secret_access_key": os.getenv("R2_SECRET_ACCESS_KEY", "").strip() or None,
+        "bucket_name": os.getenv("R2_BUCKET_NAME", "").strip() or None,
+        "public_url": os.getenv("R2_PUBLIC_URL", "").strip() or None,
+    }
+
+
+def is_r2_object_key(value: str | None) -> bool:
+    """Detect a Cloudflare R2 object key stored in the database."""
+    if not value:
+        return False
+    normalized = value.strip().lstrip("/")
+    if normalized.startswith("http://") or normalized.startswith("https://"):
+        return False
+    return bool(normalized) and "/" in normalized and not normalized.startswith("media/")
+
+
+def get_r2_client():
+    """Return a boto3 S3 client for Cloudflare R2 when environment is configured."""
+    config = get_r2_config()
+    if not all(config.get(key) for key in ("account_id", "access_key_id", "secret_access_key", "bucket_name")):
+        return None
+
+    endpoint_url = f"https://{config['account_id']}.r2.cloudflarestorage.com"
+    return boto3.client(
+        "s3",
+        endpoint_url=endpoint_url,
+        aws_access_key_id=config["access_key_id"],
+        aws_secret_access_key=config["secret_access_key"],
+        region_name="auto",
+    )
+
+
+def build_r2_public_url(folder: str, filename: str) -> str | None:
+    """Build a public Cloudflare R2 URL for public files when configured."""
+    config = get_r2_config()
+    if not config["public_url"]:
+        return None
+    public_url = config["public_url"].rstrip("/")
+    return f"{public_url}/{folder.strip('/')}/{filename.lstrip('/')}"
+
+
+def upload_file_to_r2(upload_file, folder: str, filename: str) -> str:
+    """Upload to Cloudflare R2 when configured; otherwise use the local file fallback."""
+    config = get_r2_config()
+    file_obj = getattr(upload_file, "file", upload_file)
+    safe_filename = Path(filename).name
+
+    if not all(config.get(key) for key in ("account_id", "access_key_id", "secret_access_key", "bucket_name")):
+        destination = (UPLOAD_ROOT / folder.strip("/") / safe_filename).resolve()
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        file_obj.seek(0)
+        with destination.open("wb") as output_file:
+            while True:
+                chunk = file_obj.read(1024 * 1024)
+                if not chunk:
+                    break
+                output_file.write(chunk)
+        file_obj.seek(0)
+        return f"/media/{folder.strip('/')}/{safe_filename}"
+
+    client = get_r2_client()
+    if client is None:
+        destination = (UPLOAD_ROOT / folder.strip("/") / safe_filename).resolve()
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        file_obj.seek(0)
+        with destination.open("wb") as output_file:
+            while True:
+                chunk = file_obj.read(1024 * 1024)
+                if not chunk:
+                    break
+                output_file.write(chunk)
+        file_obj.seek(0)
+        return f"/media/{folder.strip('/')}/{safe_filename}"
+
+    key = f"{folder.strip('/')}/{safe_filename}"
+    bucket_name = config["bucket_name"]
+    if not bucket_name:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="R2 bucket is not configured",
+        )
+
+    try:
+        file_obj.seek(0)
+        client.upload_fileobj(file_obj, bucket_name, key)
+    except (BotoCoreError, ClientError, ValueError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to upload file to Cloudflare R2: {exc}",
+        ) from exc
+
+    if folder == "tracks":
+        return key
+
+    public_url = build_r2_public_url(folder, safe_filename)
+    if public_url:
+        return public_url
+    return f"https://{config['account_id']}.r2.cloudflarestorage.com/{bucket_name}/{key}"
+
+
+def generate_r2_presigned_download_url(file_key: str, expires_in: int = 900) -> str:
+    """Generate a presigned URL for a private Cloudflare R2 object."""
+    config = get_r2_config()
+    client = get_r2_client()
+    if client is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Cloudflare R2 is not configured",
+        )
+
+    bucket_name = config["bucket_name"]
+    if not bucket_name:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="R2 bucket is not configured",
+        )
+
+    try:
+        return client.generate_presigned_url(
+            "get_object",
+            Params={"Bucket": bucket_name, "Key": file_key.lstrip("/")},
+            ExpiresIn=expires_in,
+        )
+    except (BotoCoreError, ClientError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate presigned download URL: {exc}",
+        ) from exc
 
 
 def normalize_media_url(url: str | None) -> str | None:

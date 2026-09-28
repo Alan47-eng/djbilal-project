@@ -15,11 +15,11 @@ from .utils import (
     COVER_UPLOAD_DIR,
     build_media_url,
     build_storage_name,
-    save_upload_file,
     build_checkout_url,
     extract_custom_data,
     create_lemonsqueezy_checkout,
     validate_upload_file,
+    upload_file_to_r2,
     AUDIO_EXTENSIONS,
     IMAGE_EXTENSIONS,
     MAX_TRACK_UPLOAD_BYTES,
@@ -238,22 +238,24 @@ class TrackService:
         preview_filename = build_storage_name(preview_file.filename)
         cover_filename = build_storage_name(cover_file.filename) if cover_file else None
 
-        await save_upload_file(track_file, TRACK_UPLOAD_DIR / track_filename, MAX_TRACK_UPLOAD_BYTES)
-        await save_upload_file(preview_file, PREVIEW_UPLOAD_DIR / preview_filename, MAX_PREVIEW_UPLOAD_BYTES)
-        if cover_file and cover_filename:
-            await save_upload_file(cover_file, COVER_UPLOAD_DIR / cover_filename, MAX_COVER_UPLOAD_BYTES)
+        track_r2_key = upload_file_to_r2(track_file, "tracks", track_filename)
+        preview_r2_url = upload_file_to_r2(preview_file, "previews", preview_filename)
+        cover_r2_url = upload_file_to_r2(cover_file, "covers", cover_filename) if cover_file and cover_filename else None
 
-        track_full_url = build_media_url(request, "tracks", track_filename)
+        track_full_url = track_r2_key if track_r2_key.startswith("tracks/") or "/" not in track_r2_key else track_r2_key
+        if not track_full_url.startswith("http") and not track_full_url.startswith("/") and not track_full_url.startswith("tracks/"):
+            track_full_url = f"/{track_r2_key}"
+
         normalized_price = 0.0 if is_free and price is None else (price or 0.0)
         checkout_url_value = None if is_free else (checkout_url.strip() if checkout_url else None)
         track_data = schemas.TrackCreate(
             title=title.strip(),
             artist=artist.strip(),
             price=normalized_price,
-            cover_image_url=build_media_url(request, "covers", cover_filename) if cover_filename else None,
+            cover_image_url=cover_r2_url,
             checkout_url=checkout_url_value,
             lemon_variant_id=None if is_free else lemon_variant_id,
-            preview_url=build_media_url(request, "previews", preview_filename),
+            preview_url=preview_r2_url,
             full_file_path=track_full_url,
             is_free=is_free,
             free_download_url=free_download_url.strip() if free_download_url else (track_full_url if is_free else None),

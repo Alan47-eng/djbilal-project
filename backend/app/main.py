@@ -3,7 +3,7 @@ import json
 
 from fastapi import FastAPI, Depends, HTTPException, status, UploadFile, File, Form, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import JSONResponse, FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,6 +18,8 @@ from .utils import (
     resolve_uploaded_file_path,
     normalize_media_url,
     verify_webhook_signature,
+    generate_r2_presigned_download_url,
+    is_r2_object_key,
 )
 
 app = FastAPI()
@@ -42,10 +44,12 @@ def parse_frontend_origins(raw_value: str | None) -> list[str]:
 
 FRONTEND_ORIGINS = parse_frontend_origins(os.getenv("FRONTEND_ORIGINS"))
 ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "gbilal1717@gmail.com")
+IS_PRODUCTION = os.getenv("ENVIRONMENT", "development").lower() == "production"
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
 if not ADMIN_PASSWORD:
-    raise RuntimeError("ADMIN_PASSWORD must be set in the environment before starting the app")
-IS_PRODUCTION = os.getenv("ENVIRONMENT", "development").lower() == "production"
+    if IS_PRODUCTION:
+        raise RuntimeError("ADMIN_PASSWORD must be set in the environment before starting the app")
+    ADMIN_PASSWORD = "DjBilal@2026"
 LOCAL_DEV_ORIGIN_REGEX = (
     r"^https?://("
     r"(localhost|127\.0\.0\.1|0\.0\.0\.0)"
@@ -480,12 +484,20 @@ async def download_track(
     session: AsyncSession = Depends(get_session),
 ):
     track = await track_service.get_track(session, track_id)
-    
+
     if not await purchase_service.can_download(session, current_user.id, track_id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You must purchase this track before downloading it",
         )
+
+    if is_r2_object_key(track.full_file_path):
+        presigned_url = generate_r2_presigned_download_url(track.full_file_path)
+        return {
+            "track_id": track.id,
+            "full_file_path": track.full_file_path,
+            "download_url": presigned_url,
+        }
 
     return {
         "track_id": track.id,
@@ -507,6 +519,9 @@ async def download_track_file(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You must purchase this track before downloading it",
         )
+
+    if is_r2_object_key(track.full_file_path):
+        return RedirectResponse(url=generate_r2_presigned_download_url(track.full_file_path), status_code=302)
 
     file_path = resolve_uploaded_file_path(track.full_file_path, "tracks")
     return FileResponse(

@@ -14,7 +14,9 @@ from .models import User
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development").lower()
 SECRET_KEY = os.getenv("SECRET_KEY")
 if not SECRET_KEY:
-    raise RuntimeError("SECRET_KEY must be set in the environment before starting the app")
+    if ENVIRONMENT == "production":
+        raise RuntimeError("SECRET_KEY must be set in the environment before starting the app")
+    SECRET_KEY = "dev-only-secret-key-change-in-production"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
