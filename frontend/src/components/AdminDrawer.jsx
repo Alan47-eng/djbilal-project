@@ -184,8 +184,8 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
       setError('Paid tracks require a price');
       return;
     }
-    if (!form.is_free && !form.lemon_variant_id) {
-      setError('Paid tracks require a Lemon variant ID');
+    if (!form.is_free && !form.price) {
+      setError('Paid tracks require a price');
       return;
     }
 
@@ -396,12 +396,11 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
                         step="1"
                         value={form.lemon_variant_id}
                         onChange={handleChange('lemon_variant_id')}
-                        placeholder="Lemon Squeezy variant ID"
+                        placeholder="Optional: default Railway cart variant will be used if blank"
                         className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
-                        required={!form.is_free}
                       />
                       <p className="text-xs text-slate-400">
-                        For cart checkout, each paid track should have its own Lemon variant ID.
+                        Leave blank to use the default Railway Lemon cart variant automatically.
                       </p>
                     </>
                   )}

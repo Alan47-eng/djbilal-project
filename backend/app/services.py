@@ -224,10 +224,14 @@ class TrackService:
                 detail="Price is required for paid tracks",
             )
         if not is_free and lemon_variant_id is None:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Lemon variant ID is required for paid tracks",
-            )
+            default_variant = os.getenv("LEMON_SQUEEZY_CART_VARIANT_ID")
+            if default_variant:
+                lemon_variant_id = int(default_variant)
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="Lemon variant ID is required or LEMON_SQUEEZY_CART_VARIANT_ID must be set",
+                )
 
         validate_upload_file(track_file, AUDIO_EXTENSIONS, MAX_TRACK_UPLOAD_BYTES, "Track file")
         validate_upload_file(preview_file, AUDIO_EXTENSIONS, MAX_PREVIEW_UPLOAD_BYTES, "Preview file")
