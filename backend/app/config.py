@@ -1,4 +1,5 @@
 import os
+import re
 from urllib.parse import urlparse
 
 from dotenv import load_dotenv
@@ -18,14 +19,37 @@ def parse_frontend_origins(raw_value: str | None) -> list[str]:
             "https://djbilal-frontend-production.up.railway.app",
         ]
 
-    origins = [origin.strip() for origin in raw_value.split(",") if origin.strip()]
+    configured_value = raw_value.strip()
+    if configured_value.startswith("[") and configured_value.endswith("]"):
+        configured_value = configured_value[1:-1].strip()
+
+    origins = [
+        origin.strip().strip("\"'")
+        for origin in configured_value.split(",")
+        if origin.strip().strip("\"'")
+    ]
     if not origins:
         raise RuntimeError("FRONTEND_ORIGINS is empty")
-    if any("*" in origin for origin in origins):
-        raise RuntimeError("FRONTEND_ORIGINS must not contain wildcard origins")
 
+    markdown_link = re.compile(r"^\[(https?://[^\]]+)\]\((https?://[^)]+)\)$")
     normalized_origins: list[str] = []
     for origin in origins:
+        match = markdown_link.fullmatch(origin)
+        if match:
+            label_url, target_url = match.groups()
+            if label_url.rstrip("/") != target_url.rstrip("/"):
+                raise RuntimeError(
+                    "FRONTEND_ORIGINS Markdown links must have matching URL text "
+                    "and destination"
+                )
+            origin = target_url
+        normalized_origins.append(origin)
+
+    if any("*" in origin for origin in normalized_origins):
+        raise RuntimeError("FRONTEND_ORIGINS must not contain wildcard origins")
+
+    exact_origins: list[str] = []
+    for origin in normalized_origins:
         parsed = urlparse(origin)
         if (
             parsed.scheme
@@ -36,10 +60,10 @@ def parse_frontend_origins(raw_value: str | None) -> list[str]:
             and not parsed.fragment
         ):
             origin = f"{parsed.scheme}://{parsed.netloc}"
-        normalized_origins.append(origin)
+        exact_origins.append(origin)
 
     if IS_PRODUCTION:
-        for origin in normalized_origins:
+        for index, origin in enumerate(exact_origins, start=1):
             parsed = urlparse(origin)
             if (
                 parsed.scheme != "https"
@@ -52,9 +76,11 @@ def parse_frontend_origins(raw_value: str | None) -> list[str]:
                 raise RuntimeError(
                     "Production FRONTEND_ORIGINS must be comma-separated exact "
                     "HTTPS origins (for example: https://djbilal.com), without "
-                    "paths, brackets, quotes, or wildcards"
+                    "paths or wildcards. Check origin entry "
+                    f"{index}; wrapper quotes, brackets, and Markdown links are "
+                    "normalized automatically."
                 )
-    return normalized_origins
+    return exact_origins
 
 
 IS_PRODUCTION = os.getenv("ENVIRONMENT", "development").lower() == "production"
