@@ -12,6 +12,7 @@ from app.models import Base
 from app.database import get_session
 from app.models import User, Track
 from app import auth, schemas
+from app.rate_limit import limiter
 from app.utils import create_lemonsqueezy_checkout
 
 
@@ -47,9 +48,25 @@ async def test_db():
 @pytest.fixture
 async def client(test_db):
     """Create async test client"""
+    limiter.reset()
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         yield client
+    limiter.reset()
+
+
+@pytest.mark.asyncio
+async def test_login_rate_limit_is_enforced(client):
+    responses = [
+        await client.post(
+            "/login",
+            json={"email": "unknown@example.com", "password": "invalid-password"},
+        )
+        for _ in range(6)
+    ]
+
+    assert [response.status_code for response in responses[:5]] == [401] * 5
+    assert responses[5].status_code == 429
 
 
 async def create_user_record(session, email, password, is_admin=False, full_name=None):

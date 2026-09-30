@@ -1,31 +1,24 @@
 """Business logic layer - Service classes for domain operations."""
 import os
-from typing import Optional
 from fastapi import HTTPException, status
-from fastapi import Request, UploadFile
+from fastapi import UploadFile
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from . import auth, schemas
+from .interfaces import BasePaymentGateway, BaseStorageService
+from .json_types import JSONObject, JSONValue
 from .models import User, Track, Purchase
-from .repositories import UserRepository, TrackRepository, PurchaseRepository
+from .repositories import PurchaseDetailData, PurchaseRepository, TrackRepository, UserRepository
 from .utils import (
-    TRACK_UPLOAD_DIR,
-    PREVIEW_UPLOAD_DIR,
-    COVER_UPLOAD_DIR,
-    build_media_url,
     build_storage_name,
     build_checkout_url,
-    extract_custom_data,
-    create_lemonsqueezy_checkout,
     validate_upload_file,
-    upload_file_to_r2,
     AUDIO_EXTENSIONS,
     IMAGE_EXTENSIONS,
     MAX_TRACK_UPLOAD_BYTES,
     MAX_PREVIEW_UPLOAD_BYTES,
     MAX_COVER_UPLOAD_BYTES,
-    is_successful_payment_event,
     generate_license_pdf,
 )
 
@@ -33,7 +26,7 @@ from .utils import (
 class UserService:
     """Handle user-related business logic."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.repo = UserRepository()
 
     async def register(self, session: AsyncSession, user_data: schemas.UserCreate) -> User:
@@ -67,7 +60,7 @@ class UserService:
 
         return user
 
-    async def get_by_email(self, session: AsyncSession, email: str) -> Optional[User]:
+    async def get_by_email(self, session: AsyncSession, email: str) -> User | None:
         """Get user by email."""
         return await self.repo.get_by_email(session, email)
 
@@ -99,8 +92,14 @@ class UserService:
 class TrackService:
     """Handle track-related business logic."""
 
-    def __init__(self):
+    def __init__(
+        self,
+        storage_service: BaseStorageService,
+        payment_gateway: BasePaymentGateway,
+    ) -> None:
         self.repo = TrackRepository()
+        self.storage_service = storage_service
+        self.payment_gateway = payment_gateway
 
     async def create_track(
         self, session: AsyncSession, track_data: schemas.TrackCreate
@@ -143,16 +142,20 @@ class TrackService:
     ) -> Track:
         """Update a track record."""
         track = await self.get_track(session, track_id)
-        update_values = track_data.model_dump(exclude_unset=True)
+        update_values: dict[str, object] = track_data.model_dump(exclude_unset=True)
         if not update_values:
             return track
 
-        if "category" in update_values:
-            update_values["category"] = update_values["category"].strip().lower()
+        category_value = update_values.get("category")
+        if isinstance(category_value, str):
+            update_values["category"] = category_value.strip().lower()
 
-        effective_is_free = update_values.get("is_free", track.is_free)
-        effective_category = update_values.get("category", track.category)
-        effective_price = update_values.get("price", track.price)
+        is_free_value = update_values.get("is_free", track.is_free)
+        effective_is_free = is_free_value if isinstance(is_free_value, bool) else track.is_free
+        updated_category = update_values.get("category", track.category)
+        effective_category = updated_category if isinstance(updated_category, str) else track.category
+        updated_price = update_values.get("price", track.price)
+        effective_price = updated_price if isinstance(updated_price, (int, float)) else track.price
 
         if effective_is_free and effective_category == "edit":
             effective_category = "remix"
@@ -204,7 +207,6 @@ class TrackService:
         self,
         *,
         session: AsyncSession,
-        request: Request,
         title: str,
         artist: str,
         category: str,
@@ -238,13 +240,17 @@ class TrackService:
         if cover_file is not None:
             validate_upload_file(cover_file, IMAGE_EXTENSIONS, MAX_COVER_UPLOAD_BYTES, "Cover image")
 
-        track_filename = build_storage_name(track_file.filename)
-        preview_filename = build_storage_name(preview_file.filename)
-        cover_filename = build_storage_name(cover_file.filename) if cover_file else None
+        track_filename = build_storage_name(track_file.filename or "")
+        preview_filename = build_storage_name(preview_file.filename or "")
+        cover_filename = build_storage_name(cover_file.filename or "") if cover_file else None
 
-        track_r2_key = upload_file_to_r2(track_file, "tracks", track_filename)
-        preview_r2_url = upload_file_to_r2(preview_file, "previews", preview_filename)
-        cover_r2_url = upload_file_to_r2(cover_file, "covers", cover_filename) if cover_file and cover_filename else None
+        track_r2_key = self.storage_service.upload_file(track_file, "tracks", track_filename)
+        preview_r2_url = self.storage_service.upload_file(preview_file, "previews", preview_filename)
+        cover_r2_url = (
+            self.storage_service.upload_file(cover_file, "covers", cover_filename)
+            if cover_file and cover_filename
+            else None
+        )
 
         track_full_url = track_r2_key if track_r2_key.startswith("tracks/") or "/" not in track_r2_key else track_r2_key
         if not track_full_url.startswith("http") and not track_full_url.startswith("/") and not track_full_url.startswith("tracks/"):
@@ -267,7 +273,9 @@ class TrackService:
         )
         return await self.create_track(session, track_data)
 
-    async def create_checkout(self, session: AsyncSession, track_id: int, current_user: User) -> dict:
+    async def create_checkout(
+        self, session: AsyncSession, track_id: int, current_user: User
+    ) -> dict[str, int | str]:
         """Create checkout URL for one paid track."""
         track = await self.get_track(session, track_id)
         if track.is_free:
@@ -277,7 +285,7 @@ class TrackService:
             )
 
         if track.lemon_variant_id:
-            checkout_url = await create_lemonsqueezy_checkout(
+            checkout_url = await self.payment_gateway.create_checkout_session(
                 variant_quantities=[{"variant_id": track.lemon_variant_id, "quantity": 1}],
                 custom_data={
                     "track_id": str(track.id),
@@ -285,6 +293,7 @@ class TrackService:
                     "user_id": str(current_user.id),
                 },
                 email=current_user.email,
+                fallback_url=track.checkout_url,
             )
         else:
             if not track.checkout_url:
@@ -311,7 +320,7 @@ class TrackService:
         session: AsyncSession,
         track_ids: list[int],
         current_user: User,
-    ) -> dict:
+    ) -> dict[str, list[int] | str]:
         """Create checkout URL for paid tracks in cart using Lemon Squeezy cart variant."""
         tracks_result = await session.execute(
             select(Track).where(Track.id.in_(track_ids))
@@ -338,36 +347,42 @@ class TrackService:
         total_price = sum(float(track.price or 0) for track in paid_tracks)
         total_cents = max(int(round(total_price * 100)), 100)
 
-        # 2. Railway'e tanimladigin Joker Varyant ID'sini al
+        # Use the configured cart variant, or a legacy per-track checkout URL.
         cart_variant_id = os.getenv("LEMON_SQUEEZY_CART_VARIANT_ID")
         if not cart_variant_id:
             cart_variant_id = paid_tracks[0].lemon_variant_id
-
-        if not cart_variant_id:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="LEMON_SQUEEZY_CART_VARIANT_ID is not configured in environment.",
-            )
-
-        # 3. Lemon Squeezy'ye tek bir joker varyant ve ozel sepet tutarini gonder
         custom_data = {
             "track_ids": ",".join(str(track_id) for track_id in cart_track_ids),
             "user_id": str(current_user.id),
             "expected_total_cents": str(total_cents),
         }
 
-        try:
-            checkout_url = await create_lemonsqueezy_checkout(
+        fallback_url = next(
+            (track.checkout_url for track in paid_tracks if track.checkout_url),
+            None,
+        )
+
+        if not cart_variant_id:
+            if not fallback_url:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=(
+                        "LEMON_SQUEEZY_CART_VARIANT_ID is not configured and "
+                        "no track checkout URL is available."
+                    ),
+                )
+            checkout_url = build_checkout_url(
+                fallback_url,
+                custom_data,
+                email=current_user.email,
+            )
+        else:
+            checkout_url = await self.payment_gateway.create_checkout_session(
                 variant_quantities=[{"variant_id": int(cart_variant_id), "quantity": 1}],
                 custom_data=custom_data,
                 email=current_user.email,
                 custom_price=total_cents,
-            )
-        except TypeError:
-            checkout_url = await create_lemonsqueezy_checkout(
-                variant_quantities=[{"variant_id": int(cart_variant_id), "quantity": 1}],
-                custom_data=custom_data,
-                email=current_user.email,
+                fallback_url=fallback_url,
             )
 
         return {
@@ -379,9 +394,14 @@ class TrackService:
 class PurchaseService:
     """Handle purchase-related business logic."""
 
-    def __init__(self):
+    def __init__(
+        self,
+        payment_gateway: BasePaymentGateway,
+        track_service: TrackService,
+    ) -> None:
         self.repo = PurchaseRepository()
-        self.track_service = TrackService()
+        self.track_service = track_service
+        self.payment_gateway = payment_gateway
 
     async def get_user_purchases(self, session: AsyncSession, user_id: int) -> list[int]:
         """Get user's purchased track IDs."""
@@ -404,7 +424,9 @@ class PurchaseService:
             license_type=license_type,
         )
 
-    async def get_user_purchases_detailed(self, session: AsyncSession, user_id: int) -> list[dict]:
+    async def get_user_purchases_detailed(
+        self, session: AsyncSession, user_id: int
+    ) -> list[PurchaseDetailData]:
         """Get detailed purchase list with track info."""
         return await self.repo.get_user_purchases_detailed(session, user_id)
 
@@ -417,13 +439,14 @@ class PurchaseService:
     async def process_successful_payment_payload(
         self,
         session: AsyncSession,
-        payload: dict,
-    ) -> dict:
+        payload: JSONObject,
+    ) -> dict[str, str | list[int]]:
         """Persist purchases for successful Lemon Squeezy webhook payload."""
-        if not is_successful_payment_event(payload):
+        event = self.payment_gateway.handle_webhook_event(payload)
+        if not event["successful"]:
             return {"status": "ignored"}
 
-        custom_data = extract_custom_data(payload)
+        custom_data = event["custom_data"]
         track_id = custom_data.get("track_id")
         track_ids = custom_data.get("track_ids")
         user_id = custom_data.get("user_id")
@@ -431,10 +454,21 @@ class PurchaseService:
 
         expected_total_cents = custom_data.get("expected_total_cents")
         if expected_total_cents:
-            paid_cents = (
-                payload.get("data", {}).get("attributes", {}).get("total")
-                or payload.get("data", {}).get("attributes", {}).get("subtotal")
+            data = payload.get("data")
+            attributes: JSONObject = {}
+            if isinstance(data, dict):
+                attributes_value = data.get("attributes")
+                if isinstance(attributes_value, dict):
+                    attributes = attributes_value
+            paid_cents_value: JSONValue = (
+                attributes.get("total")
+                or attributes.get("subtotal")
                 or 0
+            )
+            paid_cents: str | int | float = (
+                paid_cents_value
+                if isinstance(paid_cents_value, (str, int, float))
+                else 0
             )
             if int(paid_cents) < int(expected_total_cents):
                 raise HTTPException(

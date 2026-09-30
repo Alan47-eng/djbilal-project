@@ -1,19 +1,24 @@
 import re
-from pydantic import BaseModel, EmailStr, field_validator, model_validator, ConfigDict
 from datetime import datetime
+from pydantic import BaseModel, ConfigDict, EmailStr, field_validator, model_validator
 
 PAID_TRACK_CATEGORIES = {"edit", "remix"}
 FREE_TRACK_CATEGORIES = {"remix", "simple-pack", "vst"}
 ALL_TRACK_CATEGORIES = PAID_TRACK_CATEGORIES | FREE_TRACK_CATEGORIES
 
-class UserCreate(BaseModel):
+
+class DTO(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
+class UserCreate(DTO):
     email: EmailStr
     password: str
     full_name: str | None = None
 
     @field_validator("password")
     @classmethod
-    def validate_password_strength(cls, value: str):
+    def validate_password_strength(cls, value: str) -> str:
         if len(value) < 8:
             raise ValueError("Password must be at least 8 characters long")
         if not re.search(r"[A-Za-z]", value) or not re.search(r"\d", value):
@@ -22,7 +27,7 @@ class UserCreate(BaseModel):
 
     @field_validator("full_name")
     @classmethod
-    def validate_full_name(cls, value: str | None):
+    def validate_full_name(cls, value: str | None) -> str | None:
         if value is None:
             return value
         normalized = value.strip()
@@ -32,33 +37,34 @@ class UserCreate(BaseModel):
             raise ValueError("Full name is too long")
         return normalized
 
-class UserRead(BaseModel):
+class UserRead(DTO):
     id: int
     email: EmailStr
     full_name: str | None = None
     is_admin: bool
     created_at: datetime
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
 
-class TokenResponse(BaseModel):
+
+class TokenResponse(DTO):
     access_token: str
     token_type: str
 
-class LoginRequest(BaseModel):
+class LoginRequest(DTO):
     email: EmailStr
     password: str
 
 
-class PasswordResetRequest(BaseModel):
+class PasswordResetRequest(DTO):
     email: EmailStr
 
 
-class PasswordResetConfirm(BaseModel):
+class PasswordResetConfirm(DTO):
     token: str
     new_password: str
 
-class TrackCreate(BaseModel):
+class TrackCreate(DTO):
     title: str
     artist: str
     price: float
@@ -73,14 +79,14 @@ class TrackCreate(BaseModel):
 
     @field_validator('title', 'artist')
     @classmethod
-    def title_artist_not_empty(cls, v):
+    def title_artist_not_empty(cls, v: str) -> str:
         if not v or not v.strip():
             raise ValueError('Title and artist cannot be empty')
         return v.strip()
 
     @field_validator('price')
     @classmethod
-    def price_must_be_valid(cls, v):
+    def price_must_be_valid(cls, v: float) -> float:
         if v < 0:
             raise ValueError('Price must be greater than 0')
         if v > 999999.99:
@@ -88,21 +94,21 @@ class TrackCreate(BaseModel):
         return v
 
     @model_validator(mode='after')
-    def validate_price_by_type(self):
+    def validate_price_by_type(self) -> "TrackCreate":
         if not self.is_free and self.price <= 0:
             raise ValueError('Price must be greater than 0 for paid tracks')
         return self
 
     @field_validator('category')
     @classmethod
-    def validate_category(cls, v: str):
+    def validate_category(cls, v: str) -> str:
         normalized = v.strip().lower()
         if normalized not in ALL_TRACK_CATEGORIES:
             raise ValueError('Category must be one of: edit, remix, simple-pack, vst')
         return normalized
 
     @model_validator(mode='after')
-    def validate_category_by_type(self):
+    def validate_category_by_type(self) -> "TrackCreate":
         if self.is_free and self.category == "edit":
             self.category = "remix"
         if self.is_free and self.category not in FREE_TRACK_CATEGORIES:
@@ -113,7 +119,7 @@ class TrackCreate(BaseModel):
 
     @field_validator('lemon_variant_id')
     @classmethod
-    def validate_lemon_variant_id(cls, value):
+    def validate_lemon_variant_id(cls, value: int | None) -> int | None:
         if value is None:
             return value
         if value <= 0:
@@ -122,14 +128,14 @@ class TrackCreate(BaseModel):
 
     @field_validator('cover_image_url', 'checkout_url', 'preview_url', 'full_file_path', 'free_download_url')
     @classmethod
-    def urls_not_empty(cls, v):
+    def urls_not_empty(cls, v: str | None) -> str | None:
         if v is None:
             return v
         if not v.strip():
             raise ValueError('URLs cannot be empty')
         return v.strip()
 
-class TrackUpdate(BaseModel):
+class TrackUpdate(DTO):
     title: str | None = None
     artist: str | None = None
     price: float | None = None
@@ -143,7 +149,7 @@ class TrackUpdate(BaseModel):
 
     @field_validator('title', 'artist')
     @classmethod
-    def title_artist_not_empty(cls, v):
+    def title_artist_not_empty(cls, v: str | None) -> str | None:
         if v is None:
             return v
         if not v or not v.strip():
@@ -152,7 +158,7 @@ class TrackUpdate(BaseModel):
 
     @field_validator('price')
     @classmethod
-    def price_must_be_valid(cls, v):
+    def price_must_be_valid(cls, v: float | None) -> float | None:
         if v is None:
             return v
         if v < 0:
@@ -163,7 +169,7 @@ class TrackUpdate(BaseModel):
 
     @field_validator('category')
     @classmethod
-    def validate_category(cls, v: str | None):
+    def validate_category(cls, v: str | None) -> str | None:
         if v is None:
             return v
         normalized = v.strip().lower()
@@ -173,7 +179,7 @@ class TrackUpdate(BaseModel):
 
     @field_validator('lemon_variant_id')
     @classmethod
-    def validate_lemon_variant_id(cls, value):
+    def validate_lemon_variant_id(cls, value: int | None) -> int | None:
         if value is None:
             return value
         if value <= 0:
@@ -182,7 +188,7 @@ class TrackUpdate(BaseModel):
 
     @field_validator('cover_image_url', 'checkout_url', 'preview_url', 'free_download_url')
     @classmethod
-    def urls_not_empty(cls, v):
+    def urls_not_empty(cls, v: str | None) -> str | None:
         if v is None:
             return v
         if not v.strip():
@@ -190,7 +196,7 @@ class TrackUpdate(BaseModel):
         return v.strip()
 
 
-class TrackResponse(BaseModel):
+class TrackResponse(DTO):
     id: int
     title: str
     artist: str
@@ -204,10 +210,10 @@ class TrackResponse(BaseModel):
     category: str = "edit"
     created_at: datetime
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
 
 
-class PurchaseDetail(BaseModel):
+class PurchaseDetail(DTO):
     id: int
     track_id: int
     track_title: str
@@ -218,23 +224,23 @@ class PurchaseDetail(BaseModel):
     license_type: str | None = None
     purchased_at: datetime
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
 
 
-class DownloadResponse(BaseModel):
+class DownloadResponse(DTO):
     track_id: int
     full_file_path: str
     download_url: str
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
 
 
-class CartCheckoutRequest(BaseModel):
+class CartCheckoutRequest(DTO):
     track_ids: list[int]
 
     @field_validator("track_ids")
     @classmethod
-    def validate_track_ids(cls, values: list[int]):
+    def validate_track_ids(cls, values: list[int]) -> list[int]:
         if not values:
             raise ValueError("track_ids cannot be empty")
         unique_ids = []

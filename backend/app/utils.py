@@ -1,16 +1,11 @@
 """Utility functions for common operations."""
 import os
-import hmac
-import json
-import hashlib
 import re
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlencode, urlparse, parse_qsl, urlunparse
 from uuid import uuid4
 import httpx
-import boto3
-from botocore.exceptions import BotoCoreError, ClientError
 from fastapi import Request, HTTPException, status
 
 
@@ -69,14 +64,10 @@ def build_media_url(request: Request, folder: str, filename: str) -> str:
 
 
 def get_r2_config() -> dict[str, str | None]:
-    """Read Cloudflare R2 config from environment and return safe values."""
-    return {
-        "account_id": os.getenv("R2_ACCOUNT_ID", "").strip() or None,
-        "access_key_id": os.getenv("R2_ACCESS_KEY_ID", "").strip() or None,
-        "secret_access_key": os.getenv("R2_SECRET_ACCESS_KEY", "").strip() or None,
-        "bucket_name": os.getenv("R2_BUCKET_NAME", "").strip() or None,
-        "public_url": os.getenv("R2_PUBLIC_URL", "").strip() or None,
-    }
+    """Compatibility wrapper for R2 adapter configuration."""
+    from .adapters.r2_storage import R2StorageService
+
+    return R2StorageService.get_config()
 
 
 def is_r2_object_key(value: str | None) -> bool:
@@ -90,117 +81,31 @@ def is_r2_object_key(value: str | None) -> bool:
 
 
 def get_r2_client():
-    """Return a boto3 S3 client for Cloudflare R2 when environment is configured."""
-    config = get_r2_config()
-    if not all(config.get(key) for key in ("account_id", "access_key_id", "secret_access_key", "bucket_name")):
-        return None
+    """Compatibility wrapper for the R2 storage adapter's boto3 client."""
+    from .adapters.r2_storage import R2StorageService
 
-    endpoint_url = f"https://{config['account_id']}.r2.cloudflarestorage.com"
-    return boto3.client(
-        "s3",
-        endpoint_url=endpoint_url,
-        aws_access_key_id=config["access_key_id"],
-        aws_secret_access_key=config["secret_access_key"],
-        region_name="auto",
-    )
+    return R2StorageService._client()
 
 
 def build_r2_public_url(folder: str, filename: str) -> str | None:
-    """Build a public Cloudflare R2 URL for public files when configured."""
-    config = get_r2_config()
-    if not config["public_url"]:
-        return None
-    public_url = config["public_url"].rstrip("/")
-    return f"{public_url}/{folder.strip('/')}/{filename.lstrip('/')}"
+    """Compatibility wrapper for public R2 URLs."""
+    from .adapters.r2_storage import R2StorageService
+
+    return R2StorageService.build_public_url(folder, filename)
 
 
 def upload_file_to_r2(upload_file, folder: str, filename: str) -> str:
-    """Upload to Cloudflare R2 when configured; otherwise use the local file fallback."""
-    config = get_r2_config()
-    file_obj = getattr(upload_file, "file", upload_file)
-    safe_filename = Path(filename).name
+    """Compatibility wrapper delegating file persistence to the R2 adapter."""
+    from .adapters.r2_storage import R2StorageService
 
-    if not all(config.get(key) for key in ("account_id", "access_key_id", "secret_access_key", "bucket_name")):
-        destination = (UPLOAD_ROOT / folder.strip("/") / safe_filename).resolve()
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        file_obj.seek(0)
-        with destination.open("wb") as output_file:
-            while True:
-                chunk = file_obj.read(1024 * 1024)
-                if not chunk:
-                    break
-                output_file.write(chunk)
-        file_obj.seek(0)
-        return f"/media/{folder.strip('/')}/{safe_filename}"
-
-    client = get_r2_client()
-    if client is None:
-        destination = (UPLOAD_ROOT / folder.strip("/") / safe_filename).resolve()
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        file_obj.seek(0)
-        with destination.open("wb") as output_file:
-            while True:
-                chunk = file_obj.read(1024 * 1024)
-                if not chunk:
-                    break
-                output_file.write(chunk)
-        file_obj.seek(0)
-        return f"/media/{folder.strip('/')}/{safe_filename}"
-
-    key = f"{folder.strip('/')}/{safe_filename}"
-    bucket_name = config["bucket_name"]
-    if not bucket_name:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="R2 bucket is not configured",
-        )
-
-    try:
-        file_obj.seek(0)
-        client.upload_fileobj(file_obj, bucket_name, key)
-    except (BotoCoreError, ClientError, ValueError) as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to upload file to Cloudflare R2: {exc}",
-        ) from exc
-
-    if folder == "tracks":
-        return key
-
-    public_url = build_r2_public_url(folder, safe_filename)
-    if public_url:
-        return public_url
-    return f"https://{config['account_id']}.r2.cloudflarestorage.com/{bucket_name}/{key}"
+    return R2StorageService().upload_file(upload_file, folder, filename)
 
 
 def generate_r2_presigned_download_url(file_key: str, expires_in: int = 900) -> str:
-    """Generate a presigned URL for a private Cloudflare R2 object."""
-    config = get_r2_config()
-    client = get_r2_client()
-    if client is None:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Cloudflare R2 is not configured",
-        )
+    """Compatibility wrapper delegating signed URL creation to the R2 adapter."""
+    from .adapters.r2_storage import R2StorageService
 
-    bucket_name = config["bucket_name"]
-    if not bucket_name:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="R2 bucket is not configured",
-        )
-
-    try:
-        return client.generate_presigned_url(
-            "get_object",
-            Params={"Bucket": bucket_name, "Key": file_key.lstrip("/")},
-            ExpiresIn=expires_in,
-        )
-    except (BotoCoreError, ClientError) as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to generate presigned download URL: {exc}",
-        ) from exc
+    return R2StorageService().generate_signed_url(file_key, expires_in)
 
 
 def normalize_media_url(url: str | None) -> str | None:
@@ -323,54 +228,24 @@ def extract_nested_dict(payload: dict, target_key: str) -> dict | None:
 
 
 def extract_custom_data(payload: dict) -> dict[str, str]:
-    """Extract custom data from webhook payload."""
-    for key in ("custom_data", "custom", "checkout_data"):
-        nested = extract_nested_dict(payload, key)
-        if nested:
-            return {str(k): str(v) for k, v in nested.items() if v is not None}
-    return {}
+    """Compatibility wrapper for webhook custom data extraction."""
+    from .adapters.lemon_squeezy import LemonSqueezyService
+
+    return LemonSqueezyService.extract_custom_data(payload)
 
 
 def is_successful_payment_event(payload: dict) -> bool:
-    """Check if webhook payload represents successful payment."""
-    event_name = (
-        payload.get("meta", {}).get("event_name")
-        or payload.get("meta", {}).get("name")
-        or payload.get("event_name")
-        or payload.get("type")
-        or ""
-    ).lower()
+    """Compatibility wrapper for Lemon Squeezy event classification."""
+    from .adapters.lemon_squeezy import LemonSqueezyService
 
-    status_value = (
-        payload.get("data", {}).get("attributes", {}).get("status")
-        or payload.get("data", {}).get("attributes", {}).get("status_formatted")
-        or payload.get("meta", {}).get("status")
-        or ""
-    ).lower()
-
-    if any(token in event_name for token in ("order", "payment", "license")):
-        return "fail" not in event_name and status_value not in ("failed", "canceled", "cancelled", "unpaid")
-
-    return status_value in ("paid", "succeeded", "successful", "completed")
+    return LemonSqueezyService.is_successful_payment_event(payload)
 
 
 def verify_webhook_signature(raw_body: bytes, signature: str | None) -> bool:
-    """Verify webhook signature from Lemon Squeezy."""
-    secret = os.getenv("LEMON_SQUEEZY_WEBHOOK_SECRET", "").strip()
-    
-    if not secret:
-        return False
-    
-    if not signature:
-        return False
-    
-    expected = hmac.new(
-        secret.encode("utf-8"),
-        raw_body,
-        hashlib.sha256,
-    ).hexdigest()
-    
-    return hmac.compare_digest(signature, expected)
+    """Compatibility wrapper for Lemon Squeezy webhook verification."""
+    from .adapters.lemon_squeezy import LemonSqueezyService
+
+    return LemonSqueezyService().verify_webhook(raw_body, signature)
 
 
 async def create_lemonsqueezy_checkout(
@@ -380,90 +255,15 @@ async def create_lemonsqueezy_checkout(
     email: str | None = None,
     custom_price: int | None = None,
 ) -> str:
-    """Create a hosted Lemon Squeezy checkout and return redirect URL."""
-    api_key = os.getenv("LEMON_SQUEEZY_API_KEY", "").strip()
-    store_id = os.getenv("LEMON_SQUEEZY_STORE_ID", "").strip()
-    if not api_key or not store_id:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Lemon Squeezy API credentials are missing",
-        )
+    """Compatibility wrapper delegating checkout creation to the payment adapter."""
+    from .adapters.lemon_squeezy import LemonSqueezyService
 
-    if not variant_quantities:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="variant_quantities cannot be empty",
-        )
-
-    target_variant_id = str(variant_quantities[0]["variant_id"])
-
-    checkout_data: dict[str, object] = {
-        "custom": custom_data,
-    }
-    if email:
-        checkout_data["email"] = email
-
-    attributes: dict[str, object] = {
-        "checkout_data": checkout_data,
-    }
-
-    # Lemon Squeezy API v1 custom_price parametresi (cent cinsinden int)
-    if custom_price is not None:
-        attributes["custom_price"] = int(custom_price)
-
-    payload = {
-        "data": {
-            "type": "checkouts",
-            "attributes": attributes,
-            "relationships": {
-                "store": {"data": {"type": "stores", "id": str(store_id)}},
-                "variant": {"data": {"type": "variants", "id": str(target_variant_id)}},
-            },
-        }
-    }
-
-    headers = {
-        "Accept": "application/vnd.api+json",
-        "Content-Type": "application/vnd.api+json",
-        "Authorization": f"Bearer {api_key}",
-    }
-
-    async with httpx.AsyncClient(timeout=20.0) as client:
-        try:
-            response = await client.post(
-                "https://api.lemonsqueezy.com/v1/checkouts",
-                headers=headers,
-                json=payload,
-            )
-        except httpx.HTTPError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail=f"Lemon Squeezy request failed: {exc}",
-            ) from exc
-
-    if response.status_code >= 400:
-        error_detail = response.text
-        try:
-            error_detail = response.json()
-        except Exception:
-            pass
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail={"message": "Lemon Squeezy checkout creation failed", "provider_error": error_detail},
-        )
-
-    body = response.json()
-    checkout_url = (
-        body.get("data", {}).get("attributes", {}).get("url")
-        or body.get("data", {}).get("attributes", {}).get("checkout_url")
+    return await LemonSqueezyService().create_checkout_session(
+        variant_quantities=variant_quantities,
+        custom_data=custom_data,
+        email=email,
+        custom_price=custom_price,
     )
-    if not checkout_url:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Lemon Squeezy response did not include checkout URL",
-        )
-
-    return str(checkout_url)
 
 
 def _pdf_escape(value: str) -> str:

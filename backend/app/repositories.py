@@ -1,52 +1,71 @@
 """Data access layer - Repository pattern for database operations."""
-from typing import Optional, List
+
+from datetime import datetime
+from typing import Generic, TypeVar, TypedDict, cast
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .models import User, Track, Purchase
+from .models import Purchase, Track, User
+
+ModelT = TypeVar("ModelT", User, Track, Purchase)
 
 
-class BaseRepository:
+class PurchaseDetailData(TypedDict):
+    id: int
+    track_id: int
+    track_title: str
+    track_artist: str
+    cover_image_url: str | None
+    download_url: str
+    license_pdf_url: str
+    license_type: str | None
+    purchased_at: datetime | None
+
+
+class BaseRepository(Generic[ModelT]):
     """Base repository with common CRUD operations."""
-    
-    def __init__(self, model):
+
+    def __init__(self, model: type[ModelT]) -> None:
         self.model = model
-    
-    async def get_by_id(self, session: AsyncSession, id: int):
+
+    async def get_by_id(self, session: AsyncSession, entity_id: int) -> ModelT | None:
         """Get entity by ID."""
-        result = await session.execute(select(self.model).where(self.model.id == id))
+        result = await session.execute(
+            select(self.model).where(self.model.__table__.c.id == entity_id)
+        )
         return result.scalars().first()
-    
-    async def get_all(self, session: AsyncSession):
+
+    async def get_all(self, session: AsyncSession) -> list[ModelT]:
         """Get all entities."""
         result = await session.execute(select(self.model))
-        return result.scalars().all()
-    
-    async def create(self, session: AsyncSession, **kwargs):
+        return list(result.scalars().all())
+
+    async def create(self, session: AsyncSession, **kwargs: object) -> ModelT:
         """Create new entity."""
-        entity = self.model(**kwargs)
+        entity = cast(ModelT, self.model(**kwargs))
         session.add(entity)
         await session.commit()
         await session.refresh(entity)
         return entity
-    
-    async def delete(self, session: AsyncSession, entity):
+
+    async def delete(self, session: AsyncSession, entity: ModelT) -> None:
         """Delete entity."""
         await session.delete(entity)
         await session.commit()
 
 
-class UserRepository(BaseRepository):
+class UserRepository(BaseRepository[User]):
     """User data access."""
-    
-    def __init__(self):
+
+    def __init__(self) -> None:
         super().__init__(User)
-    
-    async def get_by_email(self, session: AsyncSession, email: str) -> Optional[User]:
+
+    async def get_by_email(self, session: AsyncSession, email: str) -> User | None:
         """Get user by email."""
         result = await session.execute(select(User).where(User.email == email))
         return result.scalars().first()
-    
+
     async def email_exists(self, session: AsyncSession, email: str) -> bool:
         """Check if email already exists."""
         result = await session.execute(
@@ -55,20 +74,20 @@ class UserRepository(BaseRepository):
         return result.scalar_one_or_none() is not None
 
 
-class TrackRepository(BaseRepository):
+class TrackRepository(BaseRepository[Track]):
     """Track data access."""
-    
-    def __init__(self):
+
+    def __init__(self) -> None:
         super().__init__(Track)
 
 
-class PurchaseRepository(BaseRepository):
+class PurchaseRepository(BaseRepository[Purchase]):
     """Purchase data access."""
-    
-    def __init__(self):
+
+    def __init__(self) -> None:
         super().__init__(Purchase)
-    
-    async def get_user_purchases(self, session: AsyncSession, user_id: int) -> List[int]:
+
+    async def get_user_purchases(self, session: AsyncSession, user_id: int) -> list[int]:
         """Get list of track IDs purchased by user."""
         result = await session.execute(
             select(Purchase.track_id)
@@ -76,10 +95,10 @@ class PurchaseRepository(BaseRepository):
             .order_by(Purchase.created_at.desc())
         )
         return list(result.scalars().all())
-    
+
     async def get_purchase(
         self, session: AsyncSession, user_id: int, track_id: int
-    ) -> Optional[Purchase]:
+    ) -> Purchase | None:
         """Get specific purchase."""
         result = await session.execute(
             select(Purchase).where(
@@ -91,7 +110,7 @@ class PurchaseRepository(BaseRepository):
 
     async def get_purchase_with_track_for_user(
         self, session: AsyncSession, user_id: int, purchase_id: int
-    ) -> Optional[tuple[Purchase, Track]]:
+    ) -> tuple[Purchase, Track] | None:
         """Get one purchase (owned by user) with its track."""
         result = await session.execute(
             select(Purchase, Track)
@@ -101,19 +120,24 @@ class PurchaseRepository(BaseRepository):
                 Purchase.user_id == user_id,
             )
         )
-        return result.first()
-    
+        row = result.first()
+        return (row[0], row[1]) if row is not None else None
+
     async def has_purchased(self, session: AsyncSession, user_id: int, track_id: int) -> bool:
         """Check if user has purchased track."""
         result = await session.execute(
-            select(Purchase.id).where(
+            select(Purchase.id)
+            .where(
                 Purchase.user_id == user_id,
                 Purchase.track_id == track_id,
-            ).limit(1)
+            )
+            .limit(1)
         )
         return result.scalar_one_or_none() is not None
 
-    async def get_user_purchases_detailed(self, session: AsyncSession, user_id: int) -> List[dict]:
+    async def get_user_purchases_detailed(
+        self, session: AsyncSession, user_id: int
+    ) -> list[PurchaseDetailData]:
         """Get detailed purchase list with track info for a user."""
         result = await session.execute(
             select(Purchase, Track)
@@ -122,9 +146,8 @@ class PurchaseRepository(BaseRepository):
             .order_by(Purchase.created_at.desc())
         )
         rows = result.all()
-        details = []
-        for purchase, track in rows:
-            details.append({
+        return [
+            {
                 "id": purchase.id,
                 "track_id": track.id,
                 "track_title": track.title,
@@ -134,5 +157,6 @@ class PurchaseRepository(BaseRepository):
                 "license_pdf_url": f"/purchases/{purchase.id}/license-pdf",
                 "license_type": purchase.license_type,
                 "purchased_at": purchase.created_at,
-            })
-        return details
+            }
+            for purchase, track in rows
+        ]

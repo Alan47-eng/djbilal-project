@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta, timezone
-from typing import Optional
+from typing import Mapping
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from fastapi import Depends, HTTPException, status, Request
@@ -8,11 +8,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import os
 
 from .database import get_session
+from .json_types import normalize_json_value
 from .models import User
 
 # Configuration
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development").lower()
-SECRET_KEY = os.getenv("SECRET_KEY")
+SECRET_KEY = os.getenv("SECRET_KEY") or ""
 if not SECRET_KEY:
     if ENVIRONMENT == "production":
         raise RuntimeError("SECRET_KEY must be set in the environment before starting the app")
@@ -33,7 +34,9 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
 
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+def create_access_token(
+    data: Mapping[str, object], expires_delta: timedelta | None = None
+) -> str:
     """Create a JWT access token.
     
     Args:
@@ -43,7 +46,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     Returns:
         Encoded JWT token string
     """
-    to_encode = data.copy()
+    to_encode = dict(data)
     
     if expires_delta:
         expire = datetime.now(timezone.utc) + expires_delta
@@ -55,7 +58,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     return encoded_jwt
 
 
-def decode_token(token: str) -> Optional[dict]:
+def decode_token(token: str) -> dict[str, object]:
     """Decode and verify a JWT token.
     
     Args:
@@ -68,9 +71,16 @@ def decode_token(token: str) -> Optional[dict]:
         HTTPException: If token is invalid or expired
     """
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        email: str = payload.get("sub")
-        if email is None:
+        decoded: object = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = normalize_json_value(decoded)
+        if not isinstance(payload, dict):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        email = payload.get("sub")
+        if not isinstance(email, str):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid token",
@@ -122,7 +132,13 @@ async def get_current_user(
     """
     token = get_bearer_token_from_request(request)
     payload = decode_token(token)
-    email: str = payload.get("sub")
+    email = payload.get("sub")
+    if not isinstance(email, str):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     
     result = await session.execute(select(User).where(User.email == email))
     user = result.scalars().first()
