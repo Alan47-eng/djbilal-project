@@ -1,4 +1,5 @@
 import os
+from urllib.parse import urlparse
 
 from dotenv import load_dotenv
 
@@ -22,10 +23,23 @@ def parse_frontend_origins(raw_value: str | None) -> list[str]:
         raise RuntimeError("FRONTEND_ORIGINS is empty")
     if any("*" in origin for origin in origins):
         raise RuntimeError("FRONTEND_ORIGINS must not contain wildcard origins")
-    if IS_PRODUCTION:
-        from urllib.parse import urlparse
 
-        for origin in origins:
+    normalized_origins: list[str] = []
+    for origin in origins:
+        parsed = urlparse(origin)
+        if (
+            parsed.scheme
+            and parsed.netloc
+            and parsed.path in ("", "/")
+            and not parsed.params
+            and not parsed.query
+            and not parsed.fragment
+        ):
+            origin = f"{parsed.scheme}://{parsed.netloc}"
+        normalized_origins.append(origin)
+
+    if IS_PRODUCTION:
+        for origin in normalized_origins:
             parsed = urlparse(origin)
             if (
                 parsed.scheme != "https"
@@ -36,9 +50,11 @@ def parse_frontend_origins(raw_value: str | None) -> list[str]:
                 or parsed.fragment
             ):
                 raise RuntimeError(
-                    "Production FRONTEND_ORIGINS must contain exact HTTPS origins"
+                    "Production FRONTEND_ORIGINS must be comma-separated exact "
+                    "HTTPS origins (for example: https://djbilal.com), without "
+                    "paths, brackets, quotes, or wildcards"
                 )
-    return origins
+    return normalized_origins
 
 
 IS_PRODUCTION = os.getenv("ENVIRONMENT", "development").lower() == "production"
