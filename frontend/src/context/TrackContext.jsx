@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import api from '../api';
+import { getApiErrorMessage } from '../utils/errors';
 
 const TrackContext = createContext(null);
 
@@ -22,7 +23,7 @@ export function TrackProvider({ children }) {
       if (!err.response) {
         setError(`Failed to load tracks (API unreachable: ${api.defaults.baseURL})`);
       } else {
-        setError(err.response?.data?.detail || 'Failed to load tracks');
+        setError(getApiErrorMessage(err, 'Failed to load tracks'));
       }
     } finally {
       setLoading(false);

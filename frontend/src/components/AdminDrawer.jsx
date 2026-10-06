@@ -18,6 +18,7 @@ import {
 import api from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useTracks } from '../context/TrackContext';
+import { getApiErrorMessage } from '../utils/errors';
 
 const emptyForm = {
   title: '',
@@ -69,7 +70,7 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
         setUsers(response.data);
         setError(null);
       } catch (err) {
-        setError(err.response?.data?.detail || 'Could not load users');
+        setError(getApiErrorMessage(err, 'Could not load users'));
       } finally {
         setLoadingUsers(false);
       }
@@ -123,7 +124,7 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
       setUsers(response.data);
       setMessage(`${email} was promoted to admin`);
     } catch (err) {
-      setError(err.response?.data?.detail || 'Could not promote user');
+      setError(getApiErrorMessage(err, 'Could not promote user'));
     }
   };
 
@@ -143,7 +144,7 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
       updateTrack(response.data);
       setMessage('Track price updated');
     } catch (err) {
-      setError(err.response?.data?.detail || 'Could not update track price');
+      setError(getApiErrorMessage(err, 'Could not update track price'));
     } finally {
       setUpdatingTrackId(null);
     }
@@ -160,7 +161,7 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
       updateTrack(response.data);
       setMessage('Gumroad product URL updated');
     } catch (err) {
-      setError(err.response?.data?.detail || 'Could not update Gumroad product URL');
+      setError(getApiErrorMessage(err, 'Could not update Gumroad product URL'));
     } finally {
       setUpdatingTrackId(null);
     }
@@ -182,7 +183,7 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
       });
       setMessage('Track deleted');
     } catch (err) {
-      setError(err.response?.data?.detail || 'Could not delete track');
+      setError(getApiErrorMessage(err, 'Could not delete track'));
     }
   };
 
@@ -196,15 +197,14 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
       setError('Category is required');
       return;
     }
-    if (!form.is_free && !form.price) {
-      setError('Paid tracks require a price');
+    if (!form.is_free && !form.external_product_id.trim()) {
+      setError('Gumroad product URL is required for paid tracks');
       return;
     }
     if (!form.is_free && !form.price) {
       setError('Paid tracks require a price');
       return;
     }
-
     try {
       setUploading(true);
       setMessage(null);
@@ -233,7 +233,7 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
       setForm(emptyForm);
       setMessage('Track added');
     } catch (err) {
-      setError(err.response?.data?.detail || 'Could not add track');
+      setError(getApiErrorMessage(err, 'Could not add track'));
     } finally {
       setUploading(false);
     }
@@ -400,11 +400,13 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
                       <input
                         value={form.external_product_id}
                         onChange={handleChange('external_product_id')}
-                        placeholder="Optional external product ID"
+                        type="url"
+                        placeholder="https://gumroad.com/l/product"
                         className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
+                        required
                       />
                       <p className="text-xs text-slate-400">
-                        The cart checkout uses the Gumroad product configured on the server.
+                        Enter this track's fixed-price Gumroad product permalink.
                       </p>
                     </>
                   )}

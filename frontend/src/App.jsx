@@ -1,6 +1,5 @@
 import React, { useRef, useState } from 'react';
 import { LogOut, LogIn, UserPlus, Music, User, Menu, LayoutGrid, ShieldCheck, Gift, Library, ShoppingCart, Info } from 'lucide-react';
-import api from './api';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { TrackProvider, useTracks } from './context/TrackContext';
 import { PurchaseProvider, usePurchases } from './context/PurchaseContext';
@@ -15,6 +14,8 @@ import FreeTracksList from './components/FreeTracksList';
 import UserPurchases from './components/UserPurchases';
 import ResetPassword from './components/ResetPassword';
 import './index.css';
+import { getApiErrorMessage } from './utils/errors';
+import { downloadTrackFile } from './utils/downloads';
 
 function AppContent() {
   const { lang, setLang, isRTL } = useLanguage();
@@ -132,21 +133,6 @@ function AppContent() {
     );
   };
 
-  const buildDownloadName = (track, sourceUrl) => {
-    const fallbackExt = 'mp3';
-    let extension = fallbackExt;
-    try {
-      const parsed = new URL(sourceUrl, window.location.origin);
-      const match = parsed.pathname.match(/\.([a-zA-Z0-9]+)$/);
-      if (match?.[1]) {
-        extension = match[1].toLowerCase();
-      }
-    } catch {
-      extension = fallbackExt;
-    }
-    return `${track.title} - ${track.artist}.${extension}`;
-  };
-
   const handlePlayPreview = (track) => {
     if (!track?.preview_url) {
       setDownloadError(t.previewMissing);
@@ -176,32 +162,20 @@ function AppContent() {
   const handleDownloadTrack = async (track) => {
     try {
       setDownloadError(null);
-      const endpoint = track.is_free
-        ? `/tracks/${track.id}/free-download-file`
-        : `/tracks/${track.id}/download-file`;
 
       if (!track.is_free && !user) {
         setAuthModal({ isOpen: true, mode: 'login' });
         return;
       }
 
-      const sourceRef = track.full_file_path || track.preview_url || '';
-      const fileResponse = await api.get(endpoint, { responseType: 'blob' });
-      const contentType = (fileResponse.headers && fileResponse.headers['content-type']) || '';
-      if (contentType.includes('text/html')) {
-        setDownloadError(t.fileMissing);
-        return;
-      }
-      const blobUrl = window.URL.createObjectURL(fileResponse.data);
-      const link = document.createElement('a');
-      link.href = blobUrl;
-      link.download = buildDownloadName(track, sourceRef);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(blobUrl);
+      await downloadTrackFile({
+        id: track.id,
+        isFree: track.is_free,
+        title: track.title,
+        artist: track.artist,
+      });
     } catch (err) {
-      setDownloadError(err.response?.data?.detail || t.downloadFailed);
+      setDownloadError(getApiErrorMessage(err, t.downloadFailed));
     }
   };
 

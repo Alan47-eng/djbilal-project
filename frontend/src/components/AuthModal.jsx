@@ -3,6 +3,7 @@ import { X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import api from '../api';
+import { getApiErrorMessage } from '../utils/errors';
 
 const AuthModal = ({ isOpen, initialMode = 'login', onClose, onSuccess }) => {
   const { lang } = useLanguage();
@@ -47,9 +48,9 @@ const AuthModal = ({ isOpen, initialMode = 'login', onClose, onSuccess }) => {
 
     try {
       if (activeTab === 'login') {
-        const success = await login(email, password);
-        if (!success) {
-          setError(t.authFailed);
+        const result = await login(email, password);
+        if (!result.success) {
+          setError(result.error || t.authFailed);
           return;
         }
         onSuccess(email);
@@ -57,18 +58,15 @@ const AuthModal = ({ isOpen, initialMode = 'login', onClose, onSuccess }) => {
         return;
       }
 
-      const success = await register(email, password, fullName);
-      if (!success) {
-        setError(t.authFailed);
+      const result = await register(email, password, fullName);
+      if (!result.success) {
+        setError(result.error || t.authFailed);
         return;
       }
       onSuccess(email);
       onClose();
     } catch (err) {
-      setError(
-        err.response?.data?.detail ||
-        t.authFailed
-      );
+      setError(getApiErrorMessage(err, t.authFailed));
     } finally {
       setLoading(false);
     }
@@ -85,7 +83,10 @@ const AuthModal = ({ isOpen, initialMode = 'login', onClose, onSuccess }) => {
       await api.post('/password/request', { email });
       setResetMessage(lang === 'ar' ? 'Sıfırlama bağlantısı e-posta gönderildi.' : 'Reset link sent to your email.');
     } catch (err) {
-      setResetMessage(lang === 'ar' ? 'E-posta gönderilemedi. Tekrar deneyin.' : 'Failed to send reset email. Try again.');
+      setResetMessage(getApiErrorMessage(
+        err,
+        lang === 'ar' ? 'E-posta gönderilemedi. Tekrar deneyin.' : 'Failed to send reset email. Try again.',
+      ));
     } finally {
       setResetLoading(false);
     }

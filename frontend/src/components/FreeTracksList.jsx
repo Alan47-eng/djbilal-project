@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { Download, Play, Gift } from 'lucide-react';
-import api, { resolveAssetUrl } from '../api';
+import { resolveAssetUrl } from '../api';
 import { useLanguage } from '../context/LanguageContext';
+import { getApiErrorMessage } from '../utils/errors';
+import { downloadTrackFile } from '../utils/downloads';
 
 const FreeTracksList = ({ tracks, onPlay }) => {
   const { lang } = useLanguage();
@@ -20,7 +22,6 @@ const FreeTracksList = ({ tracks, onPlay }) => {
     downloading: lang === 'ar' ? 'جاري التنزيل...' : 'Downloading...',
     download: lang === 'ar' ? 'تنزيل' : 'Download',
     downloadFailed: lang === 'ar' ? 'فشل التنزيل.' : 'Download failed.',
-    invalidFile: lang === 'ar' ? 'تم استلام ملف غير صالح.' : 'Received HTML instead of media file',
     free: lang === 'ar' ? 'مجاني' : 'FREE',
     vst: 'VST',
   };
@@ -71,21 +72,14 @@ const FreeTracksList = ({ tracks, onPlay }) => {
       setDownloading(track.id);
       setError(null);
       const sourceRef = track.full_file_path || track.preview_url || '';
-      const fileResponse = await api.get(`/tracks/${track.id}/free-download-file`, { responseType: 'blob' });
-      const contentType = (fileResponse.headers && fileResponse.headers['content-type']) || '';
-      if (contentType.includes('text/html')) {
-        throw new Error(t.invalidFile);
-      }
-      const blobUrl = window.URL.createObjectURL(fileResponse.data);
-      const link = document.createElement('a');
-      link.href = blobUrl;
-      link.download = buildDownloadName(track, sourceRef);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(blobUrl);
+      await downloadTrackFile({
+        id: track.id,
+        isFree: true,
+        title: track.title,
+        artist: track.artist,
+      });
     } catch (err) {
-      setError(err.response?.data?.detail || t.downloadFailed);
+      setError(getApiErrorMessage(err, t.downloadFailed));
     } finally {
       setDownloading(null);
     }

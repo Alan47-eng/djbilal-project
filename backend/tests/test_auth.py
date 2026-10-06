@@ -1,4 +1,5 @@
 import pytest
+from types import SimpleNamespace
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
@@ -8,6 +9,7 @@ from urllib.parse import urlparse, parse_qs
 from app.main import app
 from app.models import Base
 from app.database import get_session
+from app.dependencies import get_storage_service
 from app.models import User, Track, Purchase, GumroadSale
 from app import auth, schemas
 from app.adapters.gumroad import GumroadService
@@ -803,6 +805,69 @@ class TestCheckoutAndWebhook:
         data = response.json()
         assert data["download_url"] == "/media/tracks/sample.mp3"
         assert data["full_file_path"] == "/media/tracks/sample.mp3"
+
+    @pytest.mark.asyncio
+    async def test_free_download_returns_signed_url_for_r2_object(self, client, test_db, monkeypatch):
+        _, AsyncSessionLocal = test_db
+        monkeypatch.setitem(
+            app.dependency_overrides,
+            get_storage_service,
+            lambda: SimpleNamespace(
+                generate_signed_url=lambda object_key: f"https://signed.example/{object_key}"
+            ),
+        )
+
+        async with AsyncSessionLocal() as session:
+            track = await create_track_record(
+                session,
+                is_free=True,
+                price=0,
+                full_file_path="tracks/free-sample.mp3",
+                free_download_url="tracks/free-sample.mp3",
+            )
+
+        response = await client.get(f"/tracks/{track.id}/free-download")
+
+        assert response.status_code == 200
+        assert response.json()["download_url"] == "https://signed.example/tracks/free-sample.mp3"
+
+    @pytest.mark.asyncio
+    async def test_purchased_r2_track_download_requires_purchase_and_returns_signed_url(
+        self, client, test_db, monkeypatch
+    ):
+        _, AsyncSessionLocal = test_db
+        monkeypatch.setitem(
+            app.dependency_overrides,
+            get_storage_service,
+            lambda: SimpleNamespace(
+                generate_signed_url=lambda object_key: f"https://signed.example/{object_key}"
+            ),
+        )
+
+        async with AsyncSessionLocal() as session:
+            user = await create_user_record(session, "r2-buyer@example.com", "password123")
+            track = await create_track_record(
+                session,
+                full_file_path="tracks/paid-sample.mp3",
+            )
+            session.add(Purchase(user_id=user.id, track_id=track.id))
+            await session.commit()
+
+        unauthenticated = await client.get(f"/tracks/{track.id}/download")
+        assert unauthenticated.status_code == 401
+
+        login_response = await client.post(
+            "/login",
+            json={"email": "r2-buyer@example.com", "password": "password123"},
+        )
+        token = login_response.json()["access_token"]
+        response = await client.get(
+            f"/tracks/{track.id}/download",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        assert response.status_code == 200
+        assert response.json()["download_url"] == "https://signed.example/tracks/paid-sample.mp3"
 
 
 class TestEdgeCases:

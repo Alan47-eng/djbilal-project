@@ -1,4 +1,5 @@
 import re
+import math
 from datetime import datetime
 from urllib.parse import urlparse
 from pydantic import BaseModel, ConfigDict, EmailStr, field_validator, model_validator
@@ -123,7 +124,7 @@ class TrackCreate(DTO):
     @field_validator('price')
     @classmethod
     def price_must_be_valid(cls, v: float) -> float:
-        if v < 0:
+        if not math.isfinite(v) or v < 0:
             raise ValueError('Price must be greater than 0')
         if v > 999999.99:
             raise ValueError('Price cannot exceed 999999.99')
@@ -192,7 +193,7 @@ class TrackUpdate(DTO):
     def price_must_be_valid(cls, v: float | None) -> float | None:
         if v is None:
             return v
-        if v < 0:
+        if not math.isfinite(v) or v < 0:
             raise ValueError('Price must be greater than 0')
         if v > 999999.99:
             raise ValueError('Price cannot exceed 999999.99')
@@ -237,6 +238,21 @@ class TrackResponse(DTO):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True, extra="forbid")
+
+    @field_validator("external_product_id")
+    @classmethod
+    def validate_external_product_id(cls, value: str | None) -> str | None:
+        return _validate_external_product_id(value)
+
+
+class CheckoutItem(DTO):
+    track_id: int
+    checkout_url: str
+
+
+class CartCheckoutResponse(DTO):
+    track_ids: list[int]
+    checkout_items: list[CheckoutItem]
 
 
 class PurchaseDetail(DTO):

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import api from '../api';
 import { useAuth } from '../context/AuthContext';
+import { getApiErrorMessage } from '../utils/errors';
 
 export function useCheckout() {
   const { user } = useAuth();
@@ -19,10 +20,7 @@ export function useCheckout() {
       const response = await api.post(`/tracks/${trackId}/checkout`);
       return response.data.checkout_url;
     } catch (err) {
-      const detail = err.response?.data?.detail;
-      const errorMsg = typeof detail === 'string'
-        ? detail
-        : detail?.message || detail?.detail || 'Checkout failed';
+      const errorMsg = getApiErrorMessage(err, 'Checkout failed');
       setError(errorMsg);
       return null;
     } finally {
@@ -46,10 +44,7 @@ export function useCheckout() {
       const response = await api.post('/checkout/cart', { track_ids: trackIds });
       return response.data.checkout_items;
     } catch (err) {
-      const detail = err.response?.data?.detail;
-      const errorMsg = typeof detail === 'string'
-        ? detail
-        : detail?.message || detail?.detail || 'Checkout failed';
+      const errorMsg = getApiErrorMessage(err, 'Checkout failed');
       setError(errorMsg);
       return null;
     } finally {
@@ -77,7 +72,7 @@ export function useDownload() {
       const response = await api.get(`/tracks/${trackId}/download`);
       return response.data.download_url;
     } catch (err) {
-      const errorMsg = err.response?.data?.detail || 'Download failed';
+      const errorMsg = getApiErrorMessage(err, 'Download failed');
       setError(errorMsg);
       return null;
     } finally {
@@ -101,7 +96,7 @@ export function useTrackUpload() {
       setError(null);
       return response.data;
     } catch (err) {
-      const errorMsg = err.response?.data?.detail || 'Upload failed';
+      const errorMsg = getApiErrorMessage(err, 'Upload failed');
       setError(errorMsg);
       return null;
     } finally {

@@ -128,6 +128,7 @@ async def free_download_track(
     track_id: int,
     session: AsyncSession = Depends(get_session),
     track_service: TrackService = Depends(get_track_service),
+    storage_service: BaseStorageService = Depends(get_storage_service),
 ) -> schemas.DownloadResponse:
     track = await track_service.get_track(session, track_id)
     if not track.is_free:
@@ -135,30 +136,40 @@ async def free_download_track(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="This track is not available for free download",
         )
-    download_url = normalize_media_url(track.free_download_url) or normalize_media_url(
-        track.full_file_path
+    download_target = track.free_download_url or track.full_file_path
+    download_url = (
+        storage_service.generate_signed_url(download_target)
+        if is_r2_object_key(download_target)
+        else normalize_media_url(download_target)
     )
     return schemas.DownloadResponse.model_validate(
         {
             "track_id": track.id,
-            "full_file_path": normalize_media_url(track.full_file_path),
+            "full_file_path": normalize_media_url(track.full_file_path) or track.full_file_path,
             "download_url": download_url,
         }
     )
 
 
-@router.get("/{track_id}/free-download-file")
+@router.get("/{track_id}/free-download-file", response_model=None)
 async def free_download_track_file(
     track_id: int,
     session: AsyncSession = Depends(get_session),
     track_service: TrackService = Depends(get_track_service),
-) -> FileResponse:
+    storage_service: BaseStorageService = Depends(get_storage_service),
+) -> FileResponse | RedirectResponse:
     track = await track_service.get_track(session, track_id)
     if not track.is_free:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="This track is not available for free download",
         )
+    if is_r2_object_key(track.full_file_path):
+        return RedirectResponse(
+            url=storage_service.generate_signed_url(track.full_file_path),
+            status_code=302,
+        )
+
     file_path = resolve_uploaded_file_path(track.full_file_path, "tracks")
     return FileResponse(
         path=file_path,

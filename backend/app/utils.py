@@ -56,6 +56,13 @@ def validate_upload_file(upload_file, allowed_extensions: set[str], max_bytes: i
             detail=f"{label} size limit is misconfigured",
         )
 
+    upload_size = getattr(upload_file, "size", None)
+    if isinstance(upload_size, int) and upload_size > max_bytes:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"{label} exceeds the maximum size of {max_bytes} bytes",
+        )
+
 
 def build_media_url(request: Request, folder: str, filename: str) -> str:
     """Build media path to avoid proxy scheme/domain mismatches."""

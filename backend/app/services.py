@@ -223,6 +223,28 @@ class TrackService:
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="Price is required for paid tracks",
             )
+
+        normalized_price = 0.0 if is_free and price is None else (price or 0.0)
+        track_data = schemas.TrackCreate(
+            title=title.strip(),
+            artist=artist.strip(),
+            price=normalized_price,
+            external_product_id=None if is_free else external_product_id,
+            preview_url="/media/previews/pending.mp3",
+            full_file_path="/media/tracks/pending.mp3",
+            is_free=is_free,
+            free_download_url=(
+                free_download_url.strip()
+                if free_download_url
+                else ("/media/tracks/pending.mp3" if is_free else None)
+            ),
+            category=category.strip().lower(),
+        )
+        if not track_data.is_free and not track_data.external_product_id:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Gumroad product URL is required for paid tracks",
+            )
         validate_upload_file(track_file, AUDIO_EXTENSIONS, MAX_TRACK_UPLOAD_BYTES, "Track file")
         validate_upload_file(preview_file, AUDIO_EXTENSIONS, MAX_PREVIEW_UPLOAD_BYTES, "Preview file")
         if cover_file is not None:
@@ -232,32 +254,49 @@ class TrackService:
         preview_filename = build_storage_name(preview_file.filename or "")
         cover_filename = build_storage_name(cover_file.filename or "") if cover_file else None
 
-        track_r2_key = self.storage_service.upload_file(track_file, "tracks", track_filename)
-        preview_r2_url = self.storage_service.upload_file(preview_file, "previews", preview_filename)
-        cover_r2_url = (
-            self.storage_service.upload_file(cover_file, "covers", cover_filename)
-            if cover_file and cover_filename
-            else None
-        )
+        uploaded_objects: list[str] = []
+        try:
+            track_r2_key = self.storage_service.upload_file(track_file, "tracks", track_filename)
+            uploaded_objects.append(f"tracks/{track_filename}")
+            preview_r2_url = self.storage_service.upload_file(
+                preview_file, "previews", preview_filename
+            )
+            uploaded_objects.append(f"previews/{preview_filename}")
+            cover_r2_url = None
+            if cover_file is not None and cover_filename is not None:
+                cover_r2_url = self.storage_service.upload_file(
+                    cover_file, "covers", cover_filename
+                )
+                uploaded_objects.append(f"covers/{cover_filename}")
 
-        track_full_url = track_r2_key if track_r2_key.startswith("tracks/") or "/" not in track_r2_key else track_r2_key
-        if not track_full_url.startswith("http") and not track_full_url.startswith("/") and not track_full_url.startswith("tracks/"):
-            track_full_url = f"/{track_r2_key}"
+            track_full_url = (
+                track_r2_key
+                if track_r2_key.startswith("tracks/") or "/" not in track_r2_key
+                else track_r2_key
+            )
+            if (
+                not track_full_url.startswith("http")
+                and not track_full_url.startswith("/")
+                and not track_full_url.startswith("tracks/")
+            ):
+                track_full_url = f"/{track_r2_key}"
 
-        normalized_price = 0.0 if is_free and price is None else (price or 0.0)
-        track_data = schemas.TrackCreate(
-            title=title.strip(),
-            artist=artist.strip(),
-            price=normalized_price,
-            cover_image_url=cover_r2_url,
-            external_product_id=None if is_free else external_product_id,
-            preview_url=preview_r2_url,
-            full_file_path=track_full_url,
-            is_free=is_free,
-            free_download_url=free_download_url.strip() if free_download_url else (track_full_url if is_free else None),
-            category=category.strip().lower(),
-        )
-        return await self.create_track(session, track_data)
+            track_data.cover_image_url = cover_r2_url
+            track_data.preview_url = preview_r2_url
+            track_data.full_file_path = track_full_url
+            if is_free and not free_download_url:
+                track_data.free_download_url = track_full_url
+            return await self.create_track(session, track_data)
+        except Exception as exc:
+            for object_key in uploaded_objects:
+                try:
+                    self.storage_service.delete_file(object_key)
+                except Exception as cleanup_error:
+                    exc.add_note(
+                        f"Could not clean up uploaded object {object_key}: "
+                        f"{cleanup_error}"
+                    )
+            raise
 
     async def create_checkout(
         self, session: AsyncSession, track_id: int, current_user: User

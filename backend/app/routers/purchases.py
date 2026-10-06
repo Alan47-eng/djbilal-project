@@ -10,13 +10,13 @@ from ..services import PurchaseService, TrackService
 router = APIRouter(tags=["purchases"])
 
 
-@router.post("/checkout/cart")
+@router.post("/checkout/cart", response_model=schemas.CartCheckoutResponse)
 async def create_cart_checkout(
     payload: schemas.CartCheckoutRequest,
     current_user: User = Depends(auth.get_current_user),
     session: AsyncSession = Depends(get_session),
     track_service: TrackService = Depends(get_track_service),
-) -> dict[str, list[int] | list[dict[str, int | str]]]:
+) -> schemas.CartCheckoutResponse:
     return await track_service.create_cart_checkout(session, payload.track_ids, current_user)
 
 

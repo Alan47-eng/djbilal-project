@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import api from '../api';
 import { useAuth } from './AuthContext';
+import { getApiErrorMessage } from '../utils/errors';
 
 const PurchaseContext = createContext(null);
 
@@ -25,7 +26,7 @@ export function PurchaseProvider({ children }) {
       setPurchases(response.data);
       setError(null);
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to load purchases');
+      setError(getApiErrorMessage(err, 'Failed to load purchases'));
     } finally {
       setLoading(false);
     }

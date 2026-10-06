@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
+import { getApiErrorMessage } from '../utils/errors';
 import { useLanguage } from '../context/LanguageContext';
 
 export default function ResetPassword() {
@@ -33,7 +34,10 @@ export default function ResetPassword() {
       setMessage(lang === 'ar' ? 'Parolanız sıfırlandı. Giriş sayfasına yönlendiriliyorsunuz.' : 'Password reset successful. Redirecting to login...');
       setTimeout(() => (window.location.href = '/'), 2000);
     } catch (err) {
-      setMessage(err.response?.data?.detail || (lang === 'ar' ? 'Sıfırlama başarısız.' : 'Reset failed.'));
+      setMessage(getApiErrorMessage(
+        err,
+        lang === 'ar' ? 'Sıfırlama başarısız.' : 'Reset failed.',
+      ));
     } finally {
       setLoading(false);
     }

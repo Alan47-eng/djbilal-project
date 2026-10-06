@@ -3,6 +3,8 @@ import { Download, FileText, ShoppingBag, BadgeCheck, RefreshCw } from 'lucide-r
 import api, { resolveAssetUrl } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
+import { getApiErrorMessage } from '../utils/errors';
+import { downloadTrackFile } from '../utils/downloads';
 
 const LICENSE_COLORS = {
   'MP3 Lease': 'bg-blue-600/20 text-blue-300 border-blue-600/40',
@@ -41,7 +43,7 @@ const UserPurchases = () => {
       const res = await api.get('/purchases/details');
       setPurchases(res.data);
     } catch (err) {
-      setError(err.response?.data?.detail || t.couldNotLoad);
+      setError(getApiErrorMessage(err, t.couldNotLoad));
     } finally {
       setLoading(false);
     }
@@ -51,39 +53,17 @@ const UserPurchases = () => {
     if (user) fetchDetails();
   }, [user]);
 
-  const buildDownloadName = (purchase) => {
-    const fallbackExt = 'mp3';
-    let extension = fallbackExt;
-    try {
-      const parsed = new URL(purchase.download_url, window.location.origin);
-      const match = parsed.pathname.match(/\.([a-zA-Z0-9]+)$/);
-      if (match?.[1]) {
-        extension = match[1].toLowerCase();
-      }
-    } catch {
-      extension = fallbackExt;
-    }
-    return `${purchase.track_title} - ${purchase.track_artist}.${extension}`;
-  };
-
   const handleDownload = async (purchase) => {
     try {
       setDownloading(purchase.track_id);
-      const fileResponse = await api.get(`/tracks/${purchase.track_id}/download-file`, { responseType: 'blob' });
-      const contentType = (fileResponse.headers && fileResponse.headers['content-type']) || '';
-      if (contentType.includes('text/html')) {
-        throw new Error('Received HTML instead of media file');
-      }
-      const blobUrl = window.URL.createObjectURL(fileResponse.data);
-      const link = document.createElement('a');
-      link.href = blobUrl;
-      link.download = buildDownloadName(purchase);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(blobUrl);
+      await downloadTrackFile({
+        id: purchase.track_id,
+        isFree: false,
+        title: purchase.track_title,
+        artist: purchase.track_artist,
+      });
     } catch (err) {
-      setError(err.response?.data?.detail || t.downloadFailed);
+      setError(getApiErrorMessage(err, t.downloadFailed));
     } finally {
       setDownloading(null);
     }
@@ -102,7 +82,7 @@ const UserPurchases = () => {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(blobUrl);
     } catch (err) {
-      setError(err.response?.data?.detail || t.downloadFailed);
+      setError(getApiErrorMessage(err, t.downloadFailed));
     } finally {
       setDownloadingLicense(null);
     }
