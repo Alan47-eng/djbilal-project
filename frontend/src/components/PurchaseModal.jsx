@@ -48,7 +48,7 @@ const PurchaseModal = ({ isOpen, track, onClose, onConfirm, loading = false, err
 
         <div className="mb-4 flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-950 p-3 text-slate-300">
           <ExternalLink size={18} className="text-purple-400" />
-          <span>You&apos;ll be redirected to Lemon Squeezy’s secure checkout page.</span>
+          <span>You&apos;ll be redirected to Gumroad&apos;s secure checkout page.</span>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">

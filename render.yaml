@@ -24,11 +24,16 @@ services:
         sync: false
       - key: FROM_EMAIL
         sync: false
-      - key: LEMON_SQUEEZY_API_KEY
+      - key: GUMROAD_PRODUCT_URL
         sync: false
-      - key: LEMON_SQUEEZY_STORE_ID
+      - key: GUMROAD_PRODUCT_ID
         sync: false
-      - key: LEMON_SQUEEZY_WEBHOOK_SECRET
+      - key: GUMROAD_SELLER_ID
+        sync: false
+      - key: GUMROAD_ACCESS_TOKEN
+        sync: false
+      - key: GUMROAD_CURRENCY
+        value: usd
         sync: false
 
   - type: web

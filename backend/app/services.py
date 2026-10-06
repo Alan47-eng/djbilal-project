@@ -1,18 +1,22 @@
 """Business logic layer - Service classes for domain operations."""
 import os
+from decimal import Decimal, ROUND_HALF_UP
+from urllib.parse import urlparse
+
 from fastapi import HTTPException, status
 from fastapi import UploadFile
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from . import auth, schemas
-from .interfaces import BasePaymentGateway, BaseStorageService
-from .json_types import JSONObject, JSONValue
-from .models import User, Track, Purchase
+from .adapters.gumroad import GumroadService
+from .interfaces import BaseStorageService
+from .models import GumroadSale, User, Track, Purchase
 from .repositories import PurchaseDetailData, PurchaseRepository, TrackRepository, UserRepository
 from .utils import (
     build_storage_name,
-    build_checkout_url,
+    build_gumroad_checkout_url,
     validate_upload_file,
     AUDIO_EXTENSIONS,
     IMAGE_EXTENSIONS,
@@ -95,11 +99,9 @@ class TrackService:
     def __init__(
         self,
         storage_service: BaseStorageService,
-        payment_gateway: BasePaymentGateway,
     ) -> None:
         self.repo = TrackRepository()
         self.storage_service = storage_service
-        self.payment_gateway = payment_gateway
 
     async def create_track(
         self, session: AsyncSession, track_data: schemas.TrackCreate
@@ -111,8 +113,7 @@ class TrackService:
             artist=track_data.artist,
             price=track_data.price,
             cover_image_url=track_data.cover_image_url,
-            checkout_url=track_data.checkout_url,
-            lemon_variant_id=track_data.lemon_variant_id,
+            external_product_id=track_data.external_product_id,
             preview_url=track_data.preview_url,
             full_file_path=track_data.full_file_path,
             is_free=track_data.is_free,
@@ -211,8 +212,7 @@ class TrackService:
         artist: str,
         category: str,
         price: float | None,
-        checkout_url: str | None,
-        lemon_variant_id: int | None,
+        external_product_id: str | None,
         is_free: bool,
         free_download_url: str | None,
         track_file: UploadFile,
@@ -225,16 +225,6 @@ class TrackService:
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="Price is required for paid tracks",
             )
-        if not is_free and lemon_variant_id is None:
-            default_variant = os.getenv("LEMON_SQUEEZY_CART_VARIANT_ID")
-            if default_variant:
-                lemon_variant_id = int(default_variant)
-            else:
-                raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail="Lemon variant ID is required or LEMON_SQUEEZY_CART_VARIANT_ID must be set",
-                )
-
         validate_upload_file(track_file, AUDIO_EXTENSIONS, MAX_TRACK_UPLOAD_BYTES, "Track file")
         validate_upload_file(preview_file, AUDIO_EXTENSIONS, MAX_PREVIEW_UPLOAD_BYTES, "Preview file")
         if cover_file is not None:
@@ -257,14 +247,12 @@ class TrackService:
             track_full_url = f"/{track_r2_key}"
 
         normalized_price = 0.0 if is_free and price is None else (price or 0.0)
-        checkout_url_value = None if is_free else (checkout_url.strip() if checkout_url else None)
         track_data = schemas.TrackCreate(
             title=title.strip(),
             artist=artist.strip(),
             price=normalized_price,
             cover_image_url=cover_r2_url,
-            checkout_url=checkout_url_value,
-            lemon_variant_id=None if is_free else lemon_variant_id,
+            external_product_id=None if is_free else external_product_id,
             preview_url=preview_r2_url,
             full_file_path=track_full_url,
             is_free=is_free,
@@ -284,31 +272,10 @@ class TrackService:
                 detail="This track is free to download",
             )
 
-        if track.lemon_variant_id:
-            checkout_url = await self.payment_gateway.create_checkout_session(
-                variant_quantities=[{"variant_id": track.lemon_variant_id, "quantity": 1}],
-                custom_data={
-                    "track_id": str(track.id),
-                    "track_ids": str(track.id),
-                    "user_id": str(current_user.id),
-                },
-                email=current_user.email,
-                fallback_url=track.checkout_url,
-            )
-        else:
-            if not track.checkout_url:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Checkout URL not configured for this track",
-                )
-            checkout_url = build_checkout_url(
-                track.checkout_url,
-                {
-                    "track_id": str(track.id),
-                    "user_id": str(current_user.id),
-                },
-                email=current_user.email,
-            )
+        checkout_url = self._build_gumroad_checkout_url(
+            [track],
+            current_user,
+        )
 
         return {
             "track_id": track.id,
@@ -321,7 +288,7 @@ class TrackService:
         track_ids: list[int],
         current_user: User,
     ) -> dict[str, list[int] | str]:
-        """Create checkout URL for paid tracks in cart using Lemon Squeezy cart variant."""
+        """Create a Gumroad checkout URL for the selected paid tracks."""
         tracks_result = await session.execute(
             select(Track).where(Track.id.in_(track_ids))
         )
@@ -343,52 +310,39 @@ class TrackService:
 
         cart_track_ids = [track.id for track in paid_tracks]
 
-        # 1. Sepetteki toplam tutari hesapla ve Cent cinsine cevir ($3.50 -> 350)
-        total_price = sum(float(track.price or 0) for track in paid_tracks)
-        total_cents = max(int(round(total_price * 100)), 100)
-
-        # Use the configured cart variant, or a legacy per-track checkout URL.
-        cart_variant_id = os.getenv("LEMON_SQUEEZY_CART_VARIANT_ID")
-        if not cart_variant_id:
-            cart_variant_id = paid_tracks[0].lemon_variant_id
-        custom_data = {
-            "track_ids": ",".join(str(track_id) for track_id in cart_track_ids),
-            "user_id": str(current_user.id),
-            "expected_total_cents": str(total_cents),
-        }
-
-        fallback_url = next(
-            (track.checkout_url for track in paid_tracks if track.checkout_url),
-            None,
-        )
-
-        if not cart_variant_id:
-            if not fallback_url:
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=(
-                        "LEMON_SQUEEZY_CART_VARIANT_ID is not configured and "
-                        "no track checkout URL is available."
-                    ),
-                )
-            checkout_url = build_checkout_url(
-                fallback_url,
-                custom_data,
-                email=current_user.email,
-            )
-        else:
-            checkout_url = await self.payment_gateway.create_checkout_session(
-                variant_quantities=[{"variant_id": int(cart_variant_id), "quantity": 1}],
-                custom_data=custom_data,
-                email=current_user.email,
-                custom_price=total_cents,
-                fallback_url=fallback_url,
-            )
+        checkout_url = self._build_gumroad_checkout_url(paid_tracks, current_user)
 
         return {
             "track_ids": cart_track_ids,
             "checkout_url": checkout_url,
         }
+
+    @staticmethod
+    def _build_gumroad_checkout_url(tracks: list[Track], current_user: User) -> str:
+        product_url = os.getenv("GUMROAD_PRODUCT_URL", "").strip()
+        if not product_url:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="GUMROAD_PRODUCT_URL is not configured",
+            )
+        parsed_url = urlparse(product_url)
+        if parsed_url.scheme != "https" or not parsed_url.netloc:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="GUMROAD_PRODUCT_URL must be a valid HTTPS URL",
+            )
+        total_cents = int(
+            (
+                sum((Decimal(str(track.price)) for track in tracks), Decimal("0"))
+                * 100
+            ).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+        )
+        return build_gumroad_checkout_url(
+            product_url,
+            user_id=current_user.id,
+            track_ids=[track.id for track in tracks],
+            total_cents=total_cents,
+        )
 
 
 class PurchaseService:
@@ -396,12 +350,12 @@ class PurchaseService:
 
     def __init__(
         self,
-        payment_gateway: BasePaymentGateway,
+        gumroad_service: GumroadService,
         track_service: TrackService,
     ) -> None:
         self.repo = PurchaseRepository()
         self.track_service = track_service
-        self.payment_gateway = payment_gateway
+        self.gumroad_service = gumroad_service
 
     async def get_user_purchases(self, session: AsyncSession, user_id: int) -> list[int]:
         """Get user's purchased track IDs."""
@@ -436,72 +390,118 @@ class PurchaseService:
         """Check if user can download track."""
         return await self.repo.has_purchased(session, user_id, track_id)
 
-    async def process_successful_payment_payload(
+    async def process_gumroad_ping(
         self,
         session: AsyncSession,
-        payload: JSONObject,
+        payload: dict[str, str],
     ) -> dict[str, str | list[int]]:
-        """Persist purchases for successful Lemon Squeezy webhook payload."""
-        event = self.payment_gateway.handle_webhook_event(payload)
-        if not event["successful"]:
-            return {"status": "ignored"}
+        """Verify a Gumroad sale and add its paid tracks to the buyer's library."""
+        custom_data = self.gumroad_service.extract_checkout_data(payload)
+        user_id_value = custom_data.get("user_id")
+        track_ids_value = custom_data.get("track_ids") or custom_data.get("track_id")
+        if not user_id_value or not track_ids_value:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Missing Gumroad cart information",
+            )
 
-        custom_data = event["custom_data"]
-        track_id = custom_data.get("track_id")
-        track_ids = custom_data.get("track_ids")
-        user_id = custom_data.get("user_id")
+        try:
+            user_id = int(user_id_value)
+            resolved_track_ids = [
+                int(value.strip()) for value in track_ids_value.split(",")
+            ]
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Gumroad cart contains invalid IDs",
+            ) from exc
+        if (
+            user_id <= 0
+            or not resolved_track_ids
+            or any(track_id <= 0 for track_id in resolved_track_ids)
+            or len(set(resolved_track_ids)) != len(resolved_track_ids)
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Gumroad cart contains invalid IDs",
+            )
+
+        sale = await self.gumroad_service.verify_sale(payload)
+        existing_sale = await session.get(GumroadSale, sale["sale_id"])
+        if existing_sale:
+            return {"status": "duplicate", "purchase_ids": []}
+
+        user = await UserRepository().get_by_id(session, user_id)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Gumroad buyer account was not found",
+            )
+
+        tracks_result = await session.execute(
+            select(Track).where(Track.id.in_(resolved_track_ids))
+        )
+        tracks_by_id = {track.id: track for track in tracks_result.scalars().all()}
+        if len(tracks_by_id) != len(resolved_track_ids):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Gumroad cart references an unknown track",
+            )
+        tracks = [tracks_by_id[track_id] for track_id in resolved_track_ids]
+        if any(track.is_free for track in tracks):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Gumroad cart can only grant paid tracks",
+            )
+
+        expected_cents = int(
+            (
+                sum((Decimal(str(track.price)) for track in tracks), Decimal("0"))
+                * 100
+            ).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+        )
+        if int(sale["price"]) != expected_cents:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Paid amount does not match the cart total",
+            )
+
         license_type = custom_data.get("license_type")
-
-        expected_total_cents = custom_data.get("expected_total_cents")
-        if expected_total_cents:
-            data = payload.get("data")
-            attributes: JSONObject = {}
-            if isinstance(data, dict):
-                attributes_value = data.get("attributes")
-                if isinstance(attributes_value, dict):
-                    attributes = attributes_value
-            paid_cents_value: JSONValue = (
-                attributes.get("total")
-                or attributes.get("subtotal")
-                or 0
+        session.add(
+            GumroadSale(
+                sale_id=sale["sale_id"],
+                user_id=user_id,
+                track_ids=resolved_track_ids,
+                paid_cents=expected_cents,
             )
-            paid_cents: str | int | float = (
-                paid_cents_value
-                if isinstance(paid_cents_value, (str, int, float))
-                else 0
-            )
-            if int(paid_cents) < int(expected_total_cents):
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Paid amount is less than expected cart total",
-                )
-
-        if not user_id or (not track_id and not track_ids):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Missing custom data",
-            )
-
-        resolved_track_ids: list[int] = []
-        if track_ids:
-            for raw_id in track_ids.split(","):
-                value = raw_id.strip()
-                if not value:
-                    continue
-                resolved_track_ids.append(int(value))
-        elif track_id:
-            resolved_track_ids.append(int(track_id))
-
-        if not resolved_track_ids:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="No valid track IDs in custom data",
-            )
-
-        purchase_ids: list[int] = []
+        )
+        purchases: list[Purchase] = []
+        existing_purchase_ids: list[int] = []
         for resolved_track_id in resolved_track_ids:
-            purchase = await self.record_purchase(session, int(user_id), resolved_track_id, license_type)
-            purchase_ids.append(purchase.id)
+            purchase = await self.repo.get_purchase(
+                session, user_id, resolved_track_id
+            )
+            if purchase:
+                existing_purchase_ids.append(purchase.id)
+                continue
+            purchase = Purchase(user_id=user_id, track_id=resolved_track_id)
+            if license_type is not None:
+                purchase.license_type = license_type
+            session.add(purchase)
+            purchases.append(purchase)
+
+        try:
+            await session.flush()
+            purchase_ids = existing_purchase_ids + [
+                purchase.id for purchase in purchases
+            ]
+            await session.commit()
+        except IntegrityError:
+            await session.rollback()
+            if await session.get(GumroadSale, sale["sale_id"]):
+                return {"status": "duplicate", "purchase_ids": []}
+            raise
+
         return {"status": "ok", "purchase_ids": purchase_ids}
 
     async def generate_license_document(

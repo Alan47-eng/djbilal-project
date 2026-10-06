@@ -69,8 +69,7 @@ class TrackCreate(DTO):
     artist: str
     price: float
     cover_image_url: str | None = None
-    checkout_url: str | None = None
-    lemon_variant_id: int | None = None
+    external_product_id: str | None = None
     preview_url: str
     full_file_path: str
     is_free: bool = False
@@ -117,16 +116,19 @@ class TrackCreate(DTO):
             raise ValueError('Paid tracks must use category: edit or remix')
         return self
 
-    @field_validator('lemon_variant_id')
+    @field_validator('external_product_id')
     @classmethod
-    def validate_lemon_variant_id(cls, value: int | None) -> int | None:
+    def validate_external_product_id(cls, value: str | None) -> str | None:
         if value is None:
             return value
-        if value <= 0:
-            raise ValueError('Lemon variant ID must be a positive integer')
-        return value
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError('External product ID cannot be empty')
+        if len(normalized) > 255:
+            raise ValueError('External product ID is too long')
+        return normalized
 
-    @field_validator('cover_image_url', 'checkout_url', 'preview_url', 'full_file_path', 'free_download_url')
+    @field_validator('cover_image_url', 'preview_url', 'full_file_path', 'free_download_url')
     @classmethod
     def urls_not_empty(cls, v: str | None) -> str | None:
         if v is None:
@@ -140,8 +142,7 @@ class TrackUpdate(DTO):
     artist: str | None = None
     price: float | None = None
     cover_image_url: str | None = None
-    checkout_url: str | None = None
-    lemon_variant_id: int | None = None
+    external_product_id: str | None = None
     preview_url: str | None = None
     is_free: bool | None = None
     free_download_url: str | None = None
@@ -177,16 +178,19 @@ class TrackUpdate(DTO):
             raise ValueError('Category must be one of: edit, remix, simple-pack, vst')
         return normalized
 
-    @field_validator('lemon_variant_id')
+    @field_validator('external_product_id')
     @classmethod
-    def validate_lemon_variant_id(cls, value: int | None) -> int | None:
+    def validate_external_product_id(cls, value: str | None) -> str | None:
         if value is None:
             return value
-        if value <= 0:
-            raise ValueError('Lemon variant ID must be a positive integer')
-        return value
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError('External product ID cannot be empty')
+        if len(normalized) > 255:
+            raise ValueError('External product ID is too long')
+        return normalized
 
-    @field_validator('cover_image_url', 'checkout_url', 'preview_url', 'free_download_url')
+    @field_validator('cover_image_url', 'preview_url', 'free_download_url')
     @classmethod
     def urls_not_empty(cls, v: str | None) -> str | None:
         if v is None:
@@ -202,8 +206,7 @@ class TrackResponse(DTO):
     artist: str
     price: float
     cover_image_url: str | None = None
-    checkout_url: str | None = None
-    lemon_variant_id: int | None = None
+    external_product_id: str | None = None
     preview_url: str
     is_free: bool = False
     free_download_url: str | None = None

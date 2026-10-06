@@ -1,6 +1,3 @@
-import hashlib
-import hmac
-import json
 import pytest
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
@@ -13,7 +10,6 @@ from app.database import get_session
 from app.models import User, Track
 from app import auth, schemas
 from app.rate_limit import limiter
-from app.utils import create_lemonsqueezy_checkout
 
 
 # Test database setup
@@ -84,7 +80,6 @@ async def create_user_record(session, email, password, is_admin=False, full_name
 
 async def create_track_record(
     session,
-    checkout_url=None,
     is_free=False,
     price=9.99,
     full_file_path="/server/music/track.mp3",
@@ -95,7 +90,7 @@ async def create_track_record(
         artist="Tester",
         price=price,
         cover_image_url=None,
-        checkout_url=checkout_url,
+
         preview_url="https://example.com/preview.mp3",
         full_file_path=full_file_path,
         is_free=is_free,
@@ -503,24 +498,17 @@ class TestUserAdminEndpoints:
 
 
 class TestCheckoutAndWebhook:
-    """Test Lemon Squeezy checkout flow"""
+    """Test Gumroad checkout and purchase processing."""
 
     @pytest.mark.asyncio
-    async def test_cart_checkout_falls_back_to_track_checkout_url(self, client, test_db):
+    async def test_cart_checkout_builds_gumroad_url(self, client, test_db, monkeypatch):
+        monkeypatch.setenv("GUMROAD_PRODUCT_URL", "https://gumroad.com/l/cart-product")
         _, AsyncSessionLocal = test_db
 
         async with AsyncSessionLocal() as session:
             user = await create_user_record(session, "cartbuyer@example.com", "password123")
-            track_one = await create_track_record(
-                session,
-                checkout_url="https://buy.lemonsqueezy.com/checkout/buy/first",
-                price=0.5,
-            )
-            track_two = await create_track_record(
-                session,
-                checkout_url="https://buy.lemonsqueezy.com/checkout/buy/second",
-                price=0.5,
-            )
+            track_one = await create_track_record(session, price=0.5)
+            track_two = await create_track_record(session, price=0.5)
 
         login_response = await client.post(
             "/login",
@@ -539,66 +527,19 @@ class TestCheckoutAndWebhook:
         assert set(data["track_ids"]) == {track_one.id, track_two.id}
         parsed = urlparse(data["checkout_url"])
         query = parse_qs(parsed.query)
-        assert query["checkout[custom][track_ids]"][0] == f"{track_one.id},{track_two.id}"
-        assert query["checkout[custom][user_id]"][0] == str(user.id)
+        assert parsed.netloc == "gumroad.com"
+        assert query["track_ids"][0] == f"{track_one.id},{track_two.id}"
+        assert query["user_id"][0] == str(user.id)
+        assert query["price"][0] == "100"
 
     @pytest.mark.asyncio
-    async def test_checkout_retries_without_variant_relationship_when_api_rejects(self, monkeypatch):
-        monkeypatch.setenv("LEMON_SQUEEZY_API_KEY", "test-api-key")
-        monkeypatch.setenv("LEMON_SQUEEZY_STORE_ID", "store-123")
-
-        payloads = []
-
-        class FakeResponse:
-            def __init__(self, status_code, payload):
-                self.status_code = status_code
-                self._payload = payload
-                self.text = json.dumps(payload)
-
-            def json(self):
-                return self._payload
-
-        class FakeAsyncClient:
-            def __init__(self, *args, **kwargs):
-                pass
-
-            async def __aenter__(self):
-                return self
-
-            async def __aexit__(self, exc_type, exc, tb):
-                return False
-
-            async def post(self, url, headers, json):
-                payloads.append(json)
-                if len(payloads) == 1:
-                    return FakeResponse(400, {"errors": [{"detail": "variant relationship is invalid"}]})
-                return FakeResponse(200, {"data": {"attributes": {"url": "https://example.com/fallback-checkout"}}})
-
-        monkeypatch.setattr("app.utils.httpx.AsyncClient", FakeAsyncClient)
-
-        checkout_url = await create_lemonsqueezy_checkout(
-            variant_quantities=[
-                {"variant_id": 101, "quantity": 1},
-                {"variant_id": 202, "quantity": 1},
-            ],
-            custom_data={"track_ids": "1,2", "user_id": "42"},
-            email="buyer@example.com",
-        )
-
-        assert checkout_url == "https://example.com/fallback-checkout"
-        assert "variant" in payloads[0]["data"]["relationships"]
-        assert "variant" not in payloads[1]["data"]["relationships"]
-
-    @pytest.mark.asyncio
-    async def test_checkout_endpoint_builds_payment_url(self, client, test_db):
+    async def test_checkout_endpoint_builds_gumroad_url(self, client, test_db, monkeypatch):
+        monkeypatch.setenv("GUMROAD_PRODUCT_URL", "https://gumroad.com/l/cart-product")
         _, AsyncSessionLocal = test_db
 
         async with AsyncSessionLocal() as session:
             user = await create_user_record(session, "buyer@example.com", "password123")
-            track = await create_track_record(
-                session,
-                "https://buy.lemonsqueezy.com/checkout/buy/abc123",
-            )
+            track = await create_track_record(session)
 
         login_response = await client.post(
             "/login",
@@ -616,9 +557,9 @@ class TestCheckoutAndWebhook:
         assert data["track_id"] == track.id
         parsed = urlparse(data["checkout_url"])
         query = parse_qs(parsed.query)
-        assert query["checkout[email]"][0] == "buyer@example.com"
-        assert query["checkout[custom][track_id]"][0] == str(track.id)
-        assert query["checkout[custom][user_id]"][0] == str(user.id)
+        assert query["track_ids"][0] == str(track.id)
+        assert query["user_id"][0] == str(user.id)
+        assert query["price"][0] == "999"
 
     @pytest.mark.asyncio
     async def test_webhook_grants_purchase(self, client, test_db, monkeypatch):
@@ -626,45 +567,35 @@ class TestCheckoutAndWebhook:
 
         async with AsyncSessionLocal() as session:
             user = await create_user_record(session, "paid@example.com", "password123")
-            track = await create_track_record(
-                session,
-                "https://buy.lemonsqueezy.com/checkout/buy/abc123",
-            )
+            track = await create_track_record(session)
 
-        payload = {
-            "type": "order_created",
-            "data": {
-                "attributes": {
-                    "status": "paid"
-                }
-            },
-            "meta": {
-                "event_name": "order_created",
-                "custom_data": {
-                    "track_id": str(track.id),
-                    "user_id": str(user.id),
-                }
-            }
-        }
+        async def verify_sale(_self, _payload):
+            return {"sale_id": "sale-123", "price": "999", "currency": "usd"}
 
-        raw_body = json.dumps(payload).encode("utf-8")
-        secret = "test-webhook-secret"
-        monkeypatch.setenv("LEMON_SQUEEZY_WEBHOOK_SECRET", secret)
-        signature = hmac.new(
-            secret.encode("utf-8"),
-            raw_body,
-            hashlib.sha256,
-        ).hexdigest()
+        monkeypatch.setattr(
+            "app.adapters.gumroad.GumroadService.verify_sale",
+            verify_sale,
+        )
 
         response = await client.post(
-            "/webhooks/lemonsqueezy",
-            content=raw_body,
-            headers={
-                "Content-Type": "application/json",
-                "X-Signature": signature,
+            "/api/webhooks/gumroad",
+            data={
+                "sale_id": "sale-123",
+                "url_params[user_id]": str(user.id),
+                "url_params[track_ids]": str(track.id),
             },
         )
         assert response.status_code == 200
+        replay_response = await client.post(
+            "/api/webhooks/gumroad",
+            data={
+                "sale_id": "sale-123",
+                "url_params[user_id]": str(user.id),
+                "url_params[track_ids]": str(track.id),
+            },
+        )
+        assert replay_response.status_code == 200
+        assert replay_response.json()["status"] == "duplicate"
 
         login_response = await client.post(
             "/login",
@@ -687,7 +618,6 @@ class TestCheckoutAndWebhook:
             user = await create_user_record(session, "freebuyer@example.com", "password123")
             track = await create_track_record(
                 session,
-                checkout_url="https://buy.lemonsqueezy.com/checkout/buy/abc123",
                 is_free=True,
                 price=0,
             )
@@ -707,16 +637,21 @@ class TestCheckoutAndWebhook:
         assert "free to download" in response.json()["detail"]
 
     @pytest.mark.asyncio
-    async def test_webhook_rejects_missing_signature(self, client, monkeypatch):
-        monkeypatch.setenv("LEMON_SQUEEZY_WEBHOOK_SECRET", "test-webhook-secret")
-        payload = {
-            "type": "order_created",
-            "data": {"attributes": {"status": "paid"}},
-            "meta": {"event_name": "order_created", "custom_data": {"track_id": "1", "user_id": "1"}},
-        }
-
-        response = await client.post("/webhooks/lemonsqueezy", json=payload)
-        assert response.status_code == 401
+    async def test_webhook_rejects_unconfigured_seller(self, client, monkeypatch):
+        monkeypatch.setenv("GUMROAD_ACCESS_TOKEN", "test-token")
+        monkeypatch.setenv("GUMROAD_SELLER_ID", "expected-seller")
+        monkeypatch.setenv("GUMROAD_PRODUCT_ID", "expected-product")
+        response = await client.post(
+            "/api/webhooks/gumroad",
+            data={
+                "sale_id": "sale-123",
+                "seller_id": "other-seller",
+                "product_id": "expected-product",
+                "price": "999",
+                "currency": "usd",
+            },
+        )
+        assert response.status_code == 400
 
     @pytest.mark.asyncio
     async def test_license_pdf_available_in_purchase_details(self, client, test_db, monkeypatch):
@@ -729,28 +664,23 @@ class TestCheckoutAndWebhook:
                 "password123",
                 full_name="Test User",
             )
-            track = await create_track_record(
-                session,
-                "https://buy.lemonsqueezy.com/checkout/buy/abc123",
-            )
+            track = await create_track_record(session)
 
-        payload = {
-            "type": "order_created",
-            "data": {"attributes": {"status": "paid"}},
-            "meta": {
-                "event_name": "order_created",
-                "custom_data": {"track_id": str(track.id), "user_id": str(user.id)},
-            },
-        }
-        raw_body = json.dumps(payload).encode("utf-8")
-        secret = "test-webhook-secret"
-        monkeypatch.setenv("LEMON_SQUEEZY_WEBHOOK_SECRET", secret)
-        signature = hmac.new(secret.encode("utf-8"), raw_body, hashlib.sha256).hexdigest()
+        async def verify_sale(_self, _payload):
+            return {"sale_id": "sale-456", "price": "999", "currency": "usd"}
+
+        monkeypatch.setattr(
+            "app.adapters.gumroad.GumroadService.verify_sale",
+            verify_sale,
+        )
 
         webhook_response = await client.post(
-            "/webhooks/lemonsqueezy",
-            content=raw_body,
-            headers={"Content-Type": "application/json", "X-Signature": signature},
+            "/api/webhooks/gumroad",
+            data={
+                "sale_id": "sale-456",
+                "custom_fields[user_id]": str(user.id),
+                "custom_fields[track_ids]": str(track.id),
+            },
         )
         assert webhook_response.status_code == 200
 

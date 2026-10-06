@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Float, Boolean, func, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, Integer, String, DateTime, Float, Boolean, JSON, func, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import declarative_base
 
 Base = declarative_base()
@@ -21,8 +21,7 @@ class Track(Base):
     artist = Column(String(255), nullable=False, index=True)
     price = Column(Float, nullable=False)
     cover_image_url = Column(String(1024), nullable=True)
-    checkout_url = Column(String(1024), nullable=True)
-    lemon_variant_id = Column(Integer, nullable=True)
+    external_product_id = Column(String(255), nullable=True)
     preview_url = Column(String(1024), nullable=False)
     full_file_path = Column(String(1024), nullable=False)
     is_free = Column(Boolean, default=False, nullable=False)
@@ -42,3 +41,13 @@ class Purchase(Base):
     track_id = Column(Integer, ForeignKey('tracks.id', ondelete='CASCADE'), nullable=False, index=True)
     license_type = Column(String(100), nullable=True)
     created_at = Column('purchased_at', DateTime(timezone=True), server_default=func.now())
+
+
+class GumroadSale(Base):
+    __tablename__ = 'gumroad_sales'
+
+    sale_id = Column(String(255), primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=False, index=True)
+    track_ids = Column(JSON, nullable=False)
+    paid_cents = Column(Integer, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

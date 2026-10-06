@@ -24,8 +24,7 @@ const emptyForm = {
   artist: '',
   category: 'edit',
   price: '',
-  checkout_url: '',
-  lemon_variant_id: '',
+  external_product_id: '',
   is_free: false,
   track_file: null,
   preview_file: null,
@@ -55,7 +54,7 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
 
   const stats = useMemo(() => [
     { label: 'Tracks', value: 'Catalog' },
-    { label: 'Sales', value: 'Lemon Squeezy' },
+    { label: 'Sales', value: 'Gumroad' },
     { label: 'Access', value: isAdmin ? 'Admin' : 'Member' },
   ], [isAdmin]);
 
@@ -98,8 +97,7 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
           ? (prev.category === 'edit' ? 'remix' : prev.category)
           : (['simple-pack', 'vst'].includes(prev.category) ? 'edit' : prev.category),
         price: checked ? '0' : prev.price === '0' ? '' : prev.price,
-        checkout_url: checked ? '' : prev.checkout_url,
-        lemon_variant_id: checked ? '' : prev.lemon_variant_id,
+        external_product_id: checked ? '' : prev.external_product_id,
       }));
       return;
     }
@@ -200,11 +198,8 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
       formData.append('category', form.category);
       formData.append('price', form.is_free ? '0' : form.price);
       formData.append('is_free', form.is_free ? 'true' : 'false');
-      if (!form.is_free && form.checkout_url) {
-        formData.append('checkout_url', form.checkout_url);
-      }
-      if (!form.is_free && form.lemon_variant_id) {
-        formData.append('lemon_variant_id', form.lemon_variant_id);
+      if (!form.is_free && form.external_product_id) {
+        formData.append('external_product_id', form.external_product_id);
       }
       formData.append('track_file', form.track_file);
       formData.append('preview_file', form.preview_file);
@@ -385,22 +380,13 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
                   {!form.is_free && (
                     <>
                       <input
-                        value={form.checkout_url}
-                        onChange={handleChange('checkout_url')}
-                        placeholder="Lemon Squeezy checkout URL"
-                        className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
-                      />
-                      <input
-                        type="number"
-                        min="1"
-                        step="1"
-                        value={form.lemon_variant_id}
-                        onChange={handleChange('lemon_variant_id')}
-                        placeholder="Optional: default Railway cart variant will be used if blank"
+                        value={form.external_product_id}
+                        onChange={handleChange('external_product_id')}
+                        placeholder="Optional external product ID"
                         className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
                       />
                       <p className="text-xs text-slate-400">
-                        Leave blank to use the default Railway Lemon cart variant automatically.
+                        The cart checkout uses the Gumroad product configured on the server.
                       </p>
                     </>
                   )}

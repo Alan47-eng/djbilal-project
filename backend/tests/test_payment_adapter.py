@@ -1,27 +1,49 @@
 import pytest
-import httpx
+from fastapi import HTTPException
 
-from app.adapters.lemon_squeezy import LemonSqueezyService
+from app.adapters.gumroad import GumroadService
 
 
-class FakeResponse:
-    def __init__(self, status_code, payload):
-        self.status_code = status_code
-        self._payload = payload
-        self.text = str(payload)
+def test_extract_checkout_data_reads_ping_form_field_groups():
+    data = GumroadService.extract_checkout_data(
+        {
+            "url_params[user_id]": "12",
+            "url_params[track_ids]": "3,4",
+            "custom_fields[license_type]": "Standard",
+            "sale_id": "sale-1",
+        }
+    )
 
-    def json(self):
-        return self._payload
+    assert data == {
+        "user_id": "12",
+        "track_ids": "3,4",
+        "license_type": "Standard",
+    }
 
 
 @pytest.mark.asyncio
-async def test_checkout_retries_transient_network_error(monkeypatch):
-    monkeypatch.setenv("LEMON_SQUEEZY_API_KEY", "test-api-key")
-    monkeypatch.setenv("LEMON_SQUEEZY_STORE_ID", "store-123")
-    calls = []
+async def test_verify_sale_checks_gumroad_api_record(monkeypatch):
+    monkeypatch.setenv("GUMROAD_ACCESS_TOKEN", "api-token")
+    monkeypatch.setenv("GUMROAD_SELLER_ID", "seller-1")
+    monkeypatch.setenv("GUMROAD_PRODUCT_ID", "product-1")
+    request_arguments = {}
+
+    class FakeResponse:
+        status_code = 200
+
+        def json(self):
+            return {
+                "success": True,
+                "sale": {
+                    "sale_id": "sale-1",
+                    "product_id": "product-1",
+                    "price": 500,
+                    "refunded": False,
+                },
+            }
 
     class FakeAsyncClient:
-        def __init__(self, *args, **kwargs):
+        def __init__(self, **kwargs):
             pass
 
         async def __aenter__(self):
@@ -30,49 +52,50 @@ async def test_checkout_retries_transient_network_error(monkeypatch):
         async def __aexit__(self, exc_type, exc, tb):
             return False
 
-        async def post(self, url, headers, json):
-            calls.append(json)
-            if len(calls) == 1:
-                raise httpx.ConnectError("temporary network failure")
-            return FakeResponse(200, {"data": {"attributes": {"url": "https://checkout.test/retry"}}})
+        async def get(self, url, params):
+            request_arguments.update(url=url, params=params)
+            return FakeResponse()
 
-    monkeypatch.setattr("app.adapters.lemon_squeezy.httpx.AsyncClient", FakeAsyncClient)
+    monkeypatch.setattr("app.adapters.gumroad.httpx.AsyncClient", FakeAsyncClient)
 
-    result = await LemonSqueezyService(max_attempts=2, retry_delay=0).create_checkout_session(
-        variant_quantities=[{"variant_id": 101, "quantity": 1}],
-        custom_data={"track_id": "1"},
+    result = await GumroadService().verify_sale(
+        {
+            "sale_id": "sale-1",
+            "seller_id": "seller-1",
+            "product_id": "product-1",
+            "price": "500",
+            "currency": "usd",
+        }
     )
 
-    assert result == "https://checkout.test/retry"
-    assert len(calls) == 2
+    assert result == {"sale_id": "sale-1", "price": "500", "currency": "usd"}
+    assert request_arguments["url"] == "https://api.gumroad.com/v2/sales/sale-1"
+    assert request_arguments["params"] == {"access_token": "api-token"}
 
 
 @pytest.mark.asyncio
-async def test_checkout_uses_fallback_when_provider_omits_url(monkeypatch):
-    monkeypatch.setenv("LEMON_SQUEEZY_API_KEY", "test-api-key")
-    monkeypatch.setenv("LEMON_SQUEEZY_STORE_ID", "store-123")
+async def test_verify_sale_rejects_wrong_seller_before_api_call(monkeypatch):
+    monkeypatch.setenv("GUMROAD_ACCESS_TOKEN", "api-token")
+    monkeypatch.setenv("GUMROAD_SELLER_ID", "seller-1")
+    monkeypatch.setenv("GUMROAD_PRODUCT_ID", "product-1")
 
-    class FakeAsyncClient:
-        def __init__(self, *args, **kwargs):
-            pass
+    async def unexpected_request(*args, **kwargs):
+        raise AssertionError("Gumroad API must not be called for another seller")
 
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, exc_type, exc, tb):
-            return False
-
-        async def post(self, url, headers, json):
-            return FakeResponse(200, {"data": {"attributes": {}}})
-
-    monkeypatch.setattr("app.adapters.lemon_squeezy.httpx.AsyncClient", FakeAsyncClient)
-
-    result = await LemonSqueezyService(max_attempts=1, retry_delay=0).create_checkout_session(
-        variant_quantities=[{"variant_id": 101, "quantity": 1}],
-        custom_data={"track_id": "1"},
-        email="buyer@example.com",
-        fallback_url="https://checkout.test/fallback",
+    monkeypatch.setattr(
+        "app.adapters.gumroad.httpx.AsyncClient.get",
+        unexpected_request,
     )
 
-    assert result.startswith("https://checkout.test/fallback?")
-    assert "checkout%5Bcustom%5D%5Btrack_id%5D=1" in result
+    with pytest.raises(HTTPException) as exc_info:
+        await GumroadService().verify_sale(
+            {
+                "sale_id": "sale-1",
+                "seller_id": "attacker",
+                "product_id": "product-1",
+                "price": "500",
+                "currency": "usd",
+            }
+        )
+
+    assert exc_info.value.status_code == 400

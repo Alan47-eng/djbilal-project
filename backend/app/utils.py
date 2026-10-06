@@ -3,9 +3,8 @@ import os
 import re
 from datetime import datetime
 from pathlib import Path
-from urllib.parse import urlencode, urlparse, parse_qsl, urlunparse
+from urllib.parse import urlencode, urlparse, parse_qsl, urlunsplit
 from uuid import uuid4
-import httpx
 from fastapi import Request, HTTPException, status
 
 
@@ -190,18 +189,33 @@ async def save_upload_file(upload_file, destination: Path, max_bytes: int | None
         await upload_file.close()
 
 
-def build_checkout_url(base_url: str, custom_data: dict[str, str], email: str | None = None) -> str:
-    """Build checkout URL with custom data."""
+def build_gumroad_checkout_url(
+    base_url: str,
+    *,
+    user_id: int,
+    track_ids: list[int],
+    total_cents: int,
+) -> str:
+    """Build a Gumroad checkout URL carrying the authenticated cart context."""
     parsed_url = urlparse(base_url)
     query_items = dict(parse_qsl(parsed_url.query, keep_blank_values=True))
+    query_items.update(
+        {
+            "user_id": str(user_id),
+            "track_ids": ",".join(str(track_id) for track_id in track_ids),
+            "price": str(total_cents),
+        }
+    )
 
-    if email:
-        query_items["checkout[email]"] = email
-
-    for key, value in custom_data.items():
-        query_items[f"checkout[custom][{key}]"] = value
-
-    return urlunparse(parsed_url._replace(query=urlencode(query_items)))
+    return urlunsplit(
+        (
+            parsed_url.scheme,
+            parsed_url.netloc,
+            parsed_url.path,
+            urlencode(query_items),
+            parsed_url.fragment,
+        )
+    )
 
 
 def extract_nested_dict(payload: dict, target_key: str) -> dict | None:
@@ -225,45 +239,6 @@ def extract_nested_dict(payload: dict, target_key: str) -> dict | None:
                         return nested
 
     return None
-
-
-def extract_custom_data(payload: dict) -> dict[str, str]:
-    """Compatibility wrapper for webhook custom data extraction."""
-    from .adapters.lemon_squeezy import LemonSqueezyService
-
-    return LemonSqueezyService.extract_custom_data(payload)
-
-
-def is_successful_payment_event(payload: dict) -> bool:
-    """Compatibility wrapper for Lemon Squeezy event classification."""
-    from .adapters.lemon_squeezy import LemonSqueezyService
-
-    return LemonSqueezyService.is_successful_payment_event(payload)
-
-
-def verify_webhook_signature(raw_body: bytes, signature: str | None) -> bool:
-    """Compatibility wrapper for Lemon Squeezy webhook verification."""
-    from .adapters.lemon_squeezy import LemonSqueezyService
-
-    return LemonSqueezyService().verify_webhook(raw_body, signature)
-
-
-async def create_lemonsqueezy_checkout(
-    *,
-    variant_quantities: list[dict[str, int]],
-    custom_data: dict[str, str],
-    email: str | None = None,
-    custom_price: int | None = None,
-) -> str:
-    """Compatibility wrapper delegating checkout creation to the payment adapter."""
-    from .adapters.lemon_squeezy import LemonSqueezyService
-
-    return await LemonSqueezyService().create_checkout_session(
-        variant_quantities=variant_quantities,
-        custom_data=custom_data,
-        email=email,
-        custom_price=custom_price,
-    )
 
 
 def _pdf_escape(value: str) -> str:
