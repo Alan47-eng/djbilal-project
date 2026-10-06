@@ -1,5 +1,6 @@
 import pytest
 from httpx import AsyncClient, ASGITransport
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 from urllib.parse import urlparse, parse_qs
@@ -7,8 +8,9 @@ from urllib.parse import urlparse, parse_qs
 from app.main import app
 from app.models import Base
 from app.database import get_session
-from app.models import User, Track
+from app.models import User, Track, Purchase, GumroadSale
 from app import auth, schemas
+from app.adapters.gumroad import GumroadService
 from app.rate_limit import limiter
 
 
@@ -84,12 +86,14 @@ async def create_track_record(
     price=9.99,
     full_file_path="/server/music/track.mp3",
     free_download_url=None,
+    external_product_id="https://gumroad.com/l/test-product",
 ):
     track = Track(
         title="Webhook Track",
         artist="Tester",
         price=price,
         cover_image_url=None,
+        external_product_id=external_product_id,
 
         preview_url="https://example.com/preview.mp3",
         full_file_path=full_file_path,
@@ -502,13 +506,16 @@ class TestCheckoutAndWebhook:
 
     @pytest.mark.asyncio
     async def test_cart_checkout_builds_gumroad_url(self, client, test_db, monkeypatch):
-        monkeypatch.setenv("GUMROAD_PRODUCT_URL", "https://gumroad.com/l/cart-product")
         _, AsyncSessionLocal = test_db
 
         async with AsyncSessionLocal() as session:
             user = await create_user_record(session, "cartbuyer@example.com", "password123")
-            track_one = await create_track_record(session, price=0.5)
-            track_two = await create_track_record(session, price=0.5)
+            track_one = await create_track_record(
+                session, price=0.5, external_product_id="https://gumroad.com/l/track-one"
+            )
+            track_two = await create_track_record(
+                session, price=0.5, external_product_id="https://gumroad.com/l/track-two"
+            )
 
         login_response = await client.post(
             "/login",
@@ -525,16 +532,19 @@ class TestCheckoutAndWebhook:
         assert response.status_code == 200
         data = response.json()
         assert set(data["track_ids"]) == {track_one.id, track_two.id}
-        parsed = urlparse(data["checkout_url"])
-        query = parse_qs(parsed.query)
-        assert parsed.netloc == "gumroad.com"
-        assert query["track_ids"][0] == f"{track_one.id},{track_two.id}"
-        assert query["user_id"][0] == str(user.id)
-        assert query["price"][0] == "100"
+        checkout_items = {item["track_id"]: item for item in data["checkout_items"]}
+        assert set(checkout_items) == {track_one.id, track_two.id}
+        for track in (track_one, track_two):
+            parsed = urlparse(checkout_items[track.id]["checkout_url"])
+            query = parse_qs(parsed.query)
+            assert parsed.path == f"/l/{track.external_product_id.rsplit('/', 1)[-1]}"
+            assert query["track_ids"] == [str(track.id)]
+            assert query["user_id"] == [str(user.id)]
+            assert "signature" in query
+            assert "price" not in query
 
     @pytest.mark.asyncio
-    async def test_checkout_endpoint_builds_gumroad_url(self, client, test_db, monkeypatch):
-        monkeypatch.setenv("GUMROAD_PRODUCT_URL", "https://gumroad.com/l/cart-product")
+    async def test_checkout_endpoint_builds_gumroad_url(self, client, test_db):
         _, AsyncSessionLocal = test_db
 
         async with AsyncSessionLocal() as session:
@@ -559,7 +569,9 @@ class TestCheckoutAndWebhook:
         query = parse_qs(parsed.query)
         assert query["track_ids"][0] == str(track.id)
         assert query["user_id"][0] == str(user.id)
-        assert query["price"][0] == "999"
+        assert query["track_ids"] == [str(track.id)]
+        assert "signature" in query
+        assert "price" not in query
 
     @pytest.mark.asyncio
     async def test_webhook_grants_purchase(self, client, test_db, monkeypatch):
@@ -570,7 +582,15 @@ class TestCheckoutAndWebhook:
             track = await create_track_record(session)
 
         async def verify_sale(_self, _payload):
-            return {"sale_id": "sale-123", "price": "999", "currency": "usd"}
+            return {
+                "sale_id": "sale-123",
+                "price": "999",
+                "product_permalink": "https://gumroad.com/l/test-product",
+            }
+
+        signature = GumroadService.checkout_signature(
+            user.id, track.id, "test-product"
+        )
 
         monkeypatch.setattr(
             "app.adapters.gumroad.GumroadService.verify_sale",
@@ -581,8 +601,10 @@ class TestCheckoutAndWebhook:
             "/api/webhooks/gumroad",
             data={
                 "sale_id": "sale-123",
+                "seller_id": "test-seller",
                 "url_params[user_id]": str(user.id),
                 "url_params[track_ids]": str(track.id),
+                "url_params[signature]": signature,
             },
         )
         assert response.status_code == 200
@@ -590,8 +612,10 @@ class TestCheckoutAndWebhook:
             "/api/webhooks/gumroad",
             data={
                 "sale_id": "sale-123",
+                "seller_id": "test-seller",
                 "url_params[user_id]": str(user.id),
                 "url_params[track_ids]": str(track.id),
+                "url_params[signature]": signature,
             },
         )
         assert replay_response.status_code == 200
@@ -609,6 +633,51 @@ class TestCheckoutAndWebhook:
         )
         assert purchases_response.status_code == 200
         assert track.id in purchases_response.json()
+
+    @pytest.mark.asyncio
+    async def test_webhook_rejects_gumroad_amount_that_differs_from_track(
+        self, client, test_db, monkeypatch
+    ):
+        _, AsyncSessionLocal = test_db
+
+        async with AsyncSessionLocal() as session:
+            user = await create_user_record(session, "amountbuyer@example.com", "password123")
+            track = await create_track_record(session)
+
+        async def verify_sale(_self, _payload):
+            return {
+                "sale_id": "sale-wrong-amount",
+                "price": "100",
+                "product_permalink": "https://gumroad.com/l/test-product",
+            }
+
+        signature = GumroadService.checkout_signature(
+            user.id, track.id, "test-product"
+        )
+        monkeypatch.setattr(
+            "app.adapters.gumroad.GumroadService.verify_sale",
+            verify_sale,
+        )
+        response = await client.post(
+            "/api/webhooks/gumroad",
+            data={
+                "sale_id": "sale-wrong-amount",
+                "url_params[user_id]": str(user.id),
+                "url_params[track_ids]": str(track.id),
+                "url_params[signature]": signature,
+            },
+        )
+
+        assert response.status_code == 400
+        async with AsyncSessionLocal() as session:
+            purchases = await session.execute(
+                select(Purchase).where(
+                    Purchase.user_id == user.id,
+                    Purchase.track_id == track.id,
+                )
+            )
+            assert purchases.scalar_one_or_none() is None
+            assert await session.get(GumroadSale, "sale-wrong-amount") is None
 
     @pytest.mark.asyncio
     async def test_checkout_rejects_free_track(self, client, test_db):
@@ -640,7 +709,6 @@ class TestCheckoutAndWebhook:
     async def test_webhook_rejects_unconfigured_seller(self, client, monkeypatch):
         monkeypatch.setenv("GUMROAD_ACCESS_TOKEN", "test-token")
         monkeypatch.setenv("GUMROAD_SELLER_ID", "expected-seller")
-        monkeypatch.setenv("GUMROAD_PRODUCT_ID", "expected-product")
         response = await client.post(
             "/api/webhooks/gumroad",
             data={
@@ -667,7 +735,15 @@ class TestCheckoutAndWebhook:
             track = await create_track_record(session)
 
         async def verify_sale(_self, _payload):
-            return {"sale_id": "sale-456", "price": "999", "currency": "usd"}
+            return {
+                "sale_id": "sale-456",
+                "price": "999",
+                "product_permalink": "https://gumroad.com/l/test-product",
+            }
+
+        signature = GumroadService.checkout_signature(
+            user.id, track.id, "test-product"
+        )
 
         monkeypatch.setattr(
             "app.adapters.gumroad.GumroadService.verify_sale",
@@ -680,6 +756,7 @@ class TestCheckoutAndWebhook:
                 "sale_id": "sale-456",
                 "custom_fields[user_id]": str(user.id),
                 "custom_fields[track_ids]": str(track.id),
+                "custom_fields[signature]": signature,
             },
         )
         assert webhook_response.status_code == 200

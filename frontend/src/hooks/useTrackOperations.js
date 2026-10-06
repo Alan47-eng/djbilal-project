@@ -44,7 +44,7 @@ export function useCheckout() {
       setLoading(true);
       setError(null);
       const response = await api.post('/checkout/cart', { track_ids: trackIds });
-      return response.data.checkout_url;
+      return response.data.checkout_items;
     } catch (err) {
       const detail = err.response?.data?.detail;
       const errorMsg = typeof detail === 'string'

@@ -39,6 +39,7 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
   const [uploading, setUploading] = useState(false);
   const [updatingTrackId, setUpdatingTrackId] = useState(null);
   const [trackPriceDrafts, setTrackPriceDrafts] = useState({});
+  const [trackProductDrafts, setTrackProductDrafts] = useState({});
   const [message, setMessage] = useState(null);
   const [error, setError] = useState(null);
   const [form, setForm] = useState(emptyForm);
@@ -143,6 +144,23 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
       setMessage('Track price updated');
     } catch (err) {
       setError(err.response?.data?.detail || 'Could not update track price');
+    } finally {
+      setUpdatingTrackId(null);
+    }
+  };
+
+  const handleTrackProductUpdate = async (trackId) => {
+    try {
+      setUpdatingTrackId(trackId);
+      setMessage(null);
+      setError(null);
+      const response = await api.put(`/tracks/${trackId}`, {
+        external_product_id: (trackProductDrafts[trackId] || '').trim() || null,
+      });
+      updateTrack(response.data);
+      setMessage('Gumroad product URL updated');
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Could not update Gumroad product URL');
     } finally {
       setUpdatingTrackId(null);
     }
@@ -469,6 +487,27 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
                             {updatingTrackId === track.id ? 'Saving...' : 'Save price'}
                           </button>
                         </div>
+                        {!track.is_free && (
+                          <div className="mt-2 flex gap-2">
+                            <input
+                              type="url"
+                              placeholder="https://gumroad.com/l/product"
+                              value={trackProductDrafts[track.id] ?? track.external_product_id ?? ''}
+                              onChange={(event) =>
+                                setTrackProductDrafts((prev) => ({ ...prev, [track.id]: event.target.value }))
+                              }
+                              className="min-w-0 flex-1 rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-white"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleTrackProductUpdate(track.id)}
+                              disabled={updatingTrackId === track.id}
+                              className="rounded-lg border border-slate-600 px-2.5 py-1.5 text-xs font-semibold text-slate-200 hover:bg-slate-800 disabled:opacity-60"
+                            >
+                              Save product URL
+                            </button>
+                          </div>
+                        )}
                       </div>
                     ))
                   )}

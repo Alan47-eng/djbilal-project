@@ -21,7 +21,7 @@ class Track(Base):
     artist = Column(String(255), nullable=False, index=True)
     price = Column(Float, nullable=False)
     cover_image_url = Column(String(1024), nullable=True)
-    external_product_id = Column(String(255), nullable=True)
+    external_product_id = Column(String(1024), nullable=True)
     preview_url = Column(String(1024), nullable=False)
     full_file_path = Column(String(1024), nullable=False)
     is_free = Column(Boolean, default=False, nullable=False)

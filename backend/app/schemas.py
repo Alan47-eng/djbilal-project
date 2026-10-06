@@ -1,10 +1,47 @@
 import re
 from datetime import datetime
+from urllib.parse import urlparse
 from pydantic import BaseModel, ConfigDict, EmailStr, field_validator, model_validator
 
 PAID_TRACK_CATEGORIES = {"edit", "remix"}
 FREE_TRACK_CATEGORIES = {"remix", "simple-pack", "vst"}
 ALL_TRACK_CATEGORIES = PAID_TRACK_CATEGORIES | FREE_TRACK_CATEGORIES
+
+
+def _validate_external_product_id(value: str | None) -> str | None:
+    if value is None:
+        return value
+    normalized = value.strip()
+    if not normalized:
+        raise ValueError('External product ID cannot be empty')
+    if len(normalized) > 1024:
+        raise ValueError('External product ID is too long')
+    if "://" not in normalized:
+        if not re.fullmatch(r"[A-Za-z0-9_-]+", normalized):
+            raise ValueError('External product ID must be a Gumroad permalink or URL')
+        return normalized
+
+    try:
+        parsed = urlparse(normalized)
+        port = parsed.port
+    except ValueError as exc:
+        raise ValueError('External product ID must be a valid Gumroad URL') from exc
+
+    hostname = (parsed.hostname or "").lower()
+    path_parts = [part for part in parsed.path.split("/") if part]
+    if (
+        parsed.scheme != "https"
+        or not (hostname == "gumroad.com" or hostname.endswith(".gumroad.com"))
+        or len(path_parts) != 2
+        or path_parts[0] != "l"
+        or parsed.username is not None
+        or parsed.password is not None
+        or port not in (None, 443)
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise ValueError('External product ID must be a Gumroad product permalink')
+    return normalized
 
 
 class DTO(BaseModel):
@@ -119,14 +156,7 @@ class TrackCreate(DTO):
     @field_validator('external_product_id')
     @classmethod
     def validate_external_product_id(cls, value: str | None) -> str | None:
-        if value is None:
-            return value
-        normalized = value.strip()
-        if not normalized:
-            raise ValueError('External product ID cannot be empty')
-        if len(normalized) > 255:
-            raise ValueError('External product ID is too long')
-        return normalized
+        return _validate_external_product_id(value)
 
     @field_validator('cover_image_url', 'preview_url', 'full_file_path', 'free_download_url')
     @classmethod
@@ -181,14 +211,7 @@ class TrackUpdate(DTO):
     @field_validator('external_product_id')
     @classmethod
     def validate_external_product_id(cls, value: str | None) -> str | None:
-        if value is None:
-            return value
-        normalized = value.strip()
-        if not normalized:
-            raise ValueError('External product ID cannot be empty')
-        if len(normalized) > 255:
-            raise ValueError('External product ID is too long')
-        return normalized
+        return _validate_external_product_id(value)
 
     @field_validator('cover_image_url', 'preview_url', 'free_download_url')
     @classmethod

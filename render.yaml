@@ -24,10 +24,6 @@ services:
         sync: false
       - key: FROM_EMAIL
         sync: false
-      - key: GUMROAD_PRODUCT_URL
-        sync: false
-      - key: GUMROAD_PRODUCT_ID
-        sync: false
       - key: GUMROAD_SELLER_ID
         sync: false
       - key: GUMROAD_ACCESS_TOKEN

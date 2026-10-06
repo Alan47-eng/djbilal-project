@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { LogOut, LogIn, UserPlus, Music, User, Menu, LayoutGrid, ShieldCheck, Gift, Library, ShoppingCart, Info } from 'lucide-react';
 import api from './api';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -29,7 +29,9 @@ function AppContent() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('edits'); // 'edits' | 'remixes' | 'free' | 'library'
   const [cartTrackIds, setCartTrackIds] = useState([]);
+  const [gumroadCheckoutItems, setGumroadCheckoutItems] = useState([]);
   const [cartOpen, setCartOpen] = useState(false);
+  const gumroadLinkRefs = useRef({});
   const [downloadError, setDownloadError] = useState(null);
   const t = {
     edits: lang === 'ar' ? 'تعديلات' : 'Edits',
@@ -42,7 +44,8 @@ function AppContent() {
     cart: lang === 'ar' ? 'السلة' : 'Cart',
     total: lang === 'ar' ? 'المجموع' : 'Total',
     checkoutCart: lang === 'ar' ? 'الدفع من السلة' : 'Checkout Cart',
-    redirecting: lang === 'ar' ? 'جاري التحويل...' : 'Redirecting...',
+    redirecting: lang === 'ar' ? 'جاري التحويل...' : 'Preparing checkout...',
+    gumroadAdd: lang === 'ar' ? 'فتح منتج Gumroad' : 'Open Gumroad product',
     remove: lang === 'ar' ? 'حذف' : 'Remove',
     openAdmin: lang === 'ar' ? 'فتح لوحة الإدارة' : 'Open Admin Panel',
     editsDesc: lang === 'ar' ? 'تعديلات أصلية ونسخ مميزة.' : 'Original edits and premium versions.',
@@ -93,10 +96,12 @@ function AppContent() {
       setAuthModal({ isOpen: true, mode: 'login' });
       return;
     }
+    setGumroadCheckoutItems([]);
     setCartTrackIds((prev) => (prev.includes(track.id) ? prev : [...prev, track.id]));
   };
 
   const removeFromCart = (trackId) => {
+    setGumroadCheckoutItems([]);
     setCartTrackIds((prev) => prev.filter((id) => id !== trackId));
   };
 
@@ -158,11 +163,14 @@ function AppContent() {
 
   const handleCheckout = async () => {
     if (cartTracks.length === 0) return;
-    const checkoutUrl = await checkoutCart(cartTracks.map((track) => track.id));
-    if (checkoutUrl) {
-      window.location.assign(checkoutUrl);
+    const checkoutItems = await checkoutCart(cartTracks.map((track) => track.id));
+    if (checkoutItems?.length) {
+      setGumroadCheckoutItems(checkoutItems);
+      window.setTimeout(() => {
+        gumroadLinkRefs.current[checkoutItems[0].track_id]?.click();
+      }, 0);
     }
-    return checkoutUrl;
+    return checkoutItems;
   };
 
   const handleDownloadTrack = async (track) => {
@@ -582,6 +590,20 @@ function AppContent() {
                             {t.remove}
                           </button>
                         </div>
+                        {gumroadCheckoutItems
+                          .filter((item) => item.track_id === track.id)
+                          .map((item) => (
+                            <a
+                              key={item.track_id}
+                              ref={(node) => {
+                                gumroadLinkRefs.current[item.track_id] = node;
+                              }}
+                              className="gumroad-button mt-3 inline-block rounded-lg bg-purple-600 px-3 py-2 text-xs font-semibold text-white hover:bg-purple-700"
+                              href={item.checkout_url}
+                            >
+                              {t.gumroadAdd}
+                            </a>
+                          ))}
                       </div>
                     ))}
                   </div>

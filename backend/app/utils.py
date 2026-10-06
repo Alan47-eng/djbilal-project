@@ -194,7 +194,7 @@ def build_gumroad_checkout_url(
     *,
     user_id: int,
     track_ids: list[int],
-    total_cents: int,
+    signature: str,
 ) -> str:
     """Build a Gumroad checkout URL carrying the authenticated cart context."""
     parsed_url = urlparse(base_url)
@@ -203,7 +203,7 @@ def build_gumroad_checkout_url(
         {
             "user_id": str(user_id),
             "track_ids": ",".join(str(track_id) for track_id in track_ids),
-            "price": str(total_cents),
+            "signature": signature,
         }
     )
 

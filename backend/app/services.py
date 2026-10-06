@@ -1,7 +1,5 @@
 """Business logic layer - Service classes for domain operations."""
-import os
 from decimal import Decimal, ROUND_HALF_UP
-from urllib.parse import urlparse
 
 from fastapi import HTTPException, status
 from fastapi import UploadFile
@@ -273,7 +271,7 @@ class TrackService:
             )
 
         checkout_url = self._build_gumroad_checkout_url(
-            [track],
+            track,
             current_user,
         )
 
@@ -287,8 +285,8 @@ class TrackService:
         session: AsyncSession,
         track_ids: list[int],
         current_user: User,
-    ) -> dict[str, list[int] | str]:
-        """Create a Gumroad checkout URL for the selected paid tracks."""
+    ) -> dict[str, list[int] | list[dict[str, int | str]]]:
+        """Create signed Gumroad product links for each paid item in the cart."""
         tracks_result = await session.execute(
             select(Track).where(Track.id.in_(track_ids))
         )
@@ -310,38 +308,40 @@ class TrackService:
 
         cart_track_ids = [track.id for track in paid_tracks]
 
-        checkout_url = self._build_gumroad_checkout_url(paid_tracks, current_user)
-
         return {
             "track_ids": cart_track_ids,
-            "checkout_url": checkout_url,
+            "checkout_items": [
+                {
+                    "track_id": track.id,
+                    "checkout_url": self._build_gumroad_checkout_url(
+                        track,
+                        current_user,
+                    ),
+                }
+                for track in paid_tracks
+            ],
         }
 
     @staticmethod
-    def _build_gumroad_checkout_url(tracks: list[Track], current_user: User) -> str:
-        product_url = os.getenv("GUMROAD_PRODUCT_URL", "").strip()
-        if not product_url:
+    def _build_gumroad_checkout_url(track: Track, current_user: User) -> str:
+        product_url = (track.external_product_id or "").strip()
+        canonical_permalink = GumroadService.normalize_product_permalink(product_url)
+        if not canonical_permalink:
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="GUMROAD_PRODUCT_URL is not configured",
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"A valid Gumroad product URL is required for track {track.id}",
             )
-        parsed_url = urlparse(product_url)
-        if parsed_url.scheme != "https" or not parsed_url.netloc:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="GUMROAD_PRODUCT_URL must be a valid HTTPS URL",
-            )
-        total_cents = int(
-            (
-                sum((Decimal(str(track.price)) for track in tracks), Decimal("0"))
-                * 100
-            ).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
-        )
+        if "://" not in product_url:
+            product_url = f"https://gumroad.com/l/{product_url}"
         return build_gumroad_checkout_url(
             product_url,
             user_id=current_user.id,
-            track_ids=[track.id for track in tracks],
-            total_cents=total_cents,
+            track_ids=[track.id],
+            signature=GumroadService.checkout_signature(
+                current_user.id,
+                track.id,
+                canonical_permalink,
+            ),
         )
 
 
@@ -398,8 +398,9 @@ class PurchaseService:
         """Verify a Gumroad sale and add its paid tracks to the buyer's library."""
         custom_data = self.gumroad_service.extract_checkout_data(payload)
         user_id_value = custom_data.get("user_id")
-        track_ids_value = custom_data.get("track_ids") or custom_data.get("track_id")
-        if not user_id_value or not track_ids_value:
+        track_ids_value = custom_data.get("track_ids")
+        signature = custom_data.get("signature")
+        if not user_id_value or not track_ids_value or not signature:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Missing Gumroad cart information",
@@ -420,6 +421,7 @@ class PurchaseService:
             or not resolved_track_ids
             or any(track_id <= 0 for track_id in resolved_track_ids)
             or len(set(resolved_track_ids)) != len(resolved_track_ids)
+            or len(resolved_track_ids) != 1
         ):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -454,16 +456,38 @@ class PurchaseService:
                 detail="Gumroad cart can only grant paid tracks",
             )
 
+        track = tracks[0]
+        track_permalink = GumroadService.normalize_product_permalink(
+            track.external_product_id or ""
+        )
+        sale_permalink = GumroadService.normalize_product_permalink(
+            sale["product_permalink"]
+        )
+        if track_permalink is None or sale_permalink != track_permalink:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Gumroad sale product does not match the requested track",
+            )
         expected_cents = int(
-            (
-                sum((Decimal(str(track.price)) for track in tracks), Decimal("0"))
-                * 100
-            ).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+            (Decimal(str(track.price)) * 100).quantize(
+                Decimal("1"),
+                rounding=ROUND_HALF_UP,
+            )
         )
         if int(sale["price"]) != expected_cents:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Paid amount does not match the cart total",
+                detail="Gumroad sale amount does not match the track price",
+            )
+        if not self.gumroad_service.verify_checkout_signature(
+            user_id=user_id,
+            track_id=track.id,
+            product_permalink=track_permalink,
+            signature=signature,
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid Gumroad checkout signature",
             )
 
         license_type = custom_data.get("license_type")
@@ -472,7 +496,7 @@ class PurchaseService:
                 sale_id=sale["sale_id"],
                 user_id=user_id,
                 track_ids=resolved_track_ids,
-                paid_cents=expected_cents,
+                paid_cents=int(sale["price"]),
             )
         )
         purchases: list[Purchase] = []

@@ -1,5 +1,9 @@
 import os
+import hashlib
+import hmac
+import json
 from collections.abc import Mapping
+from urllib.parse import parse_qsl, quote, urlparse
 
 import httpx
 from fastapi import HTTPException, status
@@ -12,15 +16,68 @@ class GumroadService:
         self.timeout = timeout
 
     @staticmethod
+    def normalize_product_permalink(value: str) -> str | None:
+        """Normalize an absolute Gumroad product URL or Gumroad permalink."""
+        candidate = value.strip()
+        parsed = urlparse(candidate if "://" in candidate else f"https://gumroad.com/l/{candidate.lstrip('/')}")
+        hostname = (parsed.hostname or "").lower()
+        if (
+            parsed.scheme != "https"
+            or not hostname
+            or not (hostname == "gumroad.com" or hostname.endswith(".gumroad.com"))
+            or parsed.query
+            or parsed.fragment
+        ):
+            return None
+        parts = [part for part in parsed.path.split("/") if part]
+        if len(parts) != 2 or parts[0] != "l":
+            return None
+        return parts[1].casefold()
+
+    @staticmethod
+    def checkout_signature(user_id: int, track_id: int, product_permalink: str) -> str:
+        from ..auth import SECRET_KEY
+
+        message = f"{user_id}:{track_id}:{product_permalink}".encode("utf-8")
+        return hmac.new(SECRET_KEY.encode("utf-8"), message, hashlib.sha256).hexdigest()
+
+    @classmethod
+    def verify_checkout_signature(
+        cls,
+        *,
+        user_id: int,
+        track_id: int,
+        product_permalink: str,
+        signature: str,
+    ) -> bool:
+        expected = cls.checkout_signature(user_id, track_id, product_permalink)
+        return hmac.compare_digest(signature, expected)
+
+    @staticmethod
     def extract_checkout_data(form_data: Mapping[str, str]) -> dict[str, str]:
         """Read cart values from Gumroad URL parameters or custom fields."""
         checkout_data: dict[str, str] = {}
-        accepted_keys = {"user_id", "track_ids", "track_id", "license_type"}
+        accepted_keys = {"user_id", "track_ids", "signature", "license_type"}
 
         for key, value in form_data.items():
             normalized_key = key.strip().lower()
             if normalized_key in accepted_keys:
                 checkout_data[normalized_key] = value
+                continue
+
+            if normalized_key in {"url_params", "custom_fields"}:
+                try:
+                    nested_values = json.loads(value)
+                except json.JSONDecodeError:
+                    nested_values = dict(parse_qsl(value, keep_blank_values=True))
+                if isinstance(nested_values, dict):
+                    for nested_key, nested_value in nested_values.items():
+                        normalized_nested_key = str(nested_key).strip().lower()
+                        if (
+                            normalized_nested_key in accepted_keys
+                            and isinstance(nested_value, (str, int))
+                        ):
+                            checkout_data[normalized_nested_key] = str(nested_value)
                 continue
 
             for prefix in ("url_params[", "custom_fields["):
@@ -33,12 +90,10 @@ class GumroadService:
         return checkout_data
 
     async def verify_sale(self, ping: Mapping[str, str]) -> dict[str, str]:
-        """Verify seller, product, paid amount, and sale state with Gumroad."""
+        """Verify the seller and sale identity with Gumroad's Sales API."""
         access_token = os.getenv("GUMROAD_ACCESS_TOKEN", "").strip()
         configured_seller_id = os.getenv("GUMROAD_SELLER_ID", "").strip()
-        configured_product_id = os.getenv("GUMROAD_PRODUCT_ID", "").strip()
-        expected_currency = os.getenv("GUMROAD_CURRENCY", "usd").strip().lower()
-        if not access_token or not configured_seller_id or not configured_product_id:
+        if not access_token or not configured_seller_id:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Gumroad verification is not configured",
@@ -46,16 +101,9 @@ class GumroadService:
 
         sale_id = ping.get("sale_id", "").strip()
         reported_seller_id = ping.get("seller_id", "").strip()
-        reported_product_id = ping.get("product_id", "").strip()
-        reported_price = self._parse_cents(ping.get("price"))
-        reported_currency = ping.get("currency", "").strip().lower()
-
         if (
             not sale_id
             or reported_seller_id != configured_seller_id
-            or reported_product_id != configured_product_id
-            or reported_price is None
-            or reported_currency != expected_currency
             or self._is_true(ping.get("refunded"))
             or self._is_true(ping.get("chargebacked"))
             or self._is_true(ping.get("test"))
@@ -68,7 +116,7 @@ class GumroadService:
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 response = await client.get(
-                    f"https://api.gumroad.com/v2/sales/{sale_id}",
+                    f"https://api.gumroad.com/v2/sales/{quote(sale_id, safe='')}",
                     params={"access_token": access_token},
                 )
         except httpx.HTTPError as exc:
@@ -100,22 +148,15 @@ class GumroadService:
 
         api_sale_id = self._identifier(sale.get("sale_id", sale.get("id", sale_id)))
         api_seller_id = sale.get("seller_id")
-        api_currency = sale.get("currency")
+        permalink = sale.get("product_permalink")
         if (
             api_sale_id != sale_id
             or (
                 api_seller_id is not None
                 and self._identifier(api_seller_id) != configured_seller_id
             )
-            or self._identifier(sale.get("product_id")) != configured_product_id
-            or self._parse_cents(sale.get("price")) != reported_price
-            or (
-                api_currency is not None
-                and (
-                    not isinstance(api_currency, str)
-                    or api_currency.lower() != expected_currency
-                )
-            )
+            or not isinstance(permalink, str)
+            or self.normalize_product_permalink(permalink) is None
             or self._is_true(sale.get("refunded"))
             or self._is_true(sale.get("chargebacked"))
             or self._is_true(sale.get("disputed"))
@@ -127,8 +168,8 @@ class GumroadService:
 
         return {
             "sale_id": sale_id,
-            "price": str(reported_price),
-            "currency": expected_currency,
+            "product_permalink": permalink,
+            "price": str(self._parse_cents(sale.get("price")) or 0),
         }
 
     @staticmethod

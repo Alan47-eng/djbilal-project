@@ -16,7 +16,7 @@ async def create_cart_checkout(
     current_user: User = Depends(auth.get_current_user),
     session: AsyncSession = Depends(get_session),
     track_service: TrackService = Depends(get_track_service),
-) -> dict[str, list[int] | str]:
+) -> dict[str, list[int] | list[dict[str, int | str]]]:
     return await track_service.create_cart_checkout(session, payload.track_ids, current_user)
 
 
