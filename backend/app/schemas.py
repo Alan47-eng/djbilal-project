@@ -19,7 +19,7 @@ def _validate_external_product_id(value: str | None) -> str | None:
         raise ValueError('External product ID is too long')
     if "://" not in normalized:
         if not re.fullmatch(r"[A-Za-z0-9_-]+", normalized):
-            raise ValueError('External product ID must be a Gumroad permalink or URL')
+            raise ValueError('Enter a Gumroad product permalink or URL')
         return normalized
 
     try:
@@ -35,14 +35,14 @@ def _validate_external_product_id(value: str | None) -> str | None:
         or not (hostname == "gumroad.com" or hostname.endswith(".gumroad.com"))
         or len(path_parts) != 2
         or path_parts[0] != "l"
+        or not re.fullmatch(r"[A-Za-z0-9_-]+", path_parts[1])
         or parsed.username is not None
         or parsed.password is not None
         or port not in (None, 443)
-        or parsed.query
-        or parsed.fragment
     ):
-        raise ValueError('External product ID must be a Gumroad product permalink')
-    return normalized
+        raise ValueError('Enter a valid Gumroad product URL such as https://gumroad.com/l/product')
+
+    return path_parts[1]
 
 
 class DTO(BaseModel):

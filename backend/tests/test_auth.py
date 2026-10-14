@@ -869,6 +869,43 @@ class TestCheckoutAndWebhook:
         assert response.status_code == 200
         assert response.json()["download_url"] == "https://signed.example/tracks/paid-sample.mp3"
 
+    @pytest.mark.asyncio
+    async def test_upload_with_invalid_gumroad_url_returns_422(self, client, test_db):
+        _, AsyncSessionLocal = test_db
+        async with AsyncSessionLocal() as session:
+            await create_user_record(
+                session,
+                "track-admin@example.com",
+                "password123",
+                is_admin=True,
+            )
+
+        login_response = await client.post(
+            "/login",
+            json={"email": "track-admin@example.com", "password": "password123"},
+        )
+        token = login_response.json()["access_token"]
+
+        response = await client.post(
+            "/tracks/upload",
+            headers={"Authorization": f"Bearer {token}"},
+            data={
+                "title": "Track",
+                "artist": "Artist",
+                "category": "remix",
+                "price": "9.99",
+                "is_free": "false",
+                "external_product_id": "https://notgumroad.com/l/product",
+            },
+            files={
+                "track_file": ("track.mp3", b"track", "audio/mpeg"),
+                "preview_file": ("preview.mp3", b"preview", "audio/mpeg"),
+            },
+        )
+
+        assert response.status_code == 422
+        assert "valid Gumroad product URL" in response.json()["detail"]
+
 
 class TestEdgeCases:
     """Test edge cases for auth endpoints"""

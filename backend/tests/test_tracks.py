@@ -35,6 +35,38 @@ class TestTrackCreate:
         assert track.title == "Song Title"
         assert track.artist == "Artist Name"
 
+    @pytest.mark.parametrize(
+        ("product_url", "expected_permalink"),
+        [
+            ("https://gumroad.com/l/my-track", "my-track"),
+            ("https://artist.gumroad.com/l/my-track", "my-track"),
+            ("https://gumroad.com/l/my-track?layout=profile", "my-track"),
+            ("  my-track  ", "my-track"),
+        ],
+    )
+    def test_external_product_url_normalizes_to_permalink(self, product_url, expected_permalink):
+        track = TrackCreate(
+            title="Track",
+            artist="Artist",
+            price=9.99,
+            external_product_id=product_url,
+            preview_url="https://example.com/preview.mp3",
+            full_file_path="/server/music/track.mp3",
+        )
+
+        assert track.external_product_id == expected_permalink
+
+    def test_external_product_url_rejects_non_gumroad_host(self):
+        with pytest.raises(ValidationError, match="valid Gumroad product URL"):
+            TrackCreate(
+                title="Track",
+                artist="Artist",
+                price=9.99,
+                external_product_id="https://notgumroad.com/l/my-track",
+                preview_url="https://example.com/preview.mp3",
+                full_file_path="/server/music/track.mp3",
+            )
+
     def test_track_with_zero_price(self):
         """Test that zero price is rejected"""
         with pytest.raises(ValidationError) as exc_info:
@@ -245,6 +277,10 @@ class TestTrackUpdate:
     def test_track_update_rejects_negative_price(self):
         with pytest.raises(ValueError):
             TrackUpdate(price=-1)
+
+    def test_track_update_normalizes_gumroad_url(self):
+        update = TrackUpdate(external_product_id="https://artist.gumroad.com/l/my-track")
+        assert update.external_product_id == "my-track"
 
 
 class TestCalculateDiscountedPrice:

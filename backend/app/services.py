@@ -3,6 +3,7 @@ from decimal import Decimal, ROUND_HALF_UP
 
 from fastapi import HTTPException, status
 from fastapi import UploadFile
+from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -225,21 +226,34 @@ class TrackService:
             )
 
         normalized_price = 0.0 if is_free and price is None else (price or 0.0)
-        track_data = schemas.TrackCreate(
-            title=title.strip(),
-            artist=artist.strip(),
-            price=normalized_price,
-            external_product_id=None if is_free else external_product_id,
-            preview_url="/media/previews/pending.mp3",
-            full_file_path="/media/tracks/pending.mp3",
-            is_free=is_free,
-            free_download_url=(
-                free_download_url.strip()
-                if free_download_url
-                else ("/media/tracks/pending.mp3" if is_free else None)
-            ),
-            category=category.strip().lower(),
-        )
+        try:
+            track_data = schemas.TrackCreate(
+                title=title.strip(),
+                artist=artist.strip(),
+                price=normalized_price,
+                external_product_id=None if is_free else external_product_id,
+                preview_url="/media/previews/pending.mp3",
+                full_file_path="/media/tracks/pending.mp3",
+                is_free=is_free,
+                free_download_url=(
+                    free_download_url.strip()
+                    if free_download_url
+                    else ("/media/tracks/pending.mp3" if is_free else None)
+                ),
+                category=category.strip().lower(),
+            )
+        except ValidationError as exc:
+            errors = exc.errors(include_url=False, include_context=False)
+            detail = "; ".join(
+                f"{'.'.join(str(part) for part in error['loc'])}: {error['msg']}"
+                if error["loc"]
+                else error["msg"]
+                for error in errors
+            )
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=detail,
+            ) from exc
         if not track_data.is_free and not track_data.external_product_id:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
