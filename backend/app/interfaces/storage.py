@@ -1,13 +1,11 @@
 from abc import ABC, abstractmethod
-from typing import BinaryIO
-
-from starlette.datastructures import UploadFile
+import io
 
 
 class BaseStorageService(ABC):
     @abstractmethod
     async def upload_file(
-        self, upload_file: UploadFile | BinaryIO, folder: str, filename: str
+        self, content: bytes | io.BytesIO, folder: str, filename: str
     ) -> str:
         """Persist a file and return its stored key or URL."""
 

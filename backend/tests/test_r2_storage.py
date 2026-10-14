@@ -2,13 +2,12 @@ from io import BytesIO
 from threading import get_ident
 
 import pytest
-from starlette.datastructures import UploadFile
 
 from app.adapters.r2_storage import R2StorageService
 
 
 @pytest.mark.asyncio
-async def test_upload_file_offloads_boto_upload_using_buffered_bytes(monkeypatch):
+async def test_upload_file_offloads_boto_upload_using_bytes(monkeypatch):
     main_thread_id = get_ident()
     upload_calls = []
 
@@ -32,29 +31,20 @@ async def test_upload_file_offloads_boto_upload_using_buffered_bytes(monkeypatch
     monkeypatch.setattr(
         R2StorageService, "_client", staticmethod(lambda: FakeS3Client())
     )
-    upload = UploadFile(file=BytesIO(b"audio bytes"), filename="track.mp3")
-
-    result = await R2StorageService().upload_file(upload, "previews", "track.mp3")
+    result = await R2StorageService().upload_file(b"audio bytes", "previews", "track.mp3")
 
     assert result == "https://cdn.example.com/previews/track.mp3"
     assert upload_calls[0][:3] == (b"audio bytes", "bucket", "previews/track.mp3")
     assert upload_calls[0][3] != main_thread_id
-    assert upload.file.tell() == len(b"audio bytes")
 
 
 @pytest.mark.asyncio
-async def test_upload_uses_buffer_even_if_request_file_closes_before_boto_runs(monkeypatch):
+async def test_upload_file_accepts_independent_bytes_io_stream(monkeypatch):
     upload_calls = []
 
     class FakeS3Client:
         def upload_fileobj(self, file_obj, bucket, key):
             upload_calls.append((file_obj.read(), bucket, key))
-
-    async def close_request_file_then_run_in_threadpool(function, *args):
-        upload.file.close()
-        from asyncio import to_thread
-
-        return await to_thread(function, *args)
 
     monkeypatch.setattr(
         R2StorageService,
@@ -72,13 +62,9 @@ async def test_upload_uses_buffer_even_if_request_file_closes_before_boto_runs(m
     monkeypatch.setattr(
         R2StorageService, "_client", staticmethod(lambda: FakeS3Client())
     )
-    monkeypatch.setattr(
-        "app.adapters.r2_storage.run_in_threadpool",
-        close_request_file_then_run_in_threadpool,
-    )
-    upload = UploadFile(file=BytesIO(b"audio bytes"), filename="track.mp3")
-
-    result = await R2StorageService().upload_file(upload, "tracks", "track.mp3")
+    content = BytesIO(b"audio bytes")
+    content.seek(4)
+    result = await R2StorageService().upload_file(content, "tracks", "track.mp3")
 
     assert result == "tracks/track.mp3"
     assert upload_calls == [(b"audio bytes", "bucket", "tracks/track.mp3")]
@@ -93,10 +79,9 @@ async def test_local_upload_fallback_offloads_file_copy(monkeypatch, tmp_path):
         staticmethod(lambda: {"account_id": None, "bucket_name": None}),
     )
     monkeypatch.setattr(R2StorageService, "_client", staticmethod(lambda: None))
-    upload = UploadFile(file=BytesIO(b"local audio"), filename="track.mp3")
-
-    result = await R2StorageService().upload_file(upload, "tracks", "track.mp3")
+    result = await R2StorageService().upload_file(
+        BytesIO(b"local audio"), "tracks", "track.mp3"
+    )
 
     assert result == "/media/tracks/track.mp3"
     assert (tmp_path / "tracks" / "track.mp3").read_bytes() == b"local audio"
-    assert upload.file.tell() == len(b"local audio")

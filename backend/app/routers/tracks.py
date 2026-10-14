@@ -9,9 +9,16 @@ from ..interfaces import BaseStorageService
 from ..models import Track, User
 from ..services import TrackService, PurchaseService
 from ..utils import (
+    AUDIO_EXTENSIONS,
+    IMAGE_EXTENSIONS,
+    MAX_COVER_UPLOAD_BYTES,
+    MAX_PREVIEW_UPLOAD_BYTES,
+    MAX_TRACK_UPLOAD_BYTES,
     is_r2_object_key,
     normalize_media_url,
     resolve_uploaded_file_path,
+    validate_upload_data,
+    validate_upload_file,
 )
 from .dependencies import require_admin
 
@@ -64,19 +71,79 @@ async def upload_track(
     track_service: TrackService = Depends(get_track_service),
 ) -> Track:
     require_admin(current_user)
-    return await track_service.upload_track(
-        session=session,
-        title=title,
-        artist=artist,
-        category=category,
-        price=price,
-        external_product_id=external_product_id,
-        is_free=is_free,
-        free_download_url=free_download_url,
-        track_file=track_file,
-        preview_file=preview_file,
-        cover_file=cover_file,
+    validate_upload_file(
+        track_file, AUDIO_EXTENSIONS, MAX_TRACK_UPLOAD_BYTES, "Track file"
     )
+    validate_upload_file(
+        preview_file, AUDIO_EXTENSIONS, MAX_PREVIEW_UPLOAD_BYTES, "Preview file"
+    )
+    if cover_file is not None:
+        validate_upload_file(
+            cover_file, IMAGE_EXTENSIONS, MAX_COVER_UPLOAD_BYTES, "Cover image"
+        )
+
+    track_content = b""
+    preview_content = b""
+    cover_content: bytes | None = None
+    try:
+        try:
+            track_content = await track_file.read()
+            preview_content = await preview_file.read()
+            if cover_file is not None:
+                cover_content = await cover_file.read()
+        except (OSError, ValueError) as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="An uploaded file could not be read; please retry the upload",
+            ) from exc
+
+        validate_upload_data(
+            track_file.filename,
+            len(track_content),
+            AUDIO_EXTENSIONS,
+            MAX_TRACK_UPLOAD_BYTES,
+            "Track file",
+        )
+        validate_upload_data(
+            preview_file.filename,
+            len(preview_content),
+            AUDIO_EXTENSIONS,
+            MAX_PREVIEW_UPLOAD_BYTES,
+            "Preview file",
+        )
+        if cover_file is not None and cover_content is not None:
+            validate_upload_data(
+                cover_file.filename,
+                len(cover_content),
+                IMAGE_EXTENSIONS,
+                MAX_COVER_UPLOAD_BYTES,
+                "Cover image",
+            )
+
+        return await track_service.upload_track(
+            session=session,
+            title=title,
+            artist=artist,
+            category=category,
+            price=price,
+            external_product_id=external_product_id,
+            is_free=is_free,
+            free_download_url=free_download_url,
+            track_file=track_content,
+            track_filename=track_file.filename or "",
+            preview_file=preview_content,
+            preview_filename=preview_file.filename or "",
+            cover_file=cover_content,
+            cover_filename=cover_file.filename if cover_file is not None else None,
+        )
+    finally:
+        track_content = b""
+        preview_content = b""
+        cover_content = None
+        await track_file.close()
+        await preview_file.close()
+        if cover_file is not None:
+            await cover_file.close()
 
 
 @router.put("/{track_id}", response_model=schemas.TrackResponse)

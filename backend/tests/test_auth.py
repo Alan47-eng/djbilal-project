@@ -906,6 +906,67 @@ class TestCheckoutAndWebhook:
         assert response.status_code == 422
         assert "valid Gumroad product URL" in response.json()["detail"]
 
+    @pytest.mark.asyncio
+    async def test_upload_buffers_request_files_before_storage(self, client, test_db, monkeypatch):
+        _, AsyncSessionLocal = test_db
+        stored_files = []
+
+        class MemoryStorage:
+            async def upload_file(self, content, folder, filename):
+                assert not hasattr(content, "filename")
+                stored_files.append((folder, content.read(), filename))
+                if folder == "tracks":
+                    return f"tracks/{filename}"
+                return f"https://cdn.example.com/{folder}/{filename}"
+
+            def delete_file(self, object_key):
+                return None
+
+        monkeypatch.setitem(
+            app.dependency_overrides,
+            get_storage_service,
+            lambda: MemoryStorage(),
+        )
+        async with AsyncSessionLocal() as session:
+            await create_user_record(
+                session,
+                "upload-admin@example.com",
+                "password123",
+                is_admin=True,
+            )
+
+        login_response = await client.post(
+            "/login",
+            json={"email": "upload-admin@example.com", "password": "password123"},
+        )
+        token = login_response.json()["access_token"]
+
+        response = await client.post(
+            "/tracks/upload",
+            headers={"Authorization": f"Bearer {token}"},
+            data={
+                "title": "Buffered Track",
+                "artist": "Artist",
+                "category": "remix",
+                "price": "9.99",
+                "is_free": "false",
+                "external_product_id": "https://gumroad.com/l/buffered-track",
+            },
+            files={
+                "track_file": ("track.mp3", b"full audio", "audio/mpeg"),
+                "preview_file": ("preview.mp3", b"preview audio", "audio/mpeg"),
+                "cover_file": ("cover.jpg", b"cover image", "image/jpeg"),
+            },
+        )
+
+        assert response.status_code == 200
+        assert response.json()["title"] == "Buffered Track"
+        assert [(folder, content) for folder, content, _ in stored_files] == [
+            ("tracks", b"full audio"),
+            ("previews", b"preview audio"),
+            ("covers", b"cover image"),
+        ]
+
 
 class TestEdgeCases:
     """Test edge cases for auth endpoints"""

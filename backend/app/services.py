@@ -1,8 +1,8 @@
 """Business logic layer - Service classes for domain operations."""
+import io
 from decimal import Decimal, ROUND_HALF_UP
 
 from fastapi import HTTPException, status
-from fastapi import UploadFile
 from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -16,7 +16,7 @@ from .repositories import PurchaseDetailData, PurchaseRepository, TrackRepositor
 from .utils import (
     build_storage_name,
     build_gumroad_checkout_url,
-    validate_upload_file,
+    validate_upload_data,
     AUDIO_EXTENSIONS,
     IMAGE_EXTENSIONS,
     MAX_TRACK_UPLOAD_BYTES,
@@ -214,9 +214,12 @@ class TrackService:
         external_product_id: str | None,
         is_free: bool,
         free_download_url: str | None,
-        track_file: UploadFile,
-        preview_file: UploadFile,
-        cover_file: UploadFile | None,
+        track_file: bytes,
+        track_filename: str,
+        preview_file: bytes,
+        preview_filename: str,
+        cover_file: bytes | None,
+        cover_filename: str | None,
     ) -> Track:
         """Validate, persist files, and create a track record."""
         if not is_free and price is None:
@@ -259,29 +262,41 @@ class TrackService:
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="Gumroad product URL is required for paid tracks",
             )
-        validate_upload_file(track_file, AUDIO_EXTENSIONS, MAX_TRACK_UPLOAD_BYTES, "Track file")
-        validate_upload_file(preview_file, AUDIO_EXTENSIONS, MAX_PREVIEW_UPLOAD_BYTES, "Preview file")
-        if cover_file is not None:
-            validate_upload_file(cover_file, IMAGE_EXTENSIONS, MAX_COVER_UPLOAD_BYTES, "Cover image")
+        track_bytes = track_file
+        preview_bytes = preview_file
+        cover_bytes = cover_file
+        validate_upload_data(
+            track_filename, len(track_bytes), AUDIO_EXTENSIONS,
+            MAX_TRACK_UPLOAD_BYTES, "Track file",
+        )
+        validate_upload_data(
+            preview_filename, len(preview_bytes), AUDIO_EXTENSIONS,
+            MAX_PREVIEW_UPLOAD_BYTES, "Preview file",
+        )
+        if cover_bytes is not None:
+            validate_upload_data(
+                cover_filename, len(cover_bytes), IMAGE_EXTENSIONS,
+                MAX_COVER_UPLOAD_BYTES, "Cover image",
+            )
 
-        track_filename = build_storage_name(track_file.filename or "")
-        preview_filename = build_storage_name(preview_file.filename or "")
-        cover_filename = build_storage_name(cover_file.filename or "") if cover_file else None
+        track_filename = build_storage_name(track_filename)
+        preview_filename = build_storage_name(preview_filename)
+        cover_filename = build_storage_name(cover_filename) if cover_bytes is not None and cover_filename else None
 
         uploaded_objects: list[str] = []
         try:
             track_r2_key = await self.storage_service.upload_file(
-                track_file, "tracks", track_filename
+                io.BytesIO(track_bytes), "tracks", track_filename
             )
             uploaded_objects.append(f"tracks/{track_filename}")
             preview_r2_url = await self.storage_service.upload_file(
-                preview_file, "previews", preview_filename
+                io.BytesIO(preview_bytes), "previews", preview_filename
             )
             uploaded_objects.append(f"previews/{preview_filename}")
             cover_r2_url = None
-            if cover_file is not None and cover_filename is not None:
+            if cover_bytes is not None and cover_filename is not None:
                 cover_r2_url = await self.storage_service.upload_file(
-                    cover_file, "covers", cover_filename
+                    io.BytesIO(cover_bytes), "covers", cover_filename
                 )
                 uploaded_objects.append(f"covers/{cover_filename}")
 
@@ -304,6 +319,7 @@ class TrackService:
                 track_data.free_download_url = track_full_url
             return await self.create_track(session, track_data)
         except Exception as exc:
+            await session.rollback()
             for object_key in uploaded_objects:
                 try:
                     self.storage_service.delete_file(object_key)
@@ -312,7 +328,12 @@ class TrackService:
                         f"Could not clean up uploaded object {object_key}: "
                         f"{cleanup_error}"
                     )
-            raise
+            if isinstance(exc, HTTPException):
+                raise
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Track upload failed while storing files or saving track metadata",
+            ) from exc
 
     async def create_checkout(
         self, session: AsyncSession, track_id: int, current_user: User

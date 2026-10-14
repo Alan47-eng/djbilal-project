@@ -1,4 +1,5 @@
 """Utility functions for common operations."""
+import io
 import os
 import re
 from datetime import datetime
@@ -33,9 +34,15 @@ def build_storage_name(filename: str) -> str:
     return f"{stem}-{uuid4().hex}{suffix}"
 
 
-def validate_upload_file(upload_file, allowed_extensions: set[str], max_bytes: int, label: str) -> None:
-    """Validate an uploaded file before persisting it."""
-    filename = (upload_file.filename or "").strip()
+def validate_upload_data(
+    filename: str | None,
+    size: int,
+    allowed_extensions: set[str],
+    max_bytes: int,
+    label: str,
+) -> None:
+    """Validate an upload's filename and exact content size."""
+    filename = (filename or "").strip()
     if not filename:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -56,12 +63,25 @@ def validate_upload_file(upload_file, allowed_extensions: set[str], max_bytes: i
             detail=f"{label} size limit is misconfigured",
         )
 
-    upload_size = getattr(upload_file, "size", None)
-    if isinstance(upload_size, int) and upload_size > max_bytes:
+    if size > max_bytes:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             detail=f"{label} exceeds the maximum size of {max_bytes} bytes",
         )
+
+
+def validate_upload_file(
+    upload_file, allowed_extensions: set[str], max_bytes: int, label: str
+) -> None:
+    """Validate an uploaded file's metadata before reading its contents."""
+    upload_size = getattr(upload_file, "size", None)
+    validate_upload_data(
+        upload_file.filename,
+        upload_size if isinstance(upload_size, int) else 0,
+        allowed_extensions,
+        max_bytes,
+        label,
+    )
 
 
 def build_media_url(request: Request, folder: str, filename: str) -> str:
@@ -100,11 +120,13 @@ def build_r2_public_url(folder: str, filename: str) -> str | None:
     return R2StorageService.build_public_url(folder, filename)
 
 
-async def upload_file_to_r2(upload_file, folder: str, filename: str) -> str:
+async def upload_file_to_r2(
+    content: bytes | io.BytesIO, folder: str, filename: str
+) -> str:
     """Compatibility wrapper delegating file persistence to the R2 adapter."""
     from .adapters.r2_storage import R2StorageService
 
-    return await R2StorageService().upload_file(upload_file, folder, filename)
+    return await R2StorageService().upload_file(content, folder, filename)
 
 
 def generate_r2_presigned_download_url(file_key: str, expires_in: int = 900) -> str:

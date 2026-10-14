@@ -7,7 +7,6 @@ import boto3
 from botocore.exceptions import BotoCoreError, ClientError
 from fastapi import HTTPException, status
 from starlette.concurrency import run_in_threadpool
-from starlette.datastructures import UploadFile
 
 from ..interfaces.storage import BaseStorageService
 from ..utils import UPLOAD_ROOT
@@ -73,37 +72,24 @@ class R2StorageService(BaseStorageService):
         )
 
     async def upload_file(
-        self, upload_file: UploadFile | BinaryIO, folder: str, filename: str
+        self, content: bytes | io.BytesIO, folder: str, filename: str
     ) -> str:
         config = self.get_config()
-        try:
-            if isinstance(upload_file, UploadFile):
-                if upload_file.file.closed:
-                    raise ValueError("Upload stream is already closed")
-                await upload_file.seek(0)
-                content = await upload_file.read()
-            else:
-                content = await run_in_threadpool(self._read_binary_file, upload_file)
-        except (OSError, ValueError) as exc:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Uploaded file is no longer available; please retry the upload",
-            ) from exc
-
-        if not isinstance(content, bytes):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Uploaded file contents must be binary",
-            )
-
-        file_obj = io.BytesIO(content)
+        file_obj = io.BytesIO(content) if isinstance(content, bytes) else content
+        file_obj.seek(0)
         safe_filename = Path(filename).name
         folder_name = folder.strip("/")
         client = self._client()
 
         if client is None:
             destination = (UPLOAD_ROOT / folder_name / safe_filename).resolve()
-            await run_in_threadpool(self._write_local_file, file_obj, destination)
+            try:
+                await run_in_threadpool(self._write_local_file, file_obj, destination)
+            except OSError as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Failed to save uploaded file to local storage",
+                ) from exc
             return f"/media/{folder_name}/{safe_filename}"
 
         bucket_name = config["bucket_name"]
@@ -118,7 +104,7 @@ class R2StorageService(BaseStorageService):
             await run_in_threadpool(
                 self._upload_r2_file, client, file_obj, bucket_name, object_key
             )
-        except (BotoCoreError, ClientError, ValueError) as exc:
+        except (BotoCoreError, ClientError, OSError, ValueError) as exc:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Failed to upload file to Cloudflare R2: {exc}",
@@ -137,15 +123,6 @@ class R2StorageService(BaseStorageService):
                 detail="R2 account is not configured",
             )
         return f"https://{account_id}.r2.cloudflarestorage.com/{bucket_name}/{object_key}"
-
-    @staticmethod
-    def _read_binary_file(file_obj: BinaryIO) -> bytes:
-        file_obj.seek(0)
-        try:
-            content = file_obj.read()
-        finally:
-            file_obj.seek(0)
-        return content
 
     @staticmethod
     def _write_local_file(file_obj: BinaryIO, destination: Path) -> None:
