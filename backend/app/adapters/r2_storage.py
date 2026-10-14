@@ -1,3 +1,4 @@
+import io
 import os
 from pathlib import Path
 from typing import BinaryIO, Mapping, Protocol, cast
@@ -75,7 +76,27 @@ class R2StorageService(BaseStorageService):
         self, upload_file: UploadFile | BinaryIO, folder: str, filename: str
     ) -> str:
         config = self.get_config()
-        file_obj = upload_file.file if isinstance(upload_file, UploadFile) else upload_file
+        try:
+            if isinstance(upload_file, UploadFile):
+                if upload_file.file.closed:
+                    raise ValueError("Upload stream is already closed")
+                await upload_file.seek(0)
+                content = await upload_file.read()
+            else:
+                content = await run_in_threadpool(self._read_binary_file, upload_file)
+        except (OSError, ValueError) as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Uploaded file is no longer available; please retry the upload",
+            ) from exc
+
+        if not isinstance(content, bytes):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Uploaded file contents must be binary",
+            )
+
+        file_obj = io.BytesIO(content)
         safe_filename = Path(filename).name
         folder_name = folder.strip("/")
         client = self._client()
@@ -116,6 +137,15 @@ class R2StorageService(BaseStorageService):
                 detail="R2 account is not configured",
             )
         return f"https://{account_id}.r2.cloudflarestorage.com/{bucket_name}/{object_key}"
+
+    @staticmethod
+    def _read_binary_file(file_obj: BinaryIO) -> bytes:
+        file_obj.seek(0)
+        try:
+            content = file_obj.read()
+        finally:
+            file_obj.seek(0)
+        return content
 
     @staticmethod
     def _write_local_file(file_obj: BinaryIO, destination: Path) -> None:
