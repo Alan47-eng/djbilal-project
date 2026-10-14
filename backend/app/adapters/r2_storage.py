@@ -4,8 +4,9 @@ from typing import BinaryIO, Mapping, Protocol, cast
 
 import boto3
 from botocore.exceptions import BotoCoreError, ClientError
-from fastapi import HTTPException, UploadFile, status
+from fastapi import HTTPException, status
 from starlette.concurrency import run_in_threadpool
+from starlette.datastructures import UploadFile
 
 from ..interfaces.storage import BaseStorageService
 from ..utils import UPLOAD_ROOT

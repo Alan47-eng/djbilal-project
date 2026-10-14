@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import BinaryIO
 
-from fastapi import UploadFile
+from starlette.datastructures import UploadFile
 
 
 class BaseStorageService(ABC):

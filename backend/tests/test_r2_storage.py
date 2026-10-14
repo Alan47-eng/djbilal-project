@@ -2,7 +2,7 @@ from io import BytesIO
 from threading import get_ident
 
 import pytest
-from fastapi import UploadFile
+from starlette.datastructures import UploadFile
 
 from app.adapters.r2_storage import R2StorageService
 
