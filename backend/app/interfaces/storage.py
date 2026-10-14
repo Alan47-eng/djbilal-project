@@ -6,7 +6,9 @@ from fastapi import UploadFile
 
 class BaseStorageService(ABC):
     @abstractmethod
-    def upload_file(self, upload_file: UploadFile | BinaryIO, folder: str, filename: str) -> str:
+    async def upload_file(
+        self, upload_file: UploadFile | BinaryIO, folder: str, filename: str
+    ) -> str:
         """Persist a file and return its stored key or URL."""
 
     @abstractmethod

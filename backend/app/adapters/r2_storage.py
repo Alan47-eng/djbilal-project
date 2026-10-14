@@ -5,6 +5,7 @@ from typing import BinaryIO, Mapping, Protocol, cast
 import boto3
 from botocore.exceptions import BotoCoreError, ClientError
 from fastapi import HTTPException, UploadFile, status
+from starlette.concurrency import run_in_threadpool
 
 from ..interfaces.storage import BaseStorageService
 from ..utils import UPLOAD_ROOT
@@ -69,7 +70,9 @@ class R2StorageService(BaseStorageService):
             ),
         )
 
-    def upload_file(self, upload_file: UploadFile | BinaryIO, folder: str, filename: str) -> str:
+    async def upload_file(
+        self, upload_file: UploadFile | BinaryIO, folder: str, filename: str
+    ) -> str:
         config = self.get_config()
         file_obj = upload_file.file if isinstance(upload_file, UploadFile) else upload_file
         safe_filename = Path(filename).name
@@ -78,15 +81,7 @@ class R2StorageService(BaseStorageService):
 
         if client is None:
             destination = (UPLOAD_ROOT / folder_name / safe_filename).resolve()
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            file_obj.seek(0)
-            with destination.open("wb") as output_file:
-                while True:
-                    chunk = file_obj.read(1024 * 1024)
-                    if not chunk:
-                        break
-                    output_file.write(chunk)
-            file_obj.seek(0)
+            await run_in_threadpool(self._write_local_file, file_obj, destination)
             return f"/media/{folder_name}/{safe_filename}"
 
         bucket_name = config["bucket_name"]
@@ -98,8 +93,9 @@ class R2StorageService(BaseStorageService):
 
         object_key = f"{folder_name}/{safe_filename}"
         try:
-            file_obj.seek(0)
-            client.upload_fileobj(file_obj, bucket_name, object_key)
+            await run_in_threadpool(
+                self._upload_r2_file, client, file_obj, bucket_name, object_key
+            )
         except (BotoCoreError, ClientError, ValueError) as exc:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -119,6 +115,27 @@ class R2StorageService(BaseStorageService):
                 detail="R2 account is not configured",
             )
         return f"https://{account_id}.r2.cloudflarestorage.com/{bucket_name}/{object_key}"
+
+    @staticmethod
+    def _write_local_file(file_obj: BinaryIO, destination: Path) -> None:
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        file_obj.seek(0)
+        try:
+            with destination.open("wb") as output_file:
+                while chunk := file_obj.read(1024 * 1024):
+                    output_file.write(chunk)
+        finally:
+            file_obj.seek(0)
+
+    @staticmethod
+    def _upload_r2_file(
+        client: S3Client, file_obj: BinaryIO, bucket_name: str, object_key: str
+    ) -> None:
+        file_obj.seek(0)
+        try:
+            client.upload_fileobj(file_obj, bucket_name, object_key)
+        finally:
+            file_obj.seek(0)
 
     def generate_signed_url(self, object_key: str, expires_in: int = 900) -> str:
         config = self.get_config()

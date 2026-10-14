@@ -100,11 +100,11 @@ def build_r2_public_url(folder: str, filename: str) -> str | None:
     return R2StorageService.build_public_url(folder, filename)
 
 
-def upload_file_to_r2(upload_file, folder: str, filename: str) -> str:
+async def upload_file_to_r2(upload_file, folder: str, filename: str) -> str:
     """Compatibility wrapper delegating file persistence to the R2 adapter."""
     from .adapters.r2_storage import R2StorageService
 
-    return R2StorageService().upload_file(upload_file, folder, filename)
+    return await R2StorageService().upload_file(upload_file, folder, filename)
 
 
 def generate_r2_presigned_download_url(file_key: str, expires_in: int = 900) -> str:

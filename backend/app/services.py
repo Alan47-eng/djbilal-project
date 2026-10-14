@@ -270,15 +270,17 @@ class TrackService:
 
         uploaded_objects: list[str] = []
         try:
-            track_r2_key = self.storage_service.upload_file(track_file, "tracks", track_filename)
+            track_r2_key = await self.storage_service.upload_file(
+                track_file, "tracks", track_filename
+            )
             uploaded_objects.append(f"tracks/{track_filename}")
-            preview_r2_url = self.storage_service.upload_file(
+            preview_r2_url = await self.storage_service.upload_file(
                 preview_file, "previews", preview_filename
             )
             uploaded_objects.append(f"previews/{preview_filename}")
             cover_r2_url = None
             if cover_file is not None and cover_filename is not None:
-                cover_r2_url = self.storage_service.upload_file(
+                cover_r2_url = await self.storage_service.upload_file(
                     cover_file, "covers", cover_filename
                 )
                 uploaded_objects.append(f"covers/{cover_filename}")
