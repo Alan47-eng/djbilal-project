@@ -68,6 +68,39 @@ async def test_upload_file_accepts_independent_bytes_io_stream(monkeypatch):
 
     assert result == "tracks/track.mp3"
     assert upload_calls == [(b"audio bytes", "bucket", "tracks/track.mp3")]
+    assert not content.closed
+    assert content.tell() == 4
+
+
+@pytest.mark.asyncio
+async def test_upload_file_is_not_affected_if_boto_closes_its_stream(monkeypatch):
+    class FakeS3Client:
+        def upload_fileobj(self, file_obj, bucket, key):
+            assert file_obj.read() == b"audio bytes"
+            file_obj.close()
+
+    monkeypatch.setattr(
+        R2StorageService,
+        "get_config",
+        staticmethod(
+            lambda: {
+                "account_id": "account",
+                "access_key_id": "access",
+                "secret_access_key": "secret",
+                "bucket_name": "bucket",
+                "public_url": "https://cdn.example.com",
+            }
+        ),
+    )
+    monkeypatch.setattr(
+        R2StorageService, "_client", staticmethod(lambda: FakeS3Client())
+    )
+    content = BytesIO(b"audio bytes")
+
+    result = await R2StorageService().upload_file(content, "tracks", "track.mp3")
+
+    assert result == "tracks/track.mp3"
+    assert not content.closed
 
 
 @pytest.mark.asyncio

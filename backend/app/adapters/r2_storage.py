@@ -75,8 +75,13 @@ class R2StorageService(BaseStorageService):
         self, content: bytes | io.BytesIO, folder: str, filename: str
     ) -> str:
         config = self.get_config()
-        file_obj = io.BytesIO(content) if isinstance(content, bytes) else content
-        file_obj.seek(0)
+        try:
+            content_bytes = content if isinstance(content, bytes) else content.getvalue()
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Uploaded file buffer is unavailable; please retry the upload",
+            ) from exc
         safe_filename = Path(filename).name
         folder_name = folder.strip("/")
         client = self._client()
@@ -84,7 +89,9 @@ class R2StorageService(BaseStorageService):
         if client is None:
             destination = (UPLOAD_ROOT / folder_name / safe_filename).resolve()
             try:
-                await run_in_threadpool(self._write_local_file, file_obj, destination)
+                await run_in_threadpool(
+                    self._write_local_file, content_bytes, destination
+                )
             except OSError as exc:
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -102,7 +109,7 @@ class R2StorageService(BaseStorageService):
         object_key = f"{folder_name}/{safe_filename}"
         try:
             await run_in_threadpool(
-                self._upload_r2_file, client, file_obj, bucket_name, object_key
+                self._upload_r2_file, client, content_bytes, bucket_name, object_key
             )
         except (BotoCoreError, ClientError, OSError, ValueError) as exc:
             raise HTTPException(
@@ -125,25 +132,15 @@ class R2StorageService(BaseStorageService):
         return f"https://{account_id}.r2.cloudflarestorage.com/{bucket_name}/{object_key}"
 
     @staticmethod
-    def _write_local_file(file_obj: BinaryIO, destination: Path) -> None:
+    def _write_local_file(content: bytes, destination: Path) -> None:
         destination.parent.mkdir(parents=True, exist_ok=True)
-        file_obj.seek(0)
-        try:
-            with destination.open("wb") as output_file:
-                while chunk := file_obj.read(1024 * 1024):
-                    output_file.write(chunk)
-        finally:
-            file_obj.seek(0)
+        destination.write_bytes(content)
 
     @staticmethod
     def _upload_r2_file(
-        client: S3Client, file_obj: BinaryIO, bucket_name: str, object_key: str
+        client: S3Client, content: bytes, bucket_name: str, object_key: str
     ) -> None:
-        file_obj.seek(0)
-        try:
-            client.upload_fileobj(file_obj, bucket_name, object_key)
-        finally:
-            file_obj.seek(0)
+        client.upload_fileobj(io.BytesIO(content), bucket_name, object_key)
 
     def generate_signed_url(self, object_key: str, expires_in: int = 900) -> str:
         config = self.get_config()

@@ -1,10 +1,15 @@
 import io
 
 import pytest
-from fastapi import HTTPException
+from fastapi import HTTPException, status
 from starlette.datastructures import UploadFile
 
-from app.utils import build_storage_name, save_upload_file, validate_upload_file
+from app.utils import (
+    build_storage_name,
+    save_upload_file,
+    validate_upload_data,
+    validate_upload_file,
+)
 
 
 def test_build_storage_name_sanitizes_filename():
@@ -23,6 +28,23 @@ def test_validate_upload_file_rejects_unsupported_extension():
         validate_upload_file(upload, {".mp3"}, 1024, "Track file")
 
     assert exc_info.value.status_code == 400
+
+
+def test_validate_upload_file_does_not_consume_or_close_content():
+    upload = UploadFile(filename="track.mp3", file=io.BytesIO(b"audio bytes"))
+    upload.file.seek(4)
+
+    validate_upload_file(upload, {".mp3"}, 1024, "Track file")
+
+    assert not upload.file.closed
+    assert upload.file.tell() == 4
+
+
+def test_validate_upload_data_uses_content_too_large_status():
+    with pytest.raises(HTTPException) as exc_info:
+        validate_upload_data("track.mp3", 4, {".mp3"}, 3, "Track file")
+
+    assert exc_info.value.status_code == status.HTTP_413_CONTENT_TOO_LARGE
 
 
 @pytest.mark.asyncio
