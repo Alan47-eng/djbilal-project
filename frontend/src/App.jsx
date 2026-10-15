@@ -46,7 +46,7 @@ function AppContent() {
     total: lang === 'ar' ? 'المجموع' : 'Total',
     checkoutCart: lang === 'ar' ? 'الدفع من السلة' : 'Checkout Cart',
     redirecting: lang === 'ar' ? 'جاري التحويل...' : 'Preparing checkout...',
-    gumroadAdd: lang === 'ar' ? 'فتح منتج Gumroad' : 'Open Gumroad product',
+    gumroadAdd: lang === 'ar' ? 'اشترِ عبر Gumroad' : 'Buy on Gumroad',
     remove: lang === 'ar' ? 'حذف' : 'Remove',
     openAdmin: lang === 'ar' ? 'فتح لوحة الإدارة' : 'Open Admin Panel',
     editsDesc: lang === 'ar' ? 'تعديلات أصلية ونسخ مميزة.' : 'Original edits and premium versions.',

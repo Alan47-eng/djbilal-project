@@ -401,7 +401,7 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
                         value={form.external_product_id}
                         onChange={handleChange('external_product_id')}
                         type="url"
-                        placeholder="https://gumroad.com/l/product"
+                        placeholder="https://mahmud27.gumroad.com/l/zgyds"
                         className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
                         required
                       />
@@ -493,7 +493,7 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
                           <div className="mt-2 flex gap-2">
                             <input
                               type="url"
-                              placeholder="https://gumroad.com/l/product"
+                              placeholder="https://mahmud27.gumroad.com/l/zgyds"
                               value={trackProductDrafts[track.id] ?? track.external_product_id ?? ''}
                               onChange={(event) =>
                                 setTrackProductDrafts((prev) => ({ ...prev, [track.id]: event.target.value }))
