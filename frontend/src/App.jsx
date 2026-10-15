@@ -17,6 +17,12 @@ import './index.css';
 import { getApiErrorMessage } from './utils/errors';
 import { downloadTrackFile } from './utils/downloads';
 
+function buildDirectCheckoutUrl(checkoutUrl) {
+  const url = new URL(checkoutUrl);
+  url.searchParams.set('wanted', 'true');
+  return url.toString();
+}
+
 function AppContent() {
   const { lang, setLang, isRTL } = useLanguage();
   const { user, logout, loading: authLoading } = useAuth();
@@ -44,9 +50,9 @@ function AppContent() {
     logout: lang === 'ar' ? 'تسجيل الخروج' : 'Logout',
     cart: lang === 'ar' ? 'السلة' : 'Cart',
     total: lang === 'ar' ? 'المجموع' : 'Total',
-    checkoutCart: lang === 'ar' ? 'الدفع من السلة' : 'Checkout Cart',
+    checkoutCart: lang === 'ar' ? 'دفع آمن' : 'Ödeme Yap',
     redirecting: lang === 'ar' ? 'جاري التحويل...' : 'Preparing checkout...',
-    gumroadAdd: lang === 'ar' ? 'اشترِ عبر Gumroad' : 'Buy on Gumroad',
+    secureCheckout: lang === 'ar' ? 'إتمام الشراء' : 'Ödeme Yap',
     remove: lang === 'ar' ? 'حذف' : 'Remove',
     openAdmin: lang === 'ar' ? 'فتح لوحة الإدارة' : 'Open Admin Panel',
     editsDesc: lang === 'ar' ? 'تعديلات أصلية ونسخ مميزة.' : 'Original edits and premium versions.',
@@ -573,9 +579,9 @@ function AppContent() {
                                 gumroadLinkRefs.current[item.track_id] = node;
                               }}
                               className="gumroad-button mt-3 inline-block rounded-lg bg-purple-600 px-3 py-2 text-xs font-semibold text-white hover:bg-purple-700"
-                              href={item.checkout_url}
+                              href={buildDirectCheckoutUrl(item.checkout_url)}
                             >
-                              {t.gumroadAdd}
+                              {t.secureCheckout}
                             </a>
                           ))}
                       </div>
@@ -587,7 +593,7 @@ function AppContent() {
                   type="button"
                   onClick={handleCheckout}
                   disabled={checkoutLoading || cartTracks.length === 0}
-                  className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
+                  className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-purple-600 to-emerald-600 px-4 py-2.5 font-semibold text-white shadow-lg shadow-purple-950/20 transition-colors hover:from-purple-700 hover:to-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <ShoppingCart size={16} />
                   {checkoutLoading ? t.redirecting : t.checkoutCart}
