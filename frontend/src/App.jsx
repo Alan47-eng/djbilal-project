@@ -17,10 +17,29 @@ import './index.css';
 import { getApiErrorMessage } from './utils/errors';
 import { downloadTrackFile } from './utils/downloads';
 
-function buildDirectCheckoutUrl(checkoutUrl) {
-  const url = new URL(checkoutUrl);
-  url.searchParams.set('wanted', 'true');
-  return url.toString();
+function openGumroadOverlayWhenReady(anchor) {
+  if (!anchor) return;
+
+  let timeoutId;
+  const observer = new MutationObserver(() => {
+    if (!anchor.querySelector('.logo-full')) return;
+    observer.disconnect();
+    window.clearTimeout(timeoutId);
+    anchor.click();
+  });
+
+  observer.observe(anchor, { childList: true });
+  timeoutId = window.setTimeout(() => {
+    observer.disconnect();
+    console.error('Gumroad overlay did not initialize; use the checkout link directly.');
+    anchor.focus();
+  }, 5000);
+
+  if (anchor.querySelector('.logo-full')) {
+    observer.disconnect();
+    window.clearTimeout(timeoutId);
+    anchor.click();
+  }
 }
 
 function AppContent() {
@@ -34,7 +53,11 @@ function AppContent() {
   const [authModal, setAuthModal] = useState({ isOpen: false, mode: 'login' });
   const [pendingCartTrackId, setPendingCartTrackId] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('edits'); // 'edits' | 'remixes' | 'free' | 'library'
+  const [activeTab, setActiveTab] = useState(() =>
+    typeof window !== 'undefined' && window.location.pathname.replace(/\/+$/, '') === '/purchases'
+      ? 'library'
+      : 'edits'
+  ); // 'edits' | 'remixes' | 'free' | 'library'
   const [cartTrackIds, setCartTrackIds] = useState([]);
   const [gumroadCheckoutItems, setGumroadCheckoutItems] = useState([]);
   const [cartOpen, setCartOpen] = useState(false);
@@ -159,7 +182,9 @@ function AppContent() {
     if (checkoutItems?.length) {
       setGumroadCheckoutItems(checkoutItems);
       window.setTimeout(() => {
-        gumroadLinkRefs.current[checkoutItems[0].track_id]?.click();
+        openGumroadOverlayWhenReady(
+          gumroadLinkRefs.current[checkoutItems[0].track_id]
+        );
       }, 0);
     }
     return checkoutItems;
@@ -579,7 +604,7 @@ function AppContent() {
                                 gumroadLinkRefs.current[item.track_id] = node;
                               }}
                               className="gumroad-button mt-3 inline-block rounded-lg bg-purple-600 px-3 py-2 text-xs font-semibold text-white hover:bg-purple-700"
-                              href={buildDirectCheckoutUrl(item.checkout_url)}
+                              href={item.checkout_url}
                             >
                               {t.secureCheckout}
                             </a>
