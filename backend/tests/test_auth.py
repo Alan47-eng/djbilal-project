@@ -637,6 +637,55 @@ class TestCheckoutAndWebhook:
         assert track.id in purchases_response.json()
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "payload",
+        [
+            {},
+            {"sale_id": "test-sale", "seller_id": "test-seller"},
+            {"sale_id": "refund-sale", "seller_id": "test-seller", "refunded": "true"},
+        ],
+    )
+    async def test_webhook_acknowledges_gumroad_test_and_non_sale_pings(
+        self, client, payload, monkeypatch
+    ):
+        monkeypatch.setenv("GUMROAD_SELLER_ID", "configured-seller")
+
+        async def unexpected_verification(*_args, **_kwargs):
+            raise AssertionError("Non-sale pings must not be verified as sales")
+
+        monkeypatch.setattr(
+            "app.adapters.gumroad.GumroadService.verify_sale",
+            unexpected_verification,
+        )
+
+        response = await client.post("/api/webhooks/gumroad", data=payload)
+
+        assert response.status_code == 200
+        assert response.json() == {"status": "ignored", "purchase_ids": []}
+
+    @pytest.mark.asyncio
+    async def test_webhook_acknowledges_sale_from_unconfigured_seller(
+        self, client, monkeypatch
+    ):
+        monkeypatch.setenv("GUMROAD_SELLER_ID", "configured-seller")
+
+        async def unexpected_verification(*_args, **_kwargs):
+            raise AssertionError("A mismatched seller must not be verified")
+
+        monkeypatch.setattr(
+            "app.adapters.gumroad.GumroadService.verify_sale",
+            unexpected_verification,
+        )
+
+        response = await client.post(
+            "/api/webhooks/gumroad",
+            data={"sale_id": "sale-1", "seller_id": "another-seller"},
+        )
+
+        assert response.status_code == 200
+        assert response.json()["status"] == "ignored"
+
+    @pytest.mark.asyncio
     async def test_webhook_rejects_gumroad_amount_that_differs_from_track(
         self, client, test_db, monkeypatch
     ):
@@ -670,7 +719,8 @@ class TestCheckoutAndWebhook:
             },
         )
 
-        assert response.status_code == 400
+        assert response.status_code == 200
+        assert response.json()["status"] == "ignored"
         async with AsyncSessionLocal() as session:
             purchases = await session.execute(
                 select(Purchase).where(
@@ -708,7 +758,7 @@ class TestCheckoutAndWebhook:
         assert "free to download" in response.json()["detail"]
 
     @pytest.mark.asyncio
-    async def test_webhook_rejects_unconfigured_seller(self, client, monkeypatch):
+    async def test_webhook_acknowledges_mismatched_seller(self, client, monkeypatch):
         monkeypatch.setenv("GUMROAD_ACCESS_TOKEN", "test-token")
         monkeypatch.setenv("GUMROAD_SELLER_ID", "expected-seller")
         response = await client.post(
@@ -721,7 +771,8 @@ class TestCheckoutAndWebhook:
                 "currency": "usd",
             },
         )
-        assert response.status_code == 400
+        assert response.status_code == 200
+        assert response.json()["status"] == "ignored"
 
     @pytest.mark.asyncio
     async def test_license_pdf_available_in_purchase_details(self, client, test_db, monkeypatch):

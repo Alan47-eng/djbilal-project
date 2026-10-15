@@ -89,6 +89,26 @@ class GumroadService:
 
         return checkout_data
 
+    @classmethod
+    def ignored_ping_reason(cls, ping: Mapping[str, str]) -> str | None:
+        """Identify Gumroad notifications that are not grantable paid sales."""
+        if cls._is_true(ping.get("test")):
+            return "test notification"
+        if any(
+            cls._is_true(ping.get(field))
+            for field in ("refunded", "chargebacked", "disputed")
+        ):
+            return "refund or dispute notification"
+        if not ping.get("sale_id", "").strip():
+            return "notification has no sale_id"
+
+        configured_seller_id = os.getenv("GUMROAD_SELLER_ID", "").strip()
+        if configured_seller_id and (
+            ping.get("seller_id", "").strip() != configured_seller_id
+        ):
+            return "seller_id does not match configured Gumroad seller"
+        return None
+
     async def verify_sale(self, ping: Mapping[str, str]) -> dict[str, str]:
         """Verify the seller and sale identity with Gumroad's Sales API."""
         access_token = os.getenv("GUMROAD_ACCESS_TOKEN", "").strip()

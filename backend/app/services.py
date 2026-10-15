@@ -1,5 +1,6 @@
 """Business logic layer - Service classes for domain operations."""
 import io
+import logging
 from decimal import Decimal, ROUND_HALF_UP
 
 from fastapi import HTTPException, status
@@ -24,6 +25,8 @@ from .utils import (
     MAX_COVER_UPLOAD_BYTES,
     generate_license_pdf,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class UserService:
@@ -472,6 +475,11 @@ class PurchaseService:
         payload: dict[str, str],
     ) -> dict[str, str | list[int]]:
         """Verify a Gumroad sale and add its paid tracks to the buyer's library."""
+        ignored_reason = self.gumroad_service.ignored_ping_reason(payload)
+        if ignored_reason:
+            logger.info("Ignoring Gumroad notification: %s", ignored_reason)
+            return {"status": "ignored", "purchase_ids": []}
+
         custom_data = self.gumroad_service.extract_checkout_data(payload)
         user_id_value = custom_data.get("user_id")
         track_ids_value = custom_data.get("track_ids")

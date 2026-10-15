@@ -37,6 +37,29 @@ def test_extract_checkout_data_reads_json_url_params():
     }
 
 
+@pytest.mark.parametrize(
+    ("payload", "reason"),
+    [
+        ({}, "notification has no sale_id"),
+        ({"sale_id": "sale-1", "test": "true"}, "test notification"),
+        (
+            {"sale_id": "sale-1", "refunded": "true"},
+            "refund or dispute notification",
+        ),
+    ],
+)
+def test_ignored_ping_reason_for_non_sale_notifications(payload, reason):
+    assert GumroadService.ignored_ping_reason(payload) == reason
+
+
+def test_ignored_ping_reason_for_unconfigured_seller(monkeypatch):
+    monkeypatch.setenv("GUMROAD_SELLER_ID", "seller-1")
+
+    assert GumroadService.ignored_ping_reason(
+        {"sale_id": "sale-1", "seller_id": "test-seller"}
+    ) == "seller_id does not match configured Gumroad seller"
+
+
 @pytest.mark.asyncio
 async def test_verify_sale_checks_gumroad_api_record(monkeypatch):
     monkeypatch.setenv("GUMROAD_ACCESS_TOKEN", "api-token")
