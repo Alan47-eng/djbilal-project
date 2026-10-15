@@ -42,6 +42,13 @@ function openGumroadOverlayWhenReady(anchor) {
   }
 }
 
+function buildGumroadOverlayUrl(checkoutUrl) {
+  const url = new URL(checkoutUrl);
+  url.searchParams.delete('wanted');
+  url.searchParams.set('overlay', 'true');
+  return url.toString();
+}
+
 function AppContent() {
   const { lang, setLang, isRTL } = useLanguage();
   const { user, logout, loading: authLoading } = useAuth();
@@ -604,7 +611,7 @@ function AppContent() {
                                 gumroadLinkRefs.current[item.track_id] = node;
                               }}
                               className="gumroad-button mt-3 inline-block rounded-lg bg-purple-600 px-3 py-2 text-xs font-semibold text-white hover:bg-purple-700"
-                              href={item.checkout_url}
+                              href={buildGumroadOverlayUrl(item.checkout_url)}
                             >
                               {t.secureCheckout}
                             </a>
