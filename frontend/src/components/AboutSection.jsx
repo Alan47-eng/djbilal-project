@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Music2, ExternalLink } from 'lucide-react';
+import api, { resolveAssetUrl } from '../api';
 import { useLanguage } from '../context/LanguageContext';
 
 const SOCIAL_LINKS = [
@@ -49,6 +50,26 @@ const SOCIAL_LINKS = [
 
 const AboutSection = () => {
   const { lang } = useLanguage();
+  const [profilePhotoUrl, setProfilePhotoUrl] = useState(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    api.get('/profile/photo')
+      .then(({ data }) => {
+        if (isMounted) setProfilePhotoUrl(data.image_url);
+      })
+      .catch((error) => {
+        console.error('Could not load profile photo:', error);
+      });
+
+    const updatePhoto = (event) => setProfilePhotoUrl(event.detail);
+    window.addEventListener('profile-photo-updated', updatePhoto);
+    return () => {
+      isMounted = false;
+      window.removeEventListener('profile-photo-updated', updatePhoto);
+    };
+  }, []);
+
   const t = {
     role: lang === 'ar' ? 'منتج · ميكس وماستر · صانع إيقاعات' : 'Producer · Mixing & Mastering · Beat Maker',
     tagline: lang === 'ar'
@@ -83,9 +104,13 @@ DJ Bilal Hamsho هو مشروع موسيقي متكامل يجمع بين DJing�
     <section className="max-w-4xl mx-auto">
       <div className="rounded-3xl border border-slate-700 bg-gradient-to-br from-slate-800 to-slate-900 overflow-hidden shadow-2xl">
         {/* Hero banner */}
-        <div className="h-40 bg-gradient-to-r from-purple-900 via-blue-900 to-slate-900 relative">
-          <div className="absolute inset-0 opacity-20"
-            style={{ backgroundImage: 'repeating-linear-gradient(45deg, #7c3aed 0, #7c3aed 1px, transparent 0, transparent 50%)', backgroundSize: '20px 20px' }}
+        <div className="relative h-40 bg-gradient-to-r from-purple-900 via-blue-900 to-slate-900">
+          <div
+            className="absolute inset-0 opacity-40"
+            style={{
+              backgroundImage:
+                'repeating-linear-gradient(45deg, #a78bfa 0 1px, transparent 1px 18px)',
+            }}
           />
         </div>
 
@@ -93,7 +118,11 @@ DJ Bilal Hamsho هو مشروع موسيقي متكامل يجمع بين DJing�
           {/* Avatar */}
           <div className="flex flex-col sm:flex-row sm:items-end gap-4 sm:gap-6 -mt-12 sm:-mt-14 mb-6">
             <div className="w-20 h-20 sm:w-28 sm:h-28 rounded-2xl border-4 border-slate-800 bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center shadow-xl flex-shrink-0 overflow-hidden">
-              <img src="/images/profile.jpg" alt="DJ Bilal" className="w-full h-full object-cover" />
+              {profilePhotoUrl ? (
+                <img src={resolveAssetUrl(profilePhotoUrl)} alt="DJ Bilal" className="w-full h-full object-cover" />
+              ) : (
+                <Music2 className="h-10 w-10 text-white" aria-hidden="true" />
+              )}
             </div>
             <div className="pb-1 sm:pb-2">
               <h2 className="text-2xl sm:text-3xl font-extrabold text-white">DJ Bilal</h2>

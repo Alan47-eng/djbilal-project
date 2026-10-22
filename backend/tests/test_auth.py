@@ -558,6 +558,79 @@ class TestUserAdminEndpoints:
         assert response.status_code == 403
 
 
+class TestProfilePhoto:
+    @pytest.mark.asyncio
+    async def test_admin_can_upload_profile_photo(self, client, test_db, monkeypatch):
+        _, AsyncSessionLocal = test_db
+        stored_uploads = []
+
+        class MemoryStorage:
+            async def upload_file(self, content, folder, filename):
+                stored_uploads.append((content, folder, filename))
+                return f"/media/{folder}/{filename}"
+
+            def generate_signed_url(self, object_key, expires_in=900):
+                return object_key
+
+            def delete_file(self, object_key):
+                return None
+
+        monkeypatch.setitem(
+            app.dependency_overrides,
+            get_storage_service,
+            lambda: MemoryStorage(),
+        )
+        async with AsyncSessionLocal() as session:
+            await create_user_record(
+                session,
+                "profile-admin@example.com",
+                "password123",
+                is_admin=True,
+            )
+
+        login = await client.post(
+            "/login",
+            json={"email": "profile-admin@example.com", "password": "password123"},
+        )
+        token = login.json()["access_token"]
+        uploaded = await client.post(
+            "/profile/photo",
+            headers={"Authorization": f"Bearer {token}"},
+            files={"photo": ("portrait.jpg", b"test image", "image/jpeg")},
+        )
+
+        assert uploaded.status_code == 200
+        image_url = uploaded.json()["image_url"]
+        assert image_url.startswith("/media/profile/")
+        assert stored_uploads[0][:2] == (b"test image", "profile")
+
+        public_photo = await client.get("/profile/photo")
+        assert public_photo.json()["image_url"] == image_url
+
+    @pytest.mark.asyncio
+    async def test_profile_photo_upload_requires_admin(self, client, test_db):
+        _, AsyncSessionLocal = test_db
+        async with AsyncSessionLocal() as session:
+            await create_user_record(
+                session,
+                "profile-member@example.com",
+                "password123",
+            )
+
+        login = await client.post(
+            "/login",
+            json={"email": "profile-member@example.com", "password": "password123"},
+        )
+        token = login.json()["access_token"]
+        response = await client.post(
+            "/profile/photo",
+            headers={"Authorization": f"Bearer {token}"},
+            files={"photo": ("portrait.jpg", b"test image", "image/jpeg")},
+        )
+
+        assert response.status_code == 403
+
+
 class TestCheckoutAndWebhook:
     """Test Gumroad checkout and purchase processing."""
 

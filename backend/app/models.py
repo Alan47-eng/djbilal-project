@@ -52,3 +52,10 @@ class GumroadSale(Base):
     track_ids = Column(JSON, nullable=False)
     paid_cents = Column(Integer, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class ProfilePhoto(Base):
+    __tablename__ = "profile_photos"
+
+    id = Column(Integer, primary_key=True)
+    image_url = Column(String(1024), nullable=False)
