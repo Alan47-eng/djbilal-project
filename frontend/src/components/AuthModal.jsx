@@ -16,6 +16,8 @@ const AuthModal = ({ isOpen, initialMode = 'login', onClose, onSuccess }) => {
   const [error, setError] = useState(null);
   const [resetMessage, setResetMessage] = useState(null);
   const [resetLoading, setResetLoading] = useState(false);
+  const [verificationPending, setVerificationPending] = useState(false);
+  const [verificationMessage, setVerificationMessage] = useState(null);
   const t = {
     signIn: lang === 'ar' ? 'تسجيل الدخول' : 'Sign In',
     signUp: lang === 'ar' ? 'إنشاء حساب' : 'Sign Up',
@@ -27,6 +29,11 @@ const AuthModal = ({ isOpen, initialMode = 'login', onClose, onSuccess }) => {
     authFailed: lang === 'ar' ? 'فشل التحقق. حاول مرة أخرى.' : 'Authentication failed. Please try again.',
     wait: lang === 'ar' ? 'يرجى الانتظار...' : 'Please wait...',
     createAccount: lang === 'ar' ? 'إنشاء حساب' : 'Create Account',
+    verificationSent: lang === 'ar'
+      ? 'تحقق من بريدك الإلكتروني واضغط على رابط التحقق لتفعيل حسابك.'
+      : 'Check your email and click the verification link to activate your account.',
+    resendVerification: lang === 'ar' ? 'إعادة إرسال رابط التحقق' : 'Resend verification email',
+    resendSuccess: lang === 'ar' ? 'تم إرسال رابط التحقق.' : 'Verification email sent.',
   };
 
   useEffect(() => {
@@ -37,6 +44,8 @@ const AuthModal = ({ isOpen, initialMode = 'login', onClose, onSuccess }) => {
     setPassword('');
     setError(null);
     setLoading(false);
+    setVerificationPending(false);
+    setVerificationMessage(null);
   }, [isOpen, initialMode]);
 
   if (!isOpen) return null;
@@ -60,15 +69,29 @@ const AuthModal = ({ isOpen, initialMode = 'login', onClose, onSuccess }) => {
 
       const result = await register(email, password, fullName);
       if (!result.success) {
+        if (result.requiresEmailVerification) {
+          setVerificationPending(true);
+          setVerificationMessage(result.error || t.authFailed);
+          return;
+        }
         setError(result.error || t.authFailed);
         return;
       }
-      onSuccess(email);
-      onClose();
+      setVerificationPending(true);
     } catch (err) {
       setError(getApiErrorMessage(err, t.authFailed));
     } finally {
       setLoading(false);
+    }
+  };
+
+  const resendVerification = async () => {
+    setVerificationMessage(null);
+    try {
+      await api.post('/verification/resend', { email });
+      setVerificationMessage(t.resendSuccess);
+    } catch (err) {
+      setVerificationMessage(getApiErrorMessage(err, t.authFailed));
     }
   };
 
@@ -117,7 +140,11 @@ const AuthModal = ({ isOpen, initialMode = 'login', onClose, onSuccess }) => {
         <div className="mb-6 grid grid-cols-2 rounded-lg bg-slate-800 p-1">
           <button
             type="button"
-            onClick={() => setActiveTab('login')}
+            onClick={() => {
+              setActiveTab('login');
+              setVerificationPending(false);
+              setVerificationMessage(null);
+            }}
             className={`rounded-md px-4 py-2 font-semibold ${
               activeTab === 'login'
                 ? 'bg-purple-600 text-white'
@@ -128,7 +155,11 @@ const AuthModal = ({ isOpen, initialMode = 'login', onClose, onSuccess }) => {
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab('register')}
+            onClick={() => {
+              setActiveTab('register');
+              setVerificationPending(false);
+              setVerificationMessage(null);
+            }}
             className={`rounded-md px-4 py-2 font-semibold ${
               activeTab === 'register'
                 ? 'bg-purple-600 text-white'
@@ -139,7 +170,23 @@ const AuthModal = ({ isOpen, initialMode = 'login', onClose, onSuccess }) => {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        {verificationPending ? (
+          <div className="space-y-4">
+            <p className="text-sm text-slate-200">{t.verificationSent}</p>
+            {verificationMessage && (
+              <div className="rounded-lg border border-slate-700 bg-slate-800 p-3 text-sm text-slate-200">
+                {verificationMessage}
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={resendVerification}
+              className="w-full rounded-lg border border-purple-500 px-4 py-3 font-semibold text-purple-200 hover:bg-purple-900/30"
+            >
+              {t.resendVerification}
+            </button>
+          </div>
+        ) : <form onSubmit={handleSubmit} className="space-y-4">
           {activeTab === 'register' && (
             <input
               type="text"
@@ -203,7 +250,7 @@ const AuthModal = ({ isOpen, initialMode = 'login', onClose, onSuccess }) => {
                 ? t.signIn
                 : t.createAccount}
           </button>
-        </form>
+        </form>}
       </div>
     </div>
   );

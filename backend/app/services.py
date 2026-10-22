@@ -35,7 +35,13 @@ class UserService:
     def __init__(self) -> None:
         self.repo = UserRepository()
 
-    async def register(self, session: AsyncSession, user_data: schemas.UserCreate) -> User:
+    async def register(
+        self,
+        session: AsyncSession,
+        user_data: schemas.UserCreate,
+        *,
+        email_verified: bool = False,
+    ) -> User:
         """Register new user."""
         if await self.repo.email_exists(session, user_data.email):
             raise HTTPException(
@@ -48,7 +54,8 @@ class UserService:
             session,
             email=user_data.email,
             full_name=user_data.full_name,
-            hashed_password=hashed_password
+            hashed_password=hashed_password,
+            email_verified=email_verified,
         )
 
     async def authenticate(
@@ -62,6 +69,12 @@ class UserService:
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid email or password",
                 headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        if not user.email_verified:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Please verify your email before logging in",
             )
 
         return user

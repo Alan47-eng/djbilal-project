@@ -13,6 +13,7 @@ import AboutSection from './components/AboutSection';
 import FreeTracksList from './components/FreeTracksList';
 import UserPurchases from './components/UserPurchases';
 import ResetPassword from './components/ResetPassword';
+import VerifyEmail from './components/VerifyEmail';
 import './index.css';
 import { getApiErrorMessage } from './utils/errors';
 import { downloadTrackFile } from './utils/downloads';
@@ -662,6 +663,14 @@ function AppContent() {
 }
 
 export default function App() {
+  if (typeof window !== 'undefined' && window.location.pathname.startsWith('/verify-email')) {
+    return (
+      <LanguageProvider>
+        <VerifyEmail />
+      </LanguageProvider>
+    );
+  }
+
   // If user opened /reset-password, render just the reset page within providers
   if (typeof window !== 'undefined' && window.location.pathname.startsWith('/reset-password')) {
     return (

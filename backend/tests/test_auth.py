@@ -46,8 +46,12 @@ async def test_db():
 
 
 @pytest.fixture
-async def client(test_db):
+async def client(test_db, monkeypatch):
     """Create async test client"""
+    monkeypatch.setattr(
+        "app.routers.auth.send_email_verification_email",
+        lambda email, token: None,
+    )
     limiter.reset()
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -80,6 +84,13 @@ async def create_user_record(session, email, password, is_admin=False, full_name
     await session.commit()
     await session.refresh(user)
     return user
+
+
+async def verify_registered_email(client, email):
+    token = auth.create_access_token(
+        data={"sub": email, "email_verification": True}
+    )
+    return await client.post("/verify-email", json={"token": token})
 
 
 async def create_track_record(
@@ -218,6 +229,46 @@ class TestRegisterEndpoint:
 
         assert response.status_code == 200
         assert response.json()["full_name"] == "Ali Veli"
+
+    @pytest.mark.asyncio
+    async def test_registration_requires_email_verification(self, client):
+        registration = await client.post(
+            "/register",
+            json={"email": "unverified@example.com", "password": "password123"},
+        )
+        assert registration.status_code == 200
+
+        login = await client.post(
+            "/login",
+            json={"email": "unverified@example.com", "password": "password123"},
+        )
+        assert login.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_verifying_email_allows_login(self, client, monkeypatch):
+        email = "verified@example.com"
+        sent_emails = []
+        monkeypatch.setattr(
+            "app.routers.auth.send_email_verification_email",
+            lambda sent_email, token: sent_emails.append((sent_email, token)),
+        )
+        registration = await client.post(
+            "/register",
+            json={"email": email, "password": "password123"},
+        )
+        assert registration.status_code == 200
+        assert sent_emails[0][0] == email
+
+        token = sent_emails[0][1]
+        verification = await client.post("/verify-email", json={"token": token})
+        assert verification.status_code == 200
+        assert verification.json() == {"status": "verified"}
+
+        login = await client.post(
+            "/login",
+            json={"email": email, "password": "password123"},
+        )
+        assert login.status_code == 200
     
     @pytest.mark.asyncio
     async def test_register_duplicate_email(self, client):
@@ -275,6 +326,7 @@ class TestLoginEndpoint:
             "/register",
             json={"email": email, "password": password}
         )
+        await verify_registered_email(client, email)
         
         # Login
         response = await client.post(
@@ -343,6 +395,7 @@ class TestMeEndpoint:
             "/register",
             json={"email": email, "password": password}
         )
+        await verify_registered_email(client, email)
         
         # Login to get token
         login_response = await client.post(
@@ -423,6 +476,7 @@ class TestCreateTrackAuthentication:
             "/register",
             json={"email": email, "password": password}
         )
+        await verify_registered_email(client, email)
         
         login_response = await client.post(
             "/login",
@@ -489,6 +543,7 @@ class TestUserAdminEndpoints:
             "/register",
             json={"email": email, "password": password}
         )
+        await verify_registered_email(client, email)
         login_response = await client.post(
             "/login",
             json={"email": email, "password": password}
@@ -1074,6 +1129,10 @@ class TestEdgeCases:
             "/register",
             json={"email": email, "password": password}
         )
+        verification_token = auth.create_access_token(
+            data={"sub": email, "email_verification": True}
+        )
+        await client.post("/verify-email", json={"token": verification_token})
         
         # Multiple logins
         response1 = await client.post(

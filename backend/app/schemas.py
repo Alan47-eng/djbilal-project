@@ -98,6 +98,10 @@ class PasswordResetRequest(DTO):
     email: EmailStr
 
 
+class EmailVerificationRequest(DTO):
+    token: str
+
+
 class PasswordResetConfirm(DTO):
     token: str
     new_password: str

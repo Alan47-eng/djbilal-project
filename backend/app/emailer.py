@@ -54,3 +54,34 @@ def send_password_reset_email(email: str, token: str) -> None:
         logger.warning("Resend email send failed for %s: %s %s", email, exc.code, body)
     except Exception as exc:
         logger.warning("Resend email send exception for %s: %s", email, exc)
+
+
+def send_email_verification_email(email: str, token: str) -> None:
+    if not RESEND_API_KEY:
+        raise RuntimeError("RESEND_API_KEY is required to send verification emails")
+
+    verification_url = f"{FRONTEND_URL.rstrip('/')}/verify-email?token={token}"
+    payload = {
+        "from": FROM_EMAIL,
+        "to": [email],
+        "subject": "DJ Bilal — E-posta Doğrulama",
+        "html": (
+            "<p>Merhaba,</p>"
+            "<p>Hesabınızı doğrulamak için aşağıdaki bağlantıya tıklayın. "
+            "Bu bağlantı 24 saat içinde geçersiz olacaktır.</p>"
+            f'<p><a href="{verification_url}">E-posta adresimi doğrula</a></p>'
+        ),
+    }
+
+    req = request.Request(
+        "https://api.resend.com/emails",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "Authorization": f"******",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        },
+        method="POST",
+    )
+    with request.urlopen(req, timeout=20) as response:
+        response.read()

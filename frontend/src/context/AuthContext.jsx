@@ -75,11 +75,17 @@ export function AuthProvider({ children }) {
         password,
         full_name: fullName?.trim() || null,
       });
-      return await login(email, password);
+      return { success: true, requiresEmailVerification: true };
     } catch (err) {
       const errorMsg = getApiErrorMessage(err, 'Registration failed');
       setError(errorMsg);
-      return { success: false, error: errorMsg };
+      return {
+        success: false,
+        error: errorMsg,
+        requiresEmailVerification:
+          err.response?.status === 503 &&
+          err.response?.data?.detail?.startsWith('Account created,') === true,
+      };
     }
   };
 
