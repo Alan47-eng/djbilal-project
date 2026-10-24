@@ -125,20 +125,12 @@ DJ Bilal Hamsho هو مشروع موسيقي متكامل يجمع بين DJing�
     <section className="max-w-4xl mx-auto">
       <div className="rounded-3xl border border-slate-700 bg-gradient-to-br from-slate-800 to-slate-900 overflow-hidden shadow-2xl">
         {/* Hero banner */}
-        <div className="relative h-40 bg-gradient-to-r from-purple-900 via-blue-900 to-slate-900">
-          <div
-            className="absolute inset-0 opacity-40"
-            style={{
-              backgroundImage:
-                'repeating-linear-gradient(45deg, #a78bfa 0 1px, transparent 1px 18px)',
-            }}
-          />
-        </div>
+        <div className="h-32 bg-gradient-to-r from-violet-950 via-indigo-950 to-slate-900 sm:h-36" />
 
         <div className="px-4 sm:px-8 pb-8 sm:pb-10">
           {/* Avatar */}
-          <div className="flex flex-col sm:flex-row sm:items-end gap-4 sm:gap-6 -mt-12 sm:-mt-14 mb-6">
-            <div className="relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-2xl border-4 border-slate-800 bg-gradient-to-br from-purple-600 to-blue-600 shadow-xl sm:h-28 sm:w-28">
+          <div className="flex flex-col gap-4 -mt-14 mb-6 sm:-mt-16 sm:flex-row sm:items-end sm:gap-6">
+            <div className="relative h-28 w-28 flex-shrink-0 overflow-hidden rounded-2xl border-4 border-slate-800 bg-gradient-to-br from-purple-600 to-blue-600 shadow-xl sm:h-36 sm:w-36">
               {profilePhotoUrl ? (
                 <img src={resolveAssetUrl(profilePhotoUrl)} alt="DJ Bilal" className="w-full h-full object-cover" />
               ) : (
