@@ -10,6 +10,38 @@ FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 FROM_EMAIL = os.getenv("FROM_EMAIL", "onboarding@resend.dev")
 
 
+def _validate_resend_api_key() -> None:
+    api_key = RESEND_API_KEY or ""
+    has_outer_whitespace = api_key != api_key.strip()
+    has_quotes = '"' in api_key or "'" in api_key
+    has_bearer_prefix = api_key.lower().startswith("bearer ")
+    starts_with_resend_prefix = api_key.startswith("re_")
+    has_whitespace = any(character.isspace() for character in api_key)
+
+    logger.info(
+        "Resend API key check: present=%s starts_with_re=%s length=%d "
+        "outer_whitespace=%s whitespace=%s quotes=%s bearer_prefix=%s",
+        bool(api_key),
+        starts_with_resend_prefix,
+        len(api_key),
+        has_outer_whitespace,
+        has_whitespace,
+        has_quotes,
+        has_bearer_prefix,
+    )
+    if not api_key:
+        raise RuntimeError("RESEND_API_KEY is not configured")
+    if (
+        not starts_with_resend_prefix
+        or has_whitespace
+        or has_quotes
+        or has_bearer_prefix
+    ):
+        raise RuntimeError(
+            "RESEND_API_KEY must contain only the raw Resend key, without quotes or a Bearer prefix"
+        )
+
+
 def send_password_reset_email(email: str, token: str) -> None:
     """Send a password reset email using Resend's REST API.
 
@@ -58,8 +90,7 @@ def send_password_reset_email(email: str, token: str) -> None:
 
 
 def send_email_verification_code(email: str, code: str) -> None:
-    if not RESEND_API_KEY:
-        raise RuntimeError("RESEND_API_KEY is not configured")
+    _validate_resend_api_key()
 
     payload = {
         "from": FROM_EMAIL,
