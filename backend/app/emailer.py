@@ -42,6 +42,7 @@ def send_password_reset_email(email: str, token: str) -> None:
             "Authorization": f"Bearer {RESEND_API_KEY}",
             "Content-Type": "application/json",
             "Accept": "application/json",
+            "User-Agent": "djbilal-project/1.0",
         },
         method="POST",
     )
@@ -79,6 +80,7 @@ def send_email_verification_code(email: str, code: str) -> None:
             "Authorization": f"******",
             "Content-Type": "application/json",
             "Accept": "application/json",
+            "User-Agent": "djbilal-project/1.0",
         },
         method="POST",
     )
