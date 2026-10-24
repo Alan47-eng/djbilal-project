@@ -44,8 +44,6 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
   const [message, setMessage] = useState(null);
   const [error, setError] = useState(null);
   const [form, setForm] = useState(emptyForm);
-  const [profilePhoto, setProfilePhoto] = useState(null);
-  const [uploadingProfilePhoto, setUploadingProfilePhoto] = useState(false);
 
   const isAdmin = user?.is_admin === true;
 
@@ -166,34 +164,6 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
       setError(getApiErrorMessage(err, 'Could not update Gumroad product URL'));
     } finally {
       setUpdatingTrackId(null);
-    }
-  };
-
-  const handleProfilePhotoUpload = async (event) => {
-    event.preventDefault();
-    if (!profilePhoto) {
-      setError('Choose a profile photo first');
-      return;
-    }
-
-    try {
-      setUploadingProfilePhoto(true);
-      setMessage(null);
-      setError(null);
-      const formData = new FormData();
-      formData.append('photo', profilePhoto);
-      const response = await api.post('/profile/photo', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-      window.dispatchEvent(
-        new CustomEvent('profile-photo-updated', { detail: response.data.image_url }),
-      );
-      setProfilePhoto(null);
-      setMessage('Profile photo updated');
-    } catch (err) {
-      setError(getApiErrorMessage(err, 'Could not update profile photo'));
-    } finally {
-      setUploadingProfilePhoto(false);
     }
   };
 
@@ -357,30 +327,6 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
             </div>
 
             <div className="flex-1 space-y-6 overflow-y-auto px-5 py-5">
-              <section className="rounded-2xl border border-slate-800 bg-slate-950 p-4">
-                <div className="mb-4 flex items-center gap-2">
-                  <Upload size={18} className="text-purple-400" />
-                  <h3 className="font-semibold">Profile Photo</h3>
-                </div>
-                <form className="space-y-3" onSubmit={handleProfilePhotoUpload}>
-                  <input
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp"
-                    onChange={(event) => setProfilePhoto(event.target.files?.[0] || null)}
-                    className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-300 file:mr-3 file:rounded-md file:border-0 file:bg-slate-700 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-white"
-                    required
-                  />
-                  <p className="text-xs text-slate-400">PNG, JPG, or WebP · up to 10 MB</p>
-                  <button
-                    type="submit"
-                    disabled={uploadingProfilePhoto}
-                    className="w-full rounded-lg bg-purple-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-purple-700 disabled:opacity-60"
-                  >
-                    {uploadingProfilePhoto ? 'Uploading...' : 'Update profile photo'}
-                  </button>
-                </form>
-              </section>
-
               <section className="rounded-2xl border border-slate-800 bg-slate-950 p-4">
                 <div className="mb-4 flex items-center gap-2">
                   <Upload size={18} className="text-purple-400" />

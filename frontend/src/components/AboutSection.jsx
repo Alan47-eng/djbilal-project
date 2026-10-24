@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { Music2, ExternalLink } from 'lucide-react';
+import { Camera, Music2, ExternalLink } from 'lucide-react';
 import api, { resolveAssetUrl } from '../api';
+import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
+import { getApiErrorMessage } from '../utils/errors';
 
 const SOCIAL_LINKS = [
 
@@ -50,7 +52,10 @@ const SOCIAL_LINKS = [
 
 const AboutSection = () => {
   const { lang } = useLanguage();
+  const { user } = useAuth();
   const [profilePhotoUrl, setProfilePhotoUrl] = useState(null);
+  const [photoError, setPhotoError] = useState(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -62,13 +67,29 @@ const AboutSection = () => {
         console.error('Could not load profile photo:', error);
       });
 
-    const updatePhoto = (event) => setProfilePhotoUrl(event.detail);
-    window.addEventListener('profile-photo-updated', updatePhoto);
     return () => {
       isMounted = false;
-      window.removeEventListener('profile-photo-updated', updatePhoto);
     };
   }, []);
+
+  const handlePhotoChange = async (event) => {
+    const photo = event.target.files?.[0];
+    if (!photo) return;
+
+    const formData = new FormData();
+    formData.append('photo', photo);
+    setUploadingPhoto(true);
+    setPhotoError(null);
+    try {
+      const response = await api.post('/profile/photo', formData);
+      setProfilePhotoUrl(response.data.image_url);
+    } catch (error) {
+      setPhotoError(getApiErrorMessage(error, 'Could not upload profile photo'));
+    } finally {
+      setUploadingPhoto(false);
+      event.target.value = '';
+    }
+  };
 
   const t = {
     role: lang === 'ar' ? 'منتج · ميكس وماستر · صانع إيقاعات' : 'Producer · Mixing & Mastering · Beat Maker',
@@ -117,17 +138,38 @@ DJ Bilal Hamsho هو مشروع موسيقي متكامل يجمع بين DJing�
         <div className="px-4 sm:px-8 pb-8 sm:pb-10">
           {/* Avatar */}
           <div className="flex flex-col sm:flex-row sm:items-end gap-4 sm:gap-6 -mt-12 sm:-mt-14 mb-6">
-            <div className="w-20 h-20 sm:w-28 sm:h-28 rounded-2xl border-4 border-slate-800 bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center shadow-xl flex-shrink-0 overflow-hidden">
+            <div className="relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-2xl border-4 border-slate-800 bg-gradient-to-br from-purple-600 to-blue-600 shadow-xl sm:h-28 sm:w-28">
               {profilePhotoUrl ? (
                 <img src={resolveAssetUrl(profilePhotoUrl)} alt="DJ Bilal" className="w-full h-full object-cover" />
               ) : (
-                <Music2 className="h-10 w-10 text-white" aria-hidden="true" />
+                <div className="flex h-full w-full items-center justify-center">
+                  <Music2 className="h-10 w-10 text-white" aria-hidden="true" />
+                </div>
+              )}
+              {user?.is_admin && (
+                <label
+                  title={lang === 'ar' ? 'تغيير الصورة' : 'Change profile photo'}
+                  className="absolute bottom-1 right-1 cursor-pointer rounded-full bg-slate-950/90 p-2 text-white shadow hover:bg-purple-700"
+                >
+                  <Camera size={16} />
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    onChange={handlePhotoChange}
+                    disabled={uploadingPhoto}
+                    className="sr-only"
+                    aria-label={lang === 'ar' ? 'تغيير الصورة' : 'Change profile photo'}
+                  />
+                </label>
               )}
             </div>
             <div className="pb-1 sm:pb-2">
               <h2 className="text-2xl sm:text-3xl font-extrabold text-white">DJ Bilal</h2>
               <p className="text-purple-400 font-medium text-sm">{t.role}</p>
             </div>
+            {photoError && (
+              <p role="alert" className="mb-4 text-sm text-red-300">{photoError}</p>
+            )}
           </div>
 
           {/* Tagline */}
