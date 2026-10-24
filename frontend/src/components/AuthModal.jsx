@@ -37,7 +37,9 @@ const AuthModal = ({ isOpen, initialMode = 'login', onClose, onSuccess }) => {
     verificationCode: lang === 'ar' ? 'رمز التحقق المكوّن من 6 أرقام' : '6-digit verification code',
     verify: lang === 'ar' ? 'تأكيد الرمز' : 'Verify code',
     resendVerification: lang === 'ar' ? 'إرسال رمز جديد' : 'Send a new code',
-    resendSuccess: lang === 'ar' ? 'تم إرسال رمز التحقق.' : 'Verification code sent.',
+    resendSuccess: lang === 'ar'
+      ? 'إذا كان هذا البريد مرتبطًا بتسجيل غير مكتمل، فسيتم إرسال رمز جديد.'
+      : 'If this email has a pending registration, a new code will be sent.',
     codeSent: lang === 'ar' ? 'أرسلنا رمز تحقق إلى بريدك الإلكتروني.' : 'We sent a verification code to your email.',
   };
 
@@ -106,6 +108,9 @@ const AuthModal = ({ isOpen, initialMode = 'login', onClose, onSuccess }) => {
       setVerificationOriginEmail(email);
       setVerificationMessage(t.resendSuccess);
     } catch (err) {
+      if (err.response?.status === 503) {
+        setVerificationOriginEmail(email);
+      }
       setVerificationMessage(getApiErrorMessage(err, t.authFailed));
     } finally {
       setLoading(false);
@@ -210,14 +215,16 @@ const AuthModal = ({ isOpen, initialMode = 'login', onClose, onSuccess }) => {
         {verificationPending ? (
           <form onSubmit={verifyEmailCode} className="space-y-4">
             <p className="text-sm text-slate-200">{t.verificationSent}</p>
+            <label className="block space-y-1 text-sm text-slate-300">
+              {t.email}
             <input
               type="email"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
-              placeholder={t.email}
               className="w-full rounded-lg border border-slate-700 bg-slate-950 px-4 py-3 text-white placeholder-slate-500"
               required
             />
+            </label>
             <input
               type="text"
               inputMode="numeric"

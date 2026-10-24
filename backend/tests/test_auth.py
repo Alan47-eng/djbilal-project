@@ -279,7 +279,57 @@ class TestRegisterEndpoint:
             json={"email": email, "password": "password123"},
         )
         assert login.status_code == 200
-    
+
+    @pytest.mark.asyncio
+    async def test_invalid_verification_codes_are_limited(self, client):
+        email = "code-attempts@example.com"
+        await client.post(
+            "/register",
+            json={"email": email, "password": "password123"},
+        )
+        correct_code = SENT_VERIFICATION_CODES[-1][1]
+        wrong_code = "000000" if correct_code != "000000" else "000001"
+
+        for _ in range(5):
+            response = await client.post(
+                "/verify-email",
+                json={"email": email, "code": wrong_code},
+            )
+            assert response.status_code == 400
+
+        blocked = await client.post(
+            "/verify-email",
+            json={"email": email, "code": correct_code},
+        )
+        assert blocked.status_code == 429
+
+    @pytest.mark.asyncio
+    async def test_resend_can_correct_registration_email(self, client):
+        old_email = "mistyped@example.com"
+        new_email = "corrected@example.com"
+        await client.post(
+            "/register",
+            json={"email": old_email, "password": "password123"},
+        )
+
+        resent = await client.post(
+            "/verification/resend",
+            json={"original_email": old_email, "email": new_email},
+        )
+        assert resent.status_code == 200
+        assert SENT_VERIFICATION_CODES[-1][0] == new_email
+
+        verification = await client.post(
+            "/verify-email",
+            json={"email": new_email, "code": SENT_VERIFICATION_CODES[-1][1]},
+        )
+        assert verification.status_code == 200
+        login = await client.post(
+            "/login",
+            json={"email": new_email, "password": "password123"},
+        )
+        assert login.status_code == 200
+
     @pytest.mark.asyncio
     async def test_register_duplicate_email(self, client):
         """Test that duplicate email registration fails"""
