@@ -59,3 +59,14 @@ class ProfilePhoto(Base):
 
     id = Column(Integer, primary_key=True)
     image_url = Column(String(1024), nullable=False)
+
+
+class PendingRegistration(Base):
+    __tablename__ = "pending_registrations"
+
+    email = Column(String(255), primary_key=True)
+    full_name = Column(String(255), nullable=True)
+    hashed_password = Column(String(255), nullable=False)
+    verification_code_hash = Column(String(64), nullable=False)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    attempts = Column(Integer, default=0, nullable=False)

@@ -10,7 +10,7 @@ from app.main import app
 from app.models import Base
 from app.database import get_session
 from app.dependencies import get_storage_service
-from app.models import User, Track, Purchase, GumroadSale
+from app.models import PendingRegistration, User, Track, Purchase, GumroadSale
 from app import auth, schemas
 from app.adapters.gumroad import GumroadService
 from app.rate_limit import limiter
@@ -18,6 +18,7 @@ from app.rate_limit import limiter
 
 # Test database setup
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
+SENT_VERIFICATION_CODES = []
 
 @pytest.fixture
 async def test_db():
@@ -48,9 +49,10 @@ async def test_db():
 @pytest.fixture
 async def client(test_db, monkeypatch):
     """Create async test client"""
+    SENT_VERIFICATION_CODES.clear()
     monkeypatch.setattr(
-        "app.routers.auth.send_email_verification_email",
-        lambda email, token: None,
+        "app.routers.auth.send_email_verification_code",
+        lambda email, code: SENT_VERIFICATION_CODES.append((email, code)),
     )
     limiter.reset()
     transport = ASGITransport(app=app)
@@ -87,10 +89,9 @@ async def create_user_record(session, email, password, is_admin=False, full_name
 
 
 async def verify_registered_email(client, email):
-    token = auth.create_access_token(
-        data={"sub": email, "email_verification": True}
-    )
-    return await client.post("/verify-email", json={"token": token})
+    sent_email, code = SENT_VERIFICATION_CODES[-1]
+    assert sent_email == email
+    return await client.post("/verify-email", json={"email": email, "code": code})
 
 
 async def create_track_record(
@@ -208,27 +209,33 @@ class TestRegisterEndpoint:
     
     @pytest.mark.asyncio
     async def test_register_success(self, client):
-        """Test successful user registration"""
         response = await client.post(
             "/register",
             json={"email": "user@example.com", "password": "password123"}
         )
         
         assert response.status_code == 200
-        data = response.json()
-        assert data["email"] == "user@example.com"
-        assert data["id"] > 0
-        assert "created_at" in data
+        assert response.json() == {"status": "verification_required"}
+        assert SENT_VERIFICATION_CODES[0][0] == "user@example.com"
 
     @pytest.mark.asyncio
-    async def test_register_with_full_name(self, client):
+    async def test_register_with_full_name(self, client, test_db):
         response = await client.post(
             "/register",
             json={"email": "fullname@example.com", "password": "password123", "full_name": "Ali Veli"}
         )
 
         assert response.status_code == 200
-        assert response.json()["full_name"] == "Ali Veli"
+        assert response.json() == {"status": "verification_required"}
+        await verify_registered_email(client, "fullname@example.com")
+        _, AsyncSessionLocal = test_db
+        async with AsyncSessionLocal() as session:
+            user = (
+                await session.execute(
+                    select(User).where(User.email == "fullname@example.com")
+                )
+            ).scalar_one()
+            assert user.full_name == "Ali Veli"
 
     @pytest.mark.asyncio
     async def test_registration_requires_email_verification(self, client):
@@ -242,15 +249,15 @@ class TestRegisterEndpoint:
             "/login",
             json={"email": "unverified@example.com", "password": "password123"},
         )
-        assert login.status_code == 403
+        assert login.status_code == 401
 
     @pytest.mark.asyncio
     async def test_verifying_email_allows_login(self, client, monkeypatch):
         email = "verified@example.com"
         sent_emails = []
         monkeypatch.setattr(
-            "app.routers.auth.send_email_verification_email",
-            lambda sent_email, token: sent_emails.append((sent_email, token)),
+            "app.routers.auth.send_email_verification_code",
+            lambda sent_email, code: sent_emails.append((sent_email, code)),
         )
         registration = await client.post(
             "/register",
@@ -259,8 +266,11 @@ class TestRegisterEndpoint:
         assert registration.status_code == 200
         assert sent_emails[0][0] == email
 
-        token = sent_emails[0][1]
-        verification = await client.post("/verify-email", json={"token": token})
+        code = sent_emails[0][1]
+        verification = await client.post(
+            "/verify-email",
+            json={"email": email, "code": code},
+        )
         assert verification.status_code == 200
         assert verification.json() == {"status": "verified"}
 
@@ -282,6 +292,7 @@ class TestRegisterEndpoint:
             json={"email": email, "password": password}
         )
         assert response1.status_code == 200
+        await verify_registered_email(client, email)
         
         # Second registration with same email
         response2 = await client.post(
@@ -1202,10 +1213,7 @@ class TestEdgeCases:
             "/register",
             json={"email": email, "password": password}
         )
-        verification_token = auth.create_access_token(
-            data={"sub": email, "email_verification": True}
-        )
-        await client.post("/verify-email", json={"token": verification_token})
+        await verify_registered_email(client, email)
         
         # Multiple logins
         response1 = await client.post(

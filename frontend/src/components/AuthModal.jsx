@@ -18,6 +18,8 @@ const AuthModal = ({ isOpen, initialMode = 'login', onClose, onSuccess }) => {
   const [resetLoading, setResetLoading] = useState(false);
   const [verificationPending, setVerificationPending] = useState(false);
   const [verificationMessage, setVerificationMessage] = useState(null);
+  const [verificationOriginEmail, setVerificationOriginEmail] = useState('');
+  const [verificationCode, setVerificationCode] = useState('');
   const t = {
     signIn: lang === 'ar' ? 'تسجيل الدخول' : 'Sign In',
     signUp: lang === 'ar' ? 'إنشاء حساب' : 'Sign Up',
@@ -30,10 +32,13 @@ const AuthModal = ({ isOpen, initialMode = 'login', onClose, onSuccess }) => {
     wait: lang === 'ar' ? 'يرجى الانتظار...' : 'Please wait...',
     createAccount: lang === 'ar' ? 'إنشاء حساب' : 'Create Account',
     verificationSent: lang === 'ar'
-      ? 'تحقق من بريدك الإلكتروني واضغط على رابط التحقق لتفعيل حسابك.'
-      : 'Check your email and click the verification link to activate your account.',
-    resendVerification: lang === 'ar' ? 'إعادة إرسال رابط التحقق' : 'Resend verification email',
-    resendSuccess: lang === 'ar' ? 'تم إرسال رابط التحقق.' : 'Verification email sent.',
+      ? 'أدخل بريدك الإلكتروني ورمز التحقق المكوّن من 6 أرقام المرسل إليك.'
+      : 'Enter your email and the 6-digit verification code sent to you.',
+    verificationCode: lang === 'ar' ? 'رمز التحقق المكوّن من 6 أرقام' : '6-digit verification code',
+    verify: lang === 'ar' ? 'تأكيد الرمز' : 'Verify code',
+    resendVerification: lang === 'ar' ? 'إرسال رمز جديد' : 'Send a new code',
+    resendSuccess: lang === 'ar' ? 'تم إرسال رمز التحقق.' : 'Verification code sent.',
+    codeSent: lang === 'ar' ? 'أرسلنا رمز تحقق إلى بريدك الإلكتروني.' : 'We sent a verification code to your email.',
   };
 
   useEffect(() => {
@@ -46,6 +51,8 @@ const AuthModal = ({ isOpen, initialMode = 'login', onClose, onSuccess }) => {
     setLoading(false);
     setVerificationPending(false);
     setVerificationMessage(null);
+    setVerificationOriginEmail('');
+    setVerificationCode('');
   }, [isOpen, initialMode]);
 
   if (!isOpen) return null;
@@ -71,6 +78,7 @@ const AuthModal = ({ isOpen, initialMode = 'login', onClose, onSuccess }) => {
       if (!result.success) {
         if (result.requiresEmailVerification) {
           setVerificationPending(true);
+          setVerificationOriginEmail(email);
           setVerificationMessage(result.error || t.authFailed);
           return;
         }
@@ -78,6 +86,8 @@ const AuthModal = ({ isOpen, initialMode = 'login', onClose, onSuccess }) => {
         return;
       }
       setVerificationPending(true);
+      setVerificationOriginEmail(email);
+      setVerificationMessage(t.codeSent);
     } catch (err) {
       setError(getApiErrorMessage(err, t.authFailed));
     } finally {
@@ -88,10 +98,37 @@ const AuthModal = ({ isOpen, initialMode = 'login', onClose, onSuccess }) => {
   const resendVerification = async () => {
     setVerificationMessage(null);
     try {
-      await api.post('/verification/resend', { email });
+      setLoading(true);
+      await api.post('/verification/resend', {
+        original_email: verificationOriginEmail,
+        email,
+      });
+      setVerificationOriginEmail(email);
       setVerificationMessage(t.resendSuccess);
     } catch (err) {
       setVerificationMessage(getApiErrorMessage(err, t.authFailed));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const verifyEmailCode = async (event) => {
+    event.preventDefault();
+    setLoading(true);
+    setVerificationMessage(null);
+    try {
+      await api.post('/verify-email', { email, code: verificationCode });
+      const result = await login(email, password);
+      if (!result.success) {
+        setVerificationMessage(result.error || t.authFailed);
+        return;
+      }
+      onSuccess(email);
+      onClose();
+    } catch (err) {
+      setVerificationMessage(getApiErrorMessage(err, t.authFailed));
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -171,21 +208,49 @@ const AuthModal = ({ isOpen, initialMode = 'login', onClose, onSuccess }) => {
         </div>
 
         {verificationPending ? (
-          <div className="space-y-4">
+          <form onSubmit={verifyEmailCode} className="space-y-4">
             <p className="text-sm text-slate-200">{t.verificationSent}</p>
+            <input
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              placeholder={t.email}
+              className="w-full rounded-lg border border-slate-700 bg-slate-950 px-4 py-3 text-white placeholder-slate-500"
+              required
+            />
+            <input
+              type="text"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              pattern="[0-9]{6}"
+              maxLength={6}
+              value={verificationCode}
+              onChange={(event) => setVerificationCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
+              placeholder={t.verificationCode}
+              className="w-full rounded-lg border border-slate-700 bg-slate-950 px-4 py-3 text-center text-2xl tracking-[0.5em] text-white placeholder:text-sm placeholder:tracking-normal"
+              required
+            />
             {verificationMessage && (
-              <div className="rounded-lg border border-slate-700 bg-slate-800 p-3 text-sm text-slate-200">
+              <div className="rounded-lg border border-slate-700 bg-slate-800 p-3 text-sm text-slate-200" role="status">
                 {verificationMessage}
               </div>
             )}
             <button
               type="button"
               onClick={resendVerification}
-              className="w-full rounded-lg border border-purple-500 px-4 py-3 font-semibold text-purple-200 hover:bg-purple-900/30"
+              disabled={loading || !email}
+              className="w-full rounded-lg border border-purple-500 px-4 py-3 font-semibold text-purple-200 hover:bg-purple-900/30 disabled:opacity-60"
             >
-              {t.resendVerification}
+              {loading ? t.wait : t.resendVerification}
             </button>
-          </div>
+            <button
+              type="submit"
+              disabled={loading || verificationCode.length !== 6}
+              className="w-full rounded-lg bg-purple-600 px-4 py-3 font-semibold text-white hover:bg-purple-700 disabled:opacity-60"
+            >
+              {loading ? t.wait : t.verify}
+            </button>
+          </form>
         ) : <form onSubmit={handleSubmit} className="space-y-4">
           {activeTab === 'register' && (
             <input

@@ -2,7 +2,7 @@ import re
 import math
 from datetime import datetime
 from urllib.parse import urlparse
-from pydantic import BaseModel, ConfigDict, EmailStr, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
 PAID_TRACK_CATEGORIES = {"edit", "remix"}
 FREE_TRACK_CATEGORIES = {"remix", "simple-pack", "vst"}
@@ -99,7 +99,13 @@ class PasswordResetRequest(DTO):
 
 
 class EmailVerificationRequest(DTO):
-    token: str
+    email: EmailStr
+    code: str = Field(pattern=r"^\d{6}$")
+
+
+class EmailVerificationResendRequest(DTO):
+    original_email: EmailStr
+    email: EmailStr
 
 
 class PasswordResetConfirm(DTO):

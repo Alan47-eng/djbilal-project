@@ -82,9 +82,7 @@ export function AuthProvider({ children }) {
       return {
         success: false,
         error: errorMsg,
-        requiresEmailVerification:
-          err.response?.status === 503 &&
-          err.response?.data?.detail?.startsWith('Account created,') === true,
+        requiresEmailVerification: err.response?.status === 503,
       };
     }
   };

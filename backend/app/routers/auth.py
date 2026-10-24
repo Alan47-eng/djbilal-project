@@ -1,40 +1,87 @@
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
+import hashlib
+import hmac
+import secrets
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .. import auth, schemas
 from ..database import get_session
-from ..emailer import send_email_verification_email
-from ..models import User
+from ..emailer import send_email_verification_code
+from ..models import PendingRegistration, User
 from ..rate_limit import limiter
 from ..services import UserService
 from .dependencies import require_admin
 
 router = APIRouter(tags=["auth"])
 user_service = UserService()
+VERIFICATION_CODE_TTL = timedelta(minutes=15)
+MAX_VERIFICATION_ATTEMPTS = 5
 
 
-@router.post("/register", response_model=schemas.UserRead)
+def _verification_code_hash(code: str) -> str:
+    return hmac.new(
+        auth.SECRET_KEY.encode("utf-8"),
+        code.encode("ascii"),
+        hashlib.sha256,
+    ).hexdigest()
+
+
+def _new_verification_code() -> str:
+    return f"{secrets.randbelow(1_000_000):06d}"
+
+
+def _set_verification_code(registration: PendingRegistration) -> str:
+    code = _new_verification_code()
+    registration.verification_code_hash = _verification_code_hash(code)
+    registration.expires_at = datetime.now(timezone.utc) + VERIFICATION_CODE_TTL
+    registration.attempts = 0
+    return code
+
+
+@router.post("/register")
 @limiter.limit("5/minute")
 async def register(
     request: Request,
     user: schemas.UserCreate,
     session: AsyncSession = Depends(get_session),
-) -> User:
-    new_user = await user_service.register(session, user)
-    verification_token = auth.create_access_token(
-        data={"sub": new_user.email, "email_verification": True},
-        expires_delta=timedelta(hours=24),
+) -> dict[str, str]:
+    if await user_service.repo.email_exists(session, user.email):
+        raise HTTPException(
+            status_code=400,
+            detail="Email already registered",
+        )
+
+    result = await session.execute(
+        select(PendingRegistration).where(PendingRegistration.email == user.email)
     )
+    registration = result.scalar_one_or_none()
+    if registration is None:
+        registration = PendingRegistration(
+            email=user.email,
+            full_name=user.full_name,
+            hashed_password=auth.hash_password(user.password),
+            verification_code_hash="",
+            expires_at=datetime.now(timezone.utc),
+            attempts=0,
+        )
+        session.add(registration)
+    else:
+        registration.full_name = user.full_name
+        registration.hashed_password = auth.hash_password(user.password)
+
+    code = _set_verification_code(registration)
+    await session.commit()
     try:
-        send_email_verification_email(new_user.email, verification_token)
+        send_email_verification_code(user.email, code)
     except Exception as exc:
         raise HTTPException(
             status_code=503,
-            detail="Account created, but the verification email could not be sent. Please try again.",
+            detail="The verification code could not be sent. Check the email service configuration and retry.",
         ) from exc
-    return new_user
+    return {"status": "verification_required"}
 
 
 @router.post("/verify-email")
@@ -44,21 +91,42 @@ async def verify_email(
     payload: schemas.EmailVerificationRequest,
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, str]:
-    token_payload = auth.decode_token(payload.token)
-    if token_payload.get("email_verification") is not True:
-        raise HTTPException(status_code=400, detail="Invalid verification token")
+    result = await session.execute(
+        select(PendingRegistration).where(
+            PendingRegistration.email == payload.email
+        )
+    )
+    registration = result.scalar_one_or_none()
+    if registration is None:
+        raise HTTPException(status_code=400, detail="Invalid email or verification code")
+    if registration.attempts >= MAX_VERIFICATION_ATTEMPTS:
+        raise HTTPException(status_code=429, detail="Too many attempts. Request a new code.")
 
-    email = token_payload.get("sub")
-    if not isinstance(email, str) or not email:
-        raise HTTPException(status_code=400, detail="Invalid verification token")
+    if registration.expires_at.tzinfo is None:
+        expires_at = registration.expires_at.replace(tzinfo=timezone.utc)
+    else:
+        expires_at = registration.expires_at
+    if expires_at <= datetime.now(timezone.utc):
+        raise HTTPException(status_code=400, detail="Verification code expired. Request a new code.")
 
-    user = await user_service.get_by_email(session, email)
-    if user is None:
-        raise HTTPException(status_code=400, detail="Invalid verification token")
-    if not user.email_verified:
-        user.email_verified = True
+    if not hmac.compare_digest(
+        registration.verification_code_hash,
+        _verification_code_hash(payload.code),
+    ):
+        registration.attempts += 1
         await session.commit()
+        raise HTTPException(status_code=400, detail="Invalid email or verification code")
 
+    session.add(
+        User(
+            email=registration.email,
+            full_name=registration.full_name,
+            hashed_password=registration.hashed_password,
+            email_verified=True,
+        )
+    )
+    await session.delete(registration)
+    await session.commit()
     return {"status": "verified"}
 
 
@@ -66,21 +134,28 @@ async def verify_email(
 @limiter.limit("3/hour")
 async def resend_verification_email(
     request: Request,
-    payload: schemas.PasswordResetRequest,
+    payload: schemas.EmailVerificationResendRequest,
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, str]:
-    user = await user_service.get_by_email(session, payload.email)
-    if user is not None and not user.email_verified:
-        verification_token = auth.create_access_token(
-            data={"sub": user.email, "email_verification": True},
-            expires_delta=timedelta(hours=24),
+    result = await session.execute(
+        select(PendingRegistration).where(
+            PendingRegistration.email == payload.original_email
         )
+    )
+    registration = result.scalar_one_or_none()
+    if registration is not None:
+        if payload.email != registration.email:
+            if await user_service.repo.email_exists(session, payload.email):
+                raise HTTPException(status_code=400, detail="Email already registered")
+            registration.email = payload.email
+        code = _set_verification_code(registration)
+        await session.commit()
         try:
-            send_email_verification_email(user.email, verification_token)
+            send_email_verification_code(registration.email, code)
         except Exception as exc:
             raise HTTPException(
                 status_code=503,
-                detail="The verification email could not be sent. Please try again later.",
+                detail="The verification code could not be sent. Please try again later.",
             ) from exc
     return {"status": "ok"}
 
