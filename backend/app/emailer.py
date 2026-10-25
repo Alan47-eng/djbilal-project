@@ -1,38 +1,37 @@
-import json
 import logging
 import os
-from urllib import request, error
+from typing import TypedDict, cast
+
+import resend
 
 logger = logging.getLogger(__name__)
 
-RESEND_API_KEY = os.getenv("RESEND_API_KEY")
+_EmailPayload = TypedDict(
+    "_EmailPayload",
+    {"from": str, "to": list[str], "subject": str, "html": str},
+)
+
+resend.api_key = os.getenv("RESEND_API_KEY")
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
-FROM_EMAIL = os.getenv("FROM_EMAIL", "onboarding@resend.dev")
+_configured_from_email = os.getenv("FROM_EMAIL")
+if not _configured_from_email:
+    logger.warning("FROM_EMAIL is not set; using Resend's onboarding sender")
+FROM_EMAIL = _configured_from_email or "onboarding@resend.dev"
 
 
 def _validate_resend_api_key() -> None:
-    api_key = RESEND_API_KEY or ""
-    has_outer_whitespace = api_key != api_key.strip()
+    api_key = resend.api_key or ""
     has_quotes = '"' in api_key or "'" in api_key
     has_bearer_prefix = api_key.lower().startswith("bearer ")
-    starts_with_resend_prefix = api_key.startswith("re_")
     has_whitespace = any(character.isspace() for character in api_key)
 
-    logger.info(
-        "Resend API key check: present=%s starts_with_re=%s length=%d "
-        "outer_whitespace=%s whitespace=%s quotes=%s bearer_prefix=%s",
-        bool(api_key),
-        starts_with_resend_prefix,
-        len(api_key),
-        has_outer_whitespace,
-        has_whitespace,
-        has_quotes,
-        has_bearer_prefix,
-    )
     if not api_key:
+        logger.critical(
+            "CRITICAL ERROR: RESEND_API_KEY is not set in environment variables!"
+        )
         raise RuntimeError("RESEND_API_KEY is not configured")
     if (
-        not starts_with_resend_prefix
+        not api_key.startswith("re_")
         or has_whitespace
         or has_quotes
         or has_bearer_prefix
@@ -42,57 +41,35 @@ def _validate_resend_api_key() -> None:
         )
 
 
+def _send_email(
+    payload: _EmailPayload, email: str, purpose: str
+) -> None:
+    _validate_resend_api_key()
+    try:
+        resend.Emails.send(cast(resend.Emails.SendParams, payload))
+    except Exception:
+        logger.exception("Resend %s failed for %s", purpose, email)
+        raise
+
+
 def send_password_reset_email(email: str, token: str) -> None:
-    """Send a password reset email using Resend's REST API.
-
-    This avoids depending on a specific `resend` SDK version that may not expose
-    the `Resend` class in this environment.
-    """
-    if not RESEND_API_KEY:
-        return
-
     reset_url = f"{FRONTEND_URL.rstrip('/')}/reset-password?token={token}"
-    subject = "DJ Bilal — Şifre Sıfırlama"
-    html = f"""
-    <p>Merhaba,</p>
-    <p>Şifrenizi sıfırlamak için aşağıdaki bağlantıya tıklayın. Bu bağlantı 1 saat içinde geçersiz olacaktır.</p>
-    <p><a href=\"{reset_url}\">Şifremi Sıfırla</a></p>
-    <p>Eğer bu isteği siz yapmadıysanız, bu e-postayı görmezden gelin.</p>
-    """
-
-    payload = {
+    payload: _EmailPayload = {
         "from": FROM_EMAIL,
         "to": [email],
-        "subject": subject,
-        "html": html,
+        "subject": "DJ Bilal — Şifre Sıfırlama",
+        "html": f"""
+        <p>Merhaba,</p>
+        <p>Şifrenizi sıfırlamak için aşağıdaki bağlantıya tıklayın. Bu bağlantı 1 saat içinde geçersiz olacaktır.</p>
+        <p><a href="{reset_url}">Şifremi Sıfırla</a></p>
+        <p>Eğer bu isteği siz yapmadıysanız, bu e-postayı görmezden gelin.</p>
+        """,
     }
-
-    req = request.Request(
-        "https://api.resend.com/emails",
-        data=json.dumps(payload).encode("utf-8"),
-        headers={
-            "Authorization": f"Bearer {RESEND_API_KEY}",
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-            "User-Agent": "djbilal-project/1.0",
-        },
-        method="POST",
-    )
-
-    try:
-        with request.urlopen(req, timeout=20) as response:
-            response.read()
-    except error.HTTPError as exc:
-        body = exc.read().decode("utf-8", errors="replace")
-        logger.warning("Resend email send failed for %s: %s %s", email, exc.code, body)
-    except Exception as exc:
-        logger.warning("Resend email send exception for %s: %s", email, exc)
+    _send_email(payload, email, "password reset email")
 
 
 def send_email_verification_code(email: str, code: str) -> None:
-    _validate_resend_api_key()
-
-    payload = {
+    payload: _EmailPayload = {
         "from": FROM_EMAIL,
         "to": [email],
         "subject": "DJ Bilal — E-posta Doğrulama Kodu",
@@ -104,24 +81,4 @@ def send_email_verification_code(email: str, code: str) -> None:
             "<p>Bu isteği siz yapmadıysanız bu e-postayı yok sayabilirsiniz.</p>"
         ),
     }
-    req = request.Request(
-        "https://api.resend.com/emails",
-        data=json.dumps(payload).encode("utf-8"),
-        headers={
-            "Authorization": f"******",
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-            "User-Agent": "djbilal-project/1.0",
-        },
-        method="POST",
-    )
-    try:
-        with request.urlopen(req, timeout=20) as response:
-            response.read()
-    except error.HTTPError as exc:
-        body = exc.read().decode("utf-8", errors="replace")
-        logger.warning("Verification email failed for %s: %s %s", email, exc.code, body)
-        raise
-    except Exception as exc:
-        logger.warning("Verification email exception for %s: %s", email, exc)
-        raise
+    _send_email(payload, email, "verification email")
