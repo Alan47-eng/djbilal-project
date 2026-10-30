@@ -282,6 +282,18 @@ class TestTrackUpdate:
         update = TrackUpdate(external_product_id="https://artist.gumroad.com/l/my-track")
         assert update.external_product_id == "my-track"
 
+    def test_track_update_accepts_product_specific_gumroad_fields(self):
+        update = TrackUpdate(
+            gumroad_url="https://djbilal.gumroad.com/l/my-track?wanted=true",
+            gumroad_product_id="123456",
+        )
+        assert update.gumroad_url == "https://djbilal.gumroad.com/l/my-track"
+        assert update.gumroad_product_id == "123456"
+
+    def test_track_update_rejects_non_numeric_gumroad_product_id(self):
+        with pytest.raises(ValueError):
+            TrackUpdate(gumroad_product_id="not-a-product-id")
+
 
 class TestCalculateDiscountedPrice:
     """Test suite for calculate_discounted_price function"""

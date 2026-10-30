@@ -233,6 +233,7 @@ def build_gumroad_checkout_url(
             "user_id": str(user_id),
             "track_ids": ",".join(str(track_id) for track_id in track_ids),
             "signature": signature,
+            "wanted": "true",
         }
     )
 

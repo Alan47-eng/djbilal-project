@@ -53,6 +53,58 @@ const UserPurchases = () => {
     if (user) fetchDetails();
   }, [user]);
 
+  useEffect(() => {
+    if (!user) return undefined;
+
+    let expectedTrackIds;
+    try {
+      expectedTrackIds = JSON.parse(
+        window.sessionStorage.getItem('gumroadCheckoutTrackIds') || '[]'
+      );
+    } catch {
+      window.sessionStorage.removeItem('gumroadCheckoutTrackIds');
+      return undefined;
+    }
+
+    if (
+      !Array.isArray(expectedTrackIds) ||
+      expectedTrackIds.length === 0 ||
+      expectedTrackIds.some((trackId) => !Number.isInteger(trackId))
+    ) {
+      window.sessionStorage.removeItem('gumroadCheckoutTrackIds');
+      return undefined;
+    }
+
+    let attempts = 0;
+    const intervalId = window.setInterval(async () => {
+      attempts += 1;
+      try {
+        const response = await api.get('/purchases/details');
+        setPurchases(response.data);
+        setError(null);
+
+        const receivedTrackIds = new Set(
+          response.data.map((purchase) => purchase.track_id)
+        );
+        if (
+          expectedTrackIds.every((trackId) => receivedTrackIds.has(trackId)) ||
+          attempts >= 20
+        ) {
+          window.clearInterval(intervalId);
+          window.sessionStorage.removeItem('gumroadCheckoutTrackIds');
+        }
+      } catch (err) {
+        setError(getApiErrorMessage(err, t.couldNotLoad));
+        if (attempts >= 20) {
+          window.clearInterval(intervalId);
+          window.sessionStorage.removeItem('gumroadCheckoutTrackIds');
+        }
+      }
+    }, 3000);
+
+    return () => window.clearInterval(intervalId);
+  }, [user]);
+
   const handleDownload = async (purchase) => {
     try {
       setDownloading(purchase.track_id);

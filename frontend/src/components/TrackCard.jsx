@@ -49,18 +49,27 @@ function buildCoverArt(track) {
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
 }
 
-const TrackCard = ({ track, onPlay, onBuy, onAddToCart, onDownload, isPurchased, inCart = false }) => {
+const TrackCard = ({
+  track,
+  onPlay,
+  onBuy,
+  onAddToCart,
+  onDownload,
+  isPurchased,
+  checkoutUrl,
+  checkoutLoading,
+}) => {
   const { lang } = useLanguage();
   const isFree = track.is_free === true;
   const canDownloadDirectly = isFree || isPurchased;
   const t = {
     playPreview: lang === 'ar' ? 'تشغيل المعاينة' : 'Play preview',
     downloadTrack: lang === 'ar' ? 'تنزيل التراك' : 'Download track',
-    addToCart: lang === 'ar' ? 'أضف إلى السلة' : 'Add to cart',
+    addToCart: lang === 'ar' ? 'أضف إلى السلة' : 'Sepete Ekle',
+    preparingCheckout: lang === 'ar' ? 'جاري التحضير...' : 'Checkout preparing...',
     free: lang === 'ar' ? 'مجاني' : 'Free',
     purchased: lang === 'ar' ? 'تم الشراء' : 'Purchased',
     download: lang === 'ar' ? 'تنزيل' : 'Download',
-    inCart: lang === 'ar' ? 'في السلة' : 'In Cart',
   };
 
   return (
@@ -83,25 +92,35 @@ const TrackCard = ({ track, onPlay, onBuy, onAddToCart, onDownload, isPurchased,
           >
             <Play size={24} fill="currentColor" />
           </button>
-          <button
-            onClick={() => {
-              if (canDownloadDirectly) {
-                onDownload(track);
-                return;
-              }
-              if (onAddToCart) {
-                onAddToCart(track);
-                return;
-              }
-              onBuy(track);
-            }}
-            className={`text-white p-4 rounded-full transition-all duration-200 transform hover:scale-110 ${
-              canDownloadDirectly ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-blue-600 hover:bg-blue-700'
-            }`}
-            title={canDownloadDirectly ? t.downloadTrack : t.addToCart}
-          >
-            {canDownloadDirectly ? <Download size={24} /> : <ShoppingCart size={24} />}
-          </button>
+          {canDownloadDirectly ? (
+            <button
+              type="button"
+              onClick={() => onDownload(track)}
+              className="text-white p-4 rounded-full transition-all duration-200 transform hover:scale-110 bg-emerald-600 hover:bg-emerald-700"
+              title={t.downloadTrack}
+            >
+              <Download size={24} />
+            </button>
+          ) : checkoutUrl ? (
+            <a
+              href={checkoutUrl}
+              onClick={(event) => onAddToCart(track, event)}
+              className="gumroad-button text-white p-4 rounded-full transition-all duration-200 transform hover:scale-110 bg-blue-600 hover:bg-blue-700"
+              title={t.addToCart}
+            >
+              <ShoppingCart size={24} />
+            </a>
+          ) : (
+            <button
+              type="button"
+              onClick={() => onBuy(track)}
+              disabled={checkoutLoading}
+              className="text-white p-4 rounded-full transition-all duration-200 transform hover:scale-110 bg-blue-600 hover:bg-blue-700 disabled:opacity-60"
+              title={t.addToCart}
+            >
+              <ShoppingCart size={24} />
+            </button>
+          )}
         </div>
 
         {/* FREE badge */}
@@ -155,15 +174,26 @@ const TrackCard = ({ track, onPlay, onBuy, onAddToCart, onDownload, isPurchased,
               {t.download}
             </button>
           ) : (
-            <button
-              type="button"
-              onClick={() => (onAddToCart ? onAddToCart(track) : onBuy(track))}
-              disabled={inCart}
-              className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-purple-600 px-4 py-3 text-sm font-semibold text-white hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <ShoppingCart size={16} />
-              {inCart ? t.inCart : t.addToCart}
-            </button>
+            checkoutUrl ? (
+              <a
+                href={checkoutUrl}
+                onClick={(event) => onAddToCart(track, event)}
+                className="gumroad-button inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-purple-600 px-4 py-3 text-sm font-semibold text-white hover:bg-purple-700"
+              >
+                <ShoppingCart size={16} />
+                {t.addToCart}
+              </a>
+            ) : (
+              <button
+                type="button"
+                onClick={() => onBuy(track)}
+                disabled={checkoutLoading}
+                className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-purple-600 px-4 py-3 text-sm font-semibold text-white hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <ShoppingCart size={16} />
+                {checkoutLoading ? t.preparingCheckout : t.addToCart}
+              </button>
+            )
           )}
         </div>
       </div>

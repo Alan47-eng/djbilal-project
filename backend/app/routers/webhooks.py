@@ -7,7 +7,7 @@ from ..database import get_session
 from ..dependencies import get_purchase_service
 from ..services import PurchaseService
 
-router = APIRouter(prefix="/api/webhooks", tags=["webhooks"])
+router = APIRouter(tags=["webhooks"])
 logger = logging.getLogger(__name__)
 
 
@@ -16,7 +16,8 @@ def _ignored_response(reason: str) -> dict[str, str | list[int]]:
     return {"status": "ignored", "purchase_ids": []}
 
 
-@router.post("/gumroad")
+@router.post("/api/v1/webhooks/gumroad")
+@router.post("/api/webhooks/gumroad", include_in_schema=False)
 async def gumroad_webhook(
     request: Request,
     session: AsyncSession = Depends(get_session),
@@ -28,11 +29,10 @@ async def gumroad_webhook(
         logger.warning("Ignoring malformed Gumroad form notification: %s", exc)
         return {"status": "ignored", "purchase_ids": []}
 
-    payload = {
-        key: value
-        for key, value in form.items()
-        if isinstance(key, str) and isinstance(value, str)
-    }
+    payload: dict[str, str] = {}
+    for key, value in form.items():
+        if isinstance(key, str) and isinstance(value, str):
+            payload[key] = value
     try:
         return await purchase_service.process_gumroad_ping(session, payload)
     except HTTPException as exc:

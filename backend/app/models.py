@@ -23,6 +23,8 @@ class Track(Base):
     price = Column(Float, nullable=False)
     cover_image_url = Column(String(1024), nullable=True)
     external_product_id = Column(String(1024), nullable=True)
+    gumroad_url = Column(String(1024), nullable=True)
+    gumroad_product_id = Column(String(255), nullable=True, unique=True, index=True)
     preview_url = Column(String(1024), nullable=False)
     full_file_path = Column(String(1024), nullable=False)
     is_free = Column(Boolean, default=False, nullable=False)

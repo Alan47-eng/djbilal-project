@@ -75,6 +75,7 @@ async def test_verify_sale_checks_gumroad_api_record(monkeypatch):
                 "sale": {
                     "sale_id": "sale-1",
                     "product_permalink": "https://gumroad.com/l/product-1",
+                    "product_id": "123456",
                     "price": 500,
                     "refunded": False,
                 },
@@ -107,6 +108,7 @@ async def test_verify_sale_checks_gumroad_api_record(monkeypatch):
         "sale_id": "sale-1",
         "price": "500",
         "product_permalink": "https://gumroad.com/l/product-1",
+        "product_id": "123456",
     }
     assert request_arguments["url"] == "https://api.gumroad.com/v2/sales/sale-1"
     assert request_arguments["params"] == {"access_token": "api-token"}

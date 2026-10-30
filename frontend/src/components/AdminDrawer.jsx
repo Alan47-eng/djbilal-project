@@ -25,7 +25,8 @@ const emptyForm = {
   artist: '',
   category: 'edit',
   price: '',
-  external_product_id: '',
+  gumroad_url: '',
+  gumroad_product_id: '',
   is_free: false,
   track_file: null,
   preview_file: null,
@@ -37,10 +38,12 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
   const { tracks, fetchTracks, updateTrack, removeTrack } = useTracks();
   const [users, setUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
+  const [updatingRoleUserId, setUpdatingRoleUserId] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [updatingTrackId, setUpdatingTrackId] = useState(null);
   const [trackPriceDrafts, setTrackPriceDrafts] = useState({});
   const [trackProductDrafts, setTrackProductDrafts] = useState({});
+  const [trackProductIdDrafts, setTrackProductIdDrafts] = useState({});
   const [message, setMessage] = useState(null);
   const [error, setError] = useState(null);
   const [form, setForm] = useState(emptyForm);
@@ -99,7 +102,8 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
           ? (prev.category === 'edit' ? 'remix' : prev.category)
           : (['simple-pack', 'vst'].includes(prev.category) ? 'edit' : prev.category),
         price: checked ? '0' : prev.price === '0' ? '' : prev.price,
-        external_product_id: checked ? '' : prev.external_product_id,
+        gumroad_url: checked ? '' : prev.gumroad_url,
+        gumroad_product_id: checked ? '' : prev.gumroad_product_id,
       }));
       return;
     }
@@ -115,16 +119,26 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
-  const handlePromote = async (email) => {
+  const handleRoleChange = async (targetUser, role) => {
     try {
       setMessage(null);
       setError(null);
-      await api.post(`/users/${encodeURIComponent(email)}/make-admin`);
-      const response = await api.get('/users');
-      setUsers(response.data);
-      setMessage(`${email} was promoted to admin`);
+      setUpdatingRoleUserId(targetUser.id);
+      const response = await api.put(`/api/v1/users/${targetUser.id}/role`, { role });
+      setUsers((currentUsers) =>
+        currentUsers.map((item) =>
+          item.id === targetUser.id ? response.data : item
+        )
+      );
+      setMessage(
+        role === 'admin'
+          ? `${targetUser.email} artık admin`
+          : `${targetUser.email} normal kullanıcı yapıldı`
+      );
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Could not promote user'));
+      setError(getApiErrorMessage(err, 'Could not update user role'));
+    } finally {
+      setUpdatingRoleUserId(null);
     }
   };
 
@@ -151,12 +165,15 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
   };
 
   const handleTrackProductUpdate = async (trackId) => {
+    const track = tracks.find((item) => item.id === trackId);
     try {
       setUpdatingTrackId(trackId);
       setMessage(null);
       setError(null);
       const response = await api.put(`/tracks/${trackId}`, {
-        external_product_id: (trackProductDrafts[trackId] || '').trim() || null,
+        gumroad_url: (trackProductDrafts[trackId] ?? track?.gumroad_url ?? '').trim() || null,
+        gumroad_product_id:
+          (trackProductIdDrafts[trackId] ?? track?.gumroad_product_id ?? '').trim() || null,
       });
       updateTrack(response.data);
       setMessage('Gumroad product URL updated');
@@ -197,7 +214,7 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
       setError('Category is required');
       return;
     }
-    if (!form.is_free && !form.external_product_id.trim()) {
+    if (!form.is_free && !form.gumroad_url.trim()) {
       setError('Gumroad product URL is required for paid tracks');
       return;
     }
@@ -216,8 +233,11 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
       formData.append('category', form.category);
       formData.append('price', form.is_free ? '0' : form.price);
       formData.append('is_free', form.is_free ? 'true' : 'false');
-      if (!form.is_free && form.external_product_id) {
-        formData.append('external_product_id', form.external_product_id);
+      if (!form.is_free && form.gumroad_url) {
+        formData.append('gumroad_url', form.gumroad_url);
+      }
+      if (!form.is_free && form.gumroad_product_id) {
+        formData.append('gumroad_product_id', form.gumroad_product_id);
       }
       formData.append('track_file', form.track_file);
       formData.append('preview_file', form.preview_file);
@@ -398,16 +418,23 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
                   {!form.is_free && (
                     <>
                       <input
-                        value={form.external_product_id}
-                        onChange={handleChange('external_product_id')}
+                        value={form.gumroad_url}
+                        onChange={handleChange('gumroad_url')}
                         type="url"
-                        placeholder="https://mahmud27.gumroad.com/l/zgyds"
+                        placeholder="https://djbilal.gumroad.com/l/your-product"
                         className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
                         required
                       />
                       <p className="text-xs text-slate-400">
-                        Enter this track's fixed-price Gumroad product permalink.
+                        Enter this track's Gumroad URL. Each track can use a different product.
                       </p>
+                      <input
+                        value={form.gumroad_product_id}
+                        onChange={handleChange('gumroad_product_id')}
+                        inputMode="numeric"
+                        placeholder="Gumroad product ID (optional)"
+                        className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
+                      />
                     </>
                   )}
 
@@ -490,11 +517,12 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
                           </button>
                         </div>
                         {!track.is_free && (
-                          <div className="mt-2 flex gap-2">
+                          <div className="mt-2 space-y-2">
+                            <div className="flex gap-2">
                             <input
                               type="url"
-                              placeholder="https://mahmud27.gumroad.com/l/zgyds"
-                              value={trackProductDrafts[track.id] ?? track.external_product_id ?? ''}
+                              placeholder="https://djbilal.gumroad.com/l/your-product"
+                              value={trackProductDrafts[track.id] ?? track.gumroad_url ?? track.external_product_id ?? ''}
                               onChange={(event) =>
                                 setTrackProductDrafts((prev) => ({ ...prev, [track.id]: event.target.value }))
                               }
@@ -506,8 +534,18 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
                               disabled={updatingTrackId === track.id}
                               className="rounded-lg border border-slate-600 px-2.5 py-1.5 text-xs font-semibold text-slate-200 hover:bg-slate-800 disabled:opacity-60"
                             >
-                              Save product URL
+                              Save product
                             </button>
+                            </div>
+                            <input
+                              inputMode="numeric"
+                              placeholder="Gumroad product ID (optional)"
+                              value={trackProductIdDrafts[track.id] ?? track.gumroad_product_id ?? ''}
+                              onChange={(event) =>
+                                setTrackProductIdDrafts((prev) => ({ ...prev, [track.id]: event.target.value }))
+                              }
+                              className="w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-white"
+                            />
                           </div>
                         )}
                       </div>
@@ -521,26 +559,53 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
                   <Users size={18} className="text-purple-400" />
                   <h3 className="font-semibold">Users</h3>
                 </div>
+                {message && (
+                  <p className="mb-3 rounded-lg bg-emerald-500/10 px-3 py-2 text-sm text-emerald-300" role="status">
+                    {message}
+                  </p>
+                )}
+                {error && (
+                  <p className="mb-3 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300" role="alert">
+                    {error}
+                  </p>
+                )}
                 {loadingUsers ? (
                   <p className="text-sm text-slate-400">Loading...</p>
                 ) : (
                   <div className="space-y-2">
                     {users.map((item) => (
-                      <div key={item.id} className="flex items-center justify-between rounded-lg border border-slate-800 px-3 py-2">
+                      <div key={item.id} className="flex items-center justify-between gap-3 rounded-lg border border-slate-800 px-3 py-2">
                         <div>
                           <p className="text-sm font-medium text-white">{item.email}</p>
-                          <p className="text-xs text-slate-400">{item.is_admin ? 'Admin' : 'Member'}</p>
+                          <p className="text-xs text-slate-400">{item.is_admin ? 'Admin' : 'User'}</p>
                         </div>
-                        {!item.is_admin && (
-                          <button
-                            type="button"
-                            onClick={() => handlePromote(item.email)}
-                            className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700"
-                          >
-                            <ShieldCheck size={14} />
-                            Make Admin
-                          </button>
-                        )}
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleRoleChange(item, item.is_admin ? 'user' : 'admin')
+                          }
+                          disabled={
+                            updatingRoleUserId === item.id ||
+                            (item.is_admin && item.id === user?.id)
+                          }
+                          title={
+                            item.is_admin && item.id === user?.id
+                              ? 'You cannot remove your own admin role'
+                              : undefined
+                          }
+                          className={`inline-flex shrink-0 items-center gap-1 rounded-lg px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50 ${
+                            item.is_admin
+                              ? 'bg-amber-700 hover:bg-amber-800'
+                              : 'bg-emerald-600 hover:bg-emerald-700'
+                          }`}
+                        >
+                          <ShieldCheck size={14} />
+                          {updatingRoleUserId === item.id
+                            ? 'Saving...'
+                            : item.is_admin
+                              ? 'Adminliği Kaldır / Normal Kullanıcı Yap'
+                              : 'Admin Yap'}
+                        </button>
                       </div>
                     ))}
                   </div>

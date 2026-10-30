@@ -211,6 +211,22 @@ async def list_users(
     return await user_service.get_all(session)
 
 
+@router.put("/api/v1/users/{user_id}/role", response_model=schemas.UserRead)
+async def update_user_role(
+    user_id: int,
+    role_update: schemas.UserRoleUpdate,
+    current_user: User = Depends(auth.get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> User:
+    require_admin(current_user)
+    return await user_service.update_role(
+        session,
+        user_id,
+        role_update.role,
+        current_user,
+    )
+
+
 @router.post("/users/{email}/make-admin", response_model=schemas.UserRead)
 async def promote_to_admin(
     email: str,

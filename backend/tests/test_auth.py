@@ -101,6 +101,8 @@ async def create_track_record(
     full_file_path="/server/music/track.mp3",
     free_download_url=None,
     external_product_id="https://gumroad.com/l/test-product",
+    gumroad_url=None,
+    gumroad_product_id=None,
 ):
     track = Track(
         title="Webhook Track",
@@ -108,6 +110,8 @@ async def create_track_record(
         price=price,
         cover_image_url=None,
         external_product_id=external_product_id,
+        gumroad_url=gumroad_url,
+        gumroad_product_id=gumroad_product_id,
 
         preview_url="https://example.com/preview.mp3",
         full_file_path=full_file_path,
@@ -692,6 +696,111 @@ class TestProfilePhoto:
         assert response.status_code == 403
 
 
+class TestAdminRoleManagement:
+    @pytest.mark.asyncio
+    async def test_admin_can_promote_and_demote_users(self, client, test_db):
+        _, AsyncSessionLocal = test_db
+        async with AsyncSessionLocal() as session:
+            admin = await create_user_record(
+                session, "role-admin@example.com", "Admin123!", is_admin=True
+            )
+            target = await create_user_record(
+                session, "role-target@example.com", "User123!"
+            )
+
+        login = await client.post(
+            "/login",
+            json={"email": admin.email, "password": "Admin123!"},
+        )
+        headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+
+        promote = await client.put(
+            f"/api/v1/users/{target.id}/role",
+            json={"role": "admin"},
+            headers=headers,
+        )
+        assert promote.status_code == 200
+        assert promote.json()["is_admin"] is True
+
+        demote = await client.put(
+            f"/api/v1/users/{target.id}/role",
+            json={"role": "user"},
+            headers=headers,
+        )
+        assert demote.status_code == 200
+        assert demote.json()["is_admin"] is False
+
+    @pytest.mark.asyncio
+    async def test_admin_cannot_remove_their_own_admin_role(self, client, test_db):
+        _, AsyncSessionLocal = test_db
+        async with AsyncSessionLocal() as session:
+            admin = await create_user_record(
+                session, "only-role-admin@example.com", "Admin123!", is_admin=True
+            )
+
+        login = await client.post(
+            "/login",
+            json={"email": admin.email, "password": "Admin123!"},
+        )
+        response = await client.put(
+            f"/api/v1/users/{admin.id}/role",
+            json={"role": "user"},
+            headers={"Authorization": f"Bearer {login.json()['access_token']}"},
+        )
+
+        assert response.status_code == 400
+        assert response.json()["detail"] == "En az bir admin bulunmalıdır"
+        async with AsyncSessionLocal() as session:
+            persisted_admin = await session.get(User, admin.id)
+            assert persisted_admin.is_admin is True
+
+    @pytest.mark.asyncio
+    async def test_non_admin_cannot_change_user_role(self, client, test_db):
+        _, AsyncSessionLocal = test_db
+        async with AsyncSessionLocal() as session:
+            user = await create_user_record(
+                session, "regular-role-user@example.com", "User123!"
+            )
+            target = await create_user_record(
+                session, "role-protected-target@example.com", "User123!"
+            )
+
+        login = await client.post(
+            "/login",
+            json={"email": user.email, "password": "User123!"},
+        )
+        response = await client.put(
+            f"/api/v1/users/{target.id}/role",
+            json={"role": "admin"},
+            headers={"Authorization": f"Bearer {login.json()['access_token']}"},
+        )
+
+        assert response.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_role_update_rejects_unknown_role(self, client, test_db):
+        _, AsyncSessionLocal = test_db
+        async with AsyncSessionLocal() as session:
+            admin = await create_user_record(
+                session, "role-validation-admin@example.com", "Admin123!", is_admin=True
+            )
+            target = await create_user_record(
+                session, "role-validation-user@example.com", "User123!"
+            )
+
+        login = await client.post(
+            "/login",
+            json={"email": admin.email, "password": "Admin123!"},
+        )
+        response = await client.put(
+            f"/api/v1/users/{target.id}/role",
+            json={"role": "superadmin"},
+            headers={"Authorization": f"Bearer {login.json()['access_token']}"},
+        )
+
+        assert response.status_code == 422
+
+
 class TestCheckoutAndWebhook:
     """Test Gumroad checkout and purchase processing."""
 
@@ -728,9 +837,11 @@ class TestCheckoutAndWebhook:
         for track in (track_one, track_two):
             parsed = urlparse(checkout_items[track.id]["checkout_url"])
             query = parse_qs(parsed.query)
+            assert parsed.netloc == "djbilal.gumroad.com"
             assert parsed.path == f"/l/{track.external_product_id.rsplit('/', 1)[-1]}"
             assert query["track_ids"] == [str(track.id)]
             assert query["user_id"] == [str(user.id)]
+            assert query["wanted"] == ["true"]
             assert "signature" in query
             assert "price" not in query
 
@@ -755,6 +866,9 @@ class TestCheckoutAndWebhook:
 
         assert response.status_code == 200
         data = response.json()
+        parsed = urlparse(data["checkout_url"])
+        assert parsed.netloc == "djbilal.gumroad.com"
+        assert parse_qs(parsed.query)["wanted"] == ["true"]
         assert data["track_id"] == track.id
         parsed = urlparse(data["checkout_url"])
         query = parse_qs(parsed.query)
@@ -789,7 +903,7 @@ class TestCheckoutAndWebhook:
         )
 
         response = await client.post(
-            "/api/webhooks/gumroad",
+            "/api/v1/webhooks/gumroad",
             data={
                 "sale_id": "sale-123",
                 "seller_id": "test-seller",
@@ -824,6 +938,125 @@ class TestCheckoutAndWebhook:
         )
         assert purchases_response.status_code == 200
         assert track.id in purchases_response.json()
+
+    @pytest.mark.asyncio
+    async def test_separate_gumroad_cart_sales_activate_every_track(
+        self, client, test_db, monkeypatch
+    ):
+        _, AsyncSessionLocal = test_db
+
+        async with AsyncSessionLocal() as session:
+            user = await create_user_record(session, "cartbuyer-multi@example.com", "password123")
+            first_track = await create_track_record(
+                session,
+                external_product_id="https://gumroad.com/l/cart-track-one",
+            )
+            second_track = await create_track_record(
+                session,
+                external_product_id="https://gumroad.com/l/cart-track-two",
+            )
+
+        verified_sales = {
+            "cart-sale-one": {
+                "sale_id": "cart-sale-one",
+                "price": "999",
+                "product_permalink": "https://gumroad.com/l/cart-track-one",
+            },
+            "cart-sale-two": {
+                "sale_id": "cart-sale-two",
+                "price": "999",
+                "product_permalink": "https://gumroad.com/l/cart-track-two",
+            },
+        }
+
+        async def verify_sale(_self, payload):
+            return verified_sales[payload["sale_id"]]
+
+        monkeypatch.setattr(
+            "app.adapters.gumroad.GumroadService.verify_sale",
+            verify_sale,
+        )
+
+        for sale_id, track, permalink in (
+            ("cart-sale-one", first_track, "cart-track-one"),
+            ("cart-sale-two", second_track, "cart-track-two"),
+        ):
+            signature = GumroadService.checkout_signature(
+                user.id, track.id, permalink
+            )
+            response = await client.post(
+                "/api/v1/webhooks/gumroad",
+                data={
+                    "sale_id": sale_id,
+                    "seller_id": "test-seller",
+                    "url_params[user_id]": str(user.id),
+                    "url_params[track_ids]": str(track.id),
+                    "url_params[signature]": signature,
+                },
+            )
+            assert response.status_code == 200
+            assert response.json()["status"] == "ok"
+
+        async with AsyncSessionLocal() as session:
+            purchase_rows = await session.execute(
+                select(Purchase.track_id).where(Purchase.user_id == user.id)
+            )
+            assert set(purchase_rows.scalars().all()) == {
+                first_track.id,
+                second_track.id,
+            }
+
+    @pytest.mark.asyncio
+    async def test_webhook_matches_verified_product_id_without_track_ids(
+        self, client, test_db, monkeypatch
+    ):
+        _, AsyncSessionLocal = test_db
+        product_url = "https://djbilal.gumroad.com/l/id-track"
+
+        async with AsyncSessionLocal() as session:
+            user = await create_user_record(session, "productidbuyer@example.com", "password123")
+            track = await create_track_record(
+                session,
+                external_product_id=None,
+                gumroad_url=product_url,
+                gumroad_product_id="987654",
+            )
+
+        async def verify_sale(_self, _payload):
+            return {
+                "sale_id": "sale-product-id",
+                "price": "999",
+                "product_permalink": product_url,
+                "product_id": "987654",
+            }
+
+        signature = GumroadService.checkout_signature(
+            user.id, track.id, "id-track"
+        )
+        monkeypatch.setattr(
+            "app.adapters.gumroad.GumroadService.verify_sale",
+            verify_sale,
+        )
+        response = await client.post(
+            "/api/webhooks/gumroad",
+            data={
+                "sale_id": "sale-product-id",
+                "seller_id": "test-seller",
+                "url_params[user_id]": str(user.id),
+                "url_params[signature]": signature,
+            },
+        )
+
+        assert response.status_code == 200
+        assert response.json()["status"] == "ok"
+        async with AsyncSessionLocal() as session:
+            purchase = await session.execute(
+                select(Purchase).where(
+                    Purchase.user_id == user.id,
+                    Purchase.track_id == track.id,
+                )
+            )
+            assert purchase.scalar_one_or_none() is not None
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(

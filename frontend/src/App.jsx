@@ -1,5 +1,5 @@
-import React, { useRef, useState } from 'react';
-import { LogOut, LogIn, UserPlus, Music, User, Menu, LayoutGrid, ShieldCheck, Gift, Library, ShoppingCart, Info } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { LogOut, LogIn, UserPlus, Music, User, Menu, LayoutGrid, ShieldCheck, Gift, Library, Info } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { TrackProvider, useTracks } from './context/TrackContext';
 import { PurchaseProvider, usePurchases } from './context/PurchaseContext';
@@ -17,34 +17,9 @@ import './index.css';
 import { getApiErrorMessage } from './utils/errors';
 import { downloadTrackFile } from './utils/downloads';
 
-function openGumroadOverlayWhenReady(anchor) {
-  if (!anchor) return;
-
-  let timeoutId;
-  const observer = new MutationObserver(() => {
-    if (!anchor.querySelector('.logo-full')) return;
-    observer.disconnect();
-    window.clearTimeout(timeoutId);
-    anchor.click();
-  });
-
-  observer.observe(anchor, { childList: true });
-  timeoutId = window.setTimeout(() => {
-    observer.disconnect();
-    console.error('Gumroad overlay did not initialize; use the checkout link directly.');
-    anchor.focus();
-  }, 5000);
-
-  if (anchor.querySelector('.logo-full')) {
-    observer.disconnect();
-    window.clearTimeout(timeoutId);
-    anchor.click();
-  }
-}
-
 function buildGumroadOverlayUrl(checkoutUrl) {
   const url = new URL(checkoutUrl);
-  url.searchParams.delete('wanted');
+  url.searchParams.set('wanted', 'true');
   url.searchParams.set('overlay', 'true');
   return url.toString();
 }
@@ -58,17 +33,13 @@ function AppContent() {
   const [currentTrack, setCurrentTrack] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [authModal, setAuthModal] = useState({ isOpen: false, mode: 'login' });
-  const [pendingCartTrackId, setPendingCartTrackId] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState(() =>
     typeof window !== 'undefined' && window.location.pathname.replace(/\/+$/, '') === '/purchases'
       ? 'library'
       : 'edits'
   ); // 'edits' | 'remixes' | 'free' | 'library'
-  const [cartTrackIds, setCartTrackIds] = useState([]);
   const [gumroadCheckoutItems, setGumroadCheckoutItems] = useState([]);
-  const [cartOpen, setCartOpen] = useState(false);
-  const gumroadLinkRefs = useRef({});
   const [downloadError, setDownloadError] = useState(null);
   const t = {
     edits: lang === 'ar' ? 'تعديلات' : 'Edits',
@@ -78,12 +49,6 @@ function AppContent() {
     signIn: lang === 'ar' ? 'تسجيل الدخول' : 'Sign In',
     signUp: lang === 'ar' ? 'إنشاء حساب' : 'Sign Up',
     logout: lang === 'ar' ? 'تسجيل الخروج' : 'Logout',
-    cart: lang === 'ar' ? 'السلة' : 'Cart',
-    total: lang === 'ar' ? 'المجموع' : 'Total',
-    checkoutCart: lang === 'ar' ? 'دفع آمن' : 'Ödeme Yap',
-    redirecting: lang === 'ar' ? 'جاري التحويل...' : 'Preparing checkout...',
-    secureCheckout: lang === 'ar' ? 'إتمام الشراء' : 'Ödeme Yap',
-    remove: lang === 'ar' ? 'حذف' : 'Remove',
     openAdmin: lang === 'ar' ? 'فتح لوحة الإدارة' : 'Open Admin Panel',
     editsDesc: lang === 'ar' ? 'تعديلات أصلية ونسخ مميزة.' : 'Original edits and premium versions.',
     remixesDesc: lang === 'ar' ? 'قائمة الريمكسات مع المعاينة الفورية والدفع.' : 'Remix catalog with instant preview and checkout.',
@@ -102,8 +67,6 @@ function AppContent() {
     terms: lang === 'ar' ? 'شروط الاستخدام' : 'Terms of Service',
     refund: lang === 'ar' ? 'سياسة الاسترجاع' : 'Refund Policy',
     contact: lang === 'ar' ? 'اتصل بنا' : 'Contact Us',
-    cartEmpty: lang === 'ar' ? 'السلة فارغة حالياً.' : 'Your cart is empty right now.',
-    close: lang === 'ar' ? 'إغلاق' : 'Close',
   };
 
   const isAdmin = user?.is_admin === true;
@@ -120,27 +83,29 @@ function AppContent() {
     if (category) return category === 'edit';
     return !`${track.title} ${track.artist}`.toLowerCase().includes('remix');
   });
-  const cartTracks = paidTracks.filter((track) => cartTrackIds.includes(track.id) && !purchases.includes(track.id));
-  const cartTotal = cartTracks.reduce((sum, track) => sum + (track.price || 0), 0);
-
-  const addToCart = (track) => {
-    if (track.is_free) {
-      handleDownloadTrack(track);
-      return;
-    }
+  useEffect(() => {
     if (!user) {
-      setPendingCartTrackId(track.id);
-      setAuthModal({ isOpen: true, mode: 'login' });
+      setGumroadCheckoutItems([]);
       return;
     }
-    setGumroadCheckoutItems([]);
-    setCartTrackIds((prev) => (prev.includes(track.id) ? prev : [...prev, track.id]));
-  };
 
-  const removeFromCart = (trackId) => {
-    setGumroadCheckoutItems([]);
-    setCartTrackIds((prev) => prev.filter((id) => id !== trackId));
-  };
+    const trackIds = paidTracks
+      .filter((track) => !purchases.includes(track.id))
+      .map((track) => track.id);
+    if (trackIds.length === 0) {
+      setGumroadCheckoutItems([]);
+      return;
+    }
+
+    let cancelled = false;
+    checkoutCart(trackIds).then((items) => {
+      if (!cancelled) setGumroadCheckoutItems(items || []);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user, tracks, purchases, checkoutCart]);
 
   const renderTrackGrid = (tracksToRender, emptyMessage) => {
     if (tracksToRender.length === 0) {
@@ -153,18 +118,28 @@ function AppContent() {
 
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-32">
-        {tracksToRender.map((track) => (
-          <TrackCard
-            key={track.id}
-            track={track}
-            isPurchased={purchases.includes(track.id)}
-            inCart={cartTrackIds.includes(track.id)}
-            onPlay={handlePlayPreview}
-            onBuy={handleBuyTrack}
-            onAddToCart={addToCart}
-            onDownload={handleDownloadTrack}
-          />
-        ))}
+        {tracksToRender.map((track) => {
+          const checkoutItem = gumroadCheckoutItems.find(
+            (item) => item.track_id === track.id
+          );
+          return (
+            <TrackCard
+              key={track.id}
+              track={track}
+              isPurchased={purchases.includes(track.id)}
+              checkoutUrl={
+                checkoutItem
+                  ? buildGumroadOverlayUrl(checkoutItem.checkout_url)
+                  : null
+              }
+              checkoutLoading={checkoutLoading}
+              onPlay={handlePlayPreview}
+              onBuy={handleBuyTrack}
+              onAddToCart={rememberTrackForCheckout}
+              onDownload={handleDownloadTrack}
+            />
+          );
+        })}
       </div>
     );
   };
@@ -179,23 +154,38 @@ function AppContent() {
     setIsPlaying(true);
   };
 
-  const handleBuyTrack = (track) => {
-    addToCart(track);
+  const handleBuyTrack = async (track) => {
+    if (!user) {
+      setAuthModal({ isOpen: true, mode: 'login' });
+      return;
+    }
+
+    const items = await checkoutCart([track.id]);
+    if (!items?.length) return;
+    setGumroadCheckoutItems((current) => [
+      ...current.filter((item) => item.track_id !== track.id),
+      ...items,
+    ]);
   };
 
-  const handleCheckout = async () => {
-    if (cartTracks.length === 0) return;
-    const checkoutItems = await checkoutCart(cartTracks.map((track) => track.id));
-    if (checkoutItems?.length) {
-      setGumroadCheckoutItems(checkoutItems);
-      window.setTimeout(() => {
-        openGumroadOverlayWhenReady(
-          gumroadLinkRefs.current[checkoutItems[0].track_id]
-        );
-      }, 0);
+  function rememberTrackForCheckout(track, event) {
+    if (!user) {
+      event.preventDefault();
+      setAuthModal({ isOpen: true, mode: 'login' });
+      return;
     }
-    return checkoutItems;
-  };
+
+    try {
+      const currentTrackIds = JSON.parse(
+        window.sessionStorage.getItem('gumroadCheckoutTrackIds') || '[]'
+      );
+      const trackIds = Array.isArray(currentTrackIds) ? currentTrackIds : [];
+      if (!trackIds.includes(track.id)) trackIds.push(track.id);
+      window.sessionStorage.setItem('gumroadCheckoutTrackIds', JSON.stringify(trackIds));
+    } catch (error) {
+      console.error('Could not save Gumroad checkout tracking data.', error);
+    }
+  }
 
   const handleDownloadTrack = async (track) => {
     try {
@@ -221,21 +211,9 @@ function AppContent() {
     logout();
     setIsPlaying(false);
     setCurrentTrack(null);
-    setPendingCartTrackId(null);
-    setCartTrackIds([]);
-    setCartOpen(false);
+    setGumroadCheckoutItems([]);
     setDownloadError(null);
     setMenuOpen(false);
-  };
-
-  const handleAuthSuccess = () => {
-    if (pendingCartTrackId) {
-      const track = tracks.find((item) => item.id === pendingCartTrackId);
-      if (track && !track.is_free) {
-        setCartTrackIds((prev) => (prev.includes(track.id) ? prev : [...prev, track.id]));
-      }
-      setPendingCartTrackId(null);
-    }
   };
 
   return (
@@ -546,94 +524,10 @@ function AppContent() {
         </div>
       )}
 
-      {user && (
-        <>
-          <button
-            type="button"
-            onClick={() => setCartOpen(true)}
-            className="fixed bottom-24 right-4 z-40 inline-flex items-center gap-2 rounded-full bg-purple-600 px-4 py-3 text-sm font-semibold text-white shadow-lg hover:bg-purple-700"
-          >
-            <ShoppingCart size={16} />
-            {t.cart} ({cartTracks.length})
-          </button>
-
-          {cartOpen && (
-            <div className="fixed inset-0 z-50 bg-black/60" onClick={() => setCartOpen(false)}>
-              <aside
-                className="absolute right-0 top-0 h-full w-full max-w-sm border-l border-slate-700 bg-slate-900 p-4"
-                onClick={(event) => event.stopPropagation()}
-              >
-                <div className="mb-4 flex items-center justify-between">
-                  <h3 className="text-lg font-bold text-white">{t.cart}</h3>
-                  <button
-                    type="button"
-                    onClick={() => setCartOpen(false)}
-                    className="rounded-lg bg-slate-800 px-3 py-1.5 text-xs text-slate-200 hover:bg-slate-700"
-                  >
-                    {t.close}
-                  </button>
-                </div>
-
-                <p className="mb-3 text-sm text-slate-400">{t.total}: ${cartTotal.toFixed(2)}</p>
-
-                {checkoutError && (
-                  <div className="mb-3 rounded-lg border border-red-600 bg-red-900/20 px-3 py-2 text-sm text-red-300">
-                    {checkoutError}
-                  </div>
-                )}
-
-                {cartTracks.length === 0 ? (
-                  <div className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-4 text-sm text-slate-300">
-                    {t.cartEmpty}
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {cartTracks.map((track) => (
-                      <div key={track.id} className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm">
-                        <p className="text-slate-100">{track.title}</p>
-                        <p className="text-xs text-slate-400">{track.artist}</p>
-                        <div className="mt-2 flex items-center justify-between">
-                          <span className="font-semibold text-purple-300">${track.price.toFixed(2)}</span>
-                          <button
-                            type="button"
-                            onClick={() => removeFromCart(track.id)}
-                            className="text-xs font-semibold text-slate-300 hover:text-white"
-                          >
-                            {t.remove}
-                          </button>
-                        </div>
-                        {gumroadCheckoutItems
-                          .filter((item) => item.track_id === track.id)
-                          .map((item) => (
-                            <a
-                              key={item.track_id}
-                              ref={(node) => {
-                                gumroadLinkRefs.current[item.track_id] = node;
-                              }}
-                              className="gumroad-button mt-3 inline-block rounded-lg bg-purple-600 px-3 py-2 text-xs font-semibold text-white hover:bg-purple-700"
-                              href={buildGumroadOverlayUrl(item.checkout_url)}
-                            >
-                              {t.secureCheckout}
-                            </a>
-                          ))}
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                <button
-                  type="button"
-                  onClick={handleCheckout}
-                  disabled={checkoutLoading || cartTracks.length === 0}
-                  className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-purple-600 to-emerald-600 px-4 py-2.5 font-semibold text-white shadow-lg shadow-purple-950/20 transition-colors hover:from-purple-700 hover:to-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  <ShoppingCart size={16} />
-                  {checkoutLoading ? t.redirecting : t.checkoutCart}
-                </button>
-              </aside>
-            </div>
-          )}
-        </>
+      {checkoutError && (
+        <div className="fixed bottom-4 left-4 right-4 z-40 rounded-lg border border-red-600 bg-red-900/90 px-4 py-3 text-sm text-red-100 md:left-auto md:max-w-md">
+          {checkoutError}
+        </div>
       )}
 
       {/* Modals */}
@@ -641,7 +535,7 @@ function AppContent() {
         isOpen={authModal.isOpen}
         mode={authModal.mode}
         onClose={() => setAuthModal({ ...authModal, isOpen: false })}
-        onSuccess={handleAuthSuccess}
+        onSuccess={() => setAuthModal({ isOpen: false, mode: 'login' })}
       />
       <AdminDrawer
         isOpen={menuOpen}

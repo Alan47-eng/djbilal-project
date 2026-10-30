@@ -169,14 +169,20 @@ class GumroadService:
         api_sale_id = self._identifier(sale.get("sale_id", sale.get("id", sale_id)))
         api_seller_id = sale.get("seller_id")
         permalink = sale.get("product_permalink")
+        product_id = self._identifier(sale.get("product_id"))
         if (
             api_sale_id != sale_id
             or (
                 api_seller_id is not None
                 and self._identifier(api_seller_id) != configured_seller_id
             )
-            or not isinstance(permalink, str)
-            or self.normalize_product_permalink(permalink) is None
+            or (
+                (
+                    not isinstance(permalink, str)
+                    or self.normalize_product_permalink(permalink) is None
+                )
+                and product_id is None
+            )
             or self._is_true(sale.get("refunded"))
             or self._is_true(sale.get("chargebacked"))
             or self._is_true(sale.get("disputed"))
@@ -186,9 +192,34 @@ class GumroadService:
                 detail="Gumroad sale is not valid for this product or amount",
             )
 
+        verified_permalink = (
+            permalink
+            if isinstance(permalink, str)
+            and self.normalize_product_permalink(permalink) is not None
+            else ""
+        )
+        ping_product_id = self._identifier(ping.get("product_id"))
+        if ping_product_id and product_id and ping_product_id != product_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Gumroad Ping product does not match the verified sale",
+            )
+        ping_permalink = ping.get("product_permalink")
+        if (
+            ping_permalink
+            and verified_permalink
+            and self.normalize_product_permalink(ping_permalink)
+            != self.normalize_product_permalink(verified_permalink)
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Gumroad Ping permalink does not match the verified sale",
+            )
+
         return {
             "sale_id": sale_id,
-            "product_permalink": permalink,
+            "product_permalink": verified_permalink,
+            "product_id": product_id or ping_product_id or "",
             "price": str(self._parse_cents(sale.get("price")) or 0),
         }
 

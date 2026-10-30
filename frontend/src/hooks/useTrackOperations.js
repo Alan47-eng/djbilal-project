@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import api from '../api';
 import { useAuth } from '../context/AuthContext';
 import { getApiErrorMessage } from '../utils/errors';
@@ -28,7 +28,7 @@ export function useCheckout() {
     }
   };
 
-  const checkoutCart = async (trackIds) => {
+  const checkoutCart = useCallback(async (trackIds) => {
     if (!user) {
       setError('You must be logged in to purchase');
       return null;
@@ -50,7 +50,7 @@ export function useCheckout() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
 
   return { checkout, checkoutCart, loading, error };
 }

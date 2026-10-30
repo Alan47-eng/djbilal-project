@@ -87,25 +87,73 @@ class UserService:
         """Get all users (admin only)."""
         return await self.repo.get_all(session)
 
-    async def make_admin(self, session: AsyncSession, email: str, current_user: User) -> User:
+    async def update_role(
+        self,
+        session: AsyncSession,
+        user_id: int,
+        role: str,
+        current_user: User,
+    ) -> User:
+        """Update a user's role while ensuring at least one admin remains."""
+        if not current_user.is_admin:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only admins can update user roles",
+            )
+
+        if role not in {"user", "admin"}:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Role must be 'user' or 'admin'",
+            )
+
+        if role == "user" and user_id == current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="En az bir admin bulunmalıdır",
+            )
+
+        if role == "user":
+            admin_result = await session.execute(
+                select(User)
+                .where(User.is_admin.is_(True))
+                .with_for_update()
+            )
+            admins = admin_result.scalars().all()
+            if len(admins) <= 1:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="En az bir admin bulunmalıdır",
+                )
+
+        user = await self.repo.get_by_id(session, user_id)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found",
+            )
+
+        user.is_admin = role == "admin"
+        await session.commit()
+        await session.refresh(user)
+        return user
+
+    async def make_admin(
+        self, session: AsyncSession, email: str, current_user: User
+    ) -> User:
         """Make a user admin. Only admins can do this."""
         if not current_user.is_admin:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only admins can promote users"
+                detail="Only admins can promote users",
             )
-
         user = await self.repo.get_by_email(session, email)
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="User not found"
+                detail="User not found",
             )
-
-        user.is_admin = True
-        await session.commit()
-        await session.refresh(user)
-        return user
+        return await self.update_role(session, user.id, "admin", current_user)
 
 
 class TrackService:
@@ -129,6 +177,8 @@ class TrackService:
             price=track_data.price,
             cover_image_url=track_data.cover_image_url,
             external_product_id=track_data.external_product_id,
+            gumroad_url=track_data.gumroad_url,
+            gumroad_product_id=track_data.gumroad_product_id,
             preview_url=track_data.preview_url,
             full_file_path=track_data.full_file_path,
             is_free=track_data.is_free,
@@ -161,6 +211,14 @@ class TrackService:
         update_values: dict[str, object] = track_data.model_dump(exclude_unset=True)
         if not update_values:
             return track
+
+        if "external_product_id" in update_values and "gumroad_url" not in update_values:
+            legacy_product_id = update_values.pop("external_product_id")
+            update_values["gumroad_url"] = (
+                f"https://djbilal.gumroad.com/l/{legacy_product_id.strip()}"
+                if isinstance(legacy_product_id, str) and legacy_product_id.strip()
+                else None
+            )
 
         category_value = update_values.get("category")
         if isinstance(category_value, str):
@@ -228,6 +286,8 @@ class TrackService:
         category: str,
         price: float | None,
         external_product_id: str | None,
+        gumroad_url: str | None,
+        gumroad_product_id: str | None,
         is_free: bool,
         free_download_url: str | None,
         track_file: bytes,
@@ -251,6 +311,8 @@ class TrackService:
                 artist=artist.strip(),
                 price=normalized_price,
                 external_product_id=None if is_free else external_product_id,
+                gumroad_url=None if is_free else gumroad_url,
+                gumroad_product_id=None if is_free else gumroad_product_id,
                 preview_url="/media/previews/pending.mp3",
                 full_file_path="/media/tracks/pending.mp3",
                 is_free=is_free,
@@ -273,10 +335,13 @@ class TrackService:
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail=detail,
             ) from exc
-        if not track_data.is_free and not track_data.external_product_id:
+        if not track_data.is_free and not (
+            track_data.gumroad_url
+            or track_data.external_product_id
+        ):
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Gumroad product URL is required for paid tracks",
+                detail="A Gumroad product URL is required for paid tracks",
             )
         track_bytes = track_file
         preview_bytes = preview_file
@@ -416,15 +481,14 @@ class TrackService:
 
     @staticmethod
     def _build_gumroad_checkout_url(track: Track, current_user: User) -> str:
-        product_url = (track.external_product_id or "").strip()
-        canonical_permalink = GumroadService.normalize_product_permalink(product_url)
+        product_value = (track.gumroad_url or track.external_product_id or "").strip()
+        canonical_permalink = GumroadService.normalize_product_permalink(product_value)
         if not canonical_permalink:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail=f"A valid Gumroad product URL is required for track {track.id}",
             )
-        if "://" not in product_url:
-            product_url = f"https://gumroad.com/l/{product_url}"
+        product_url = f"https://djbilal.gumroad.com/l/{canonical_permalink}"
         return build_gumroad_checkout_url(
             product_url,
             user_id=current_user.id,
@@ -497,32 +561,23 @@ class PurchaseService:
         user_id_value = custom_data.get("user_id")
         track_ids_value = custom_data.get("track_ids")
         signature = custom_data.get("signature")
-        if not user_id_value or not track_ids_value or not signature:
+        if not user_id_value or not signature:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Missing Gumroad cart information",
+                detail="Missing Gumroad buyer information",
             )
 
         try:
             user_id = int(user_id_value)
-            resolved_track_ids = [
-                int(value.strip()) for value in track_ids_value.split(",")
-            ]
         except ValueError as exc:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Gumroad cart contains invalid IDs",
+                detail="Gumroad buyer information contains an invalid user ID",
             ) from exc
-        if (
-            user_id <= 0
-            or not resolved_track_ids
-            or any(track_id <= 0 for track_id in resolved_track_ids)
-            or len(set(resolved_track_ids)) != len(resolved_track_ids)
-            or len(resolved_track_ids) != 1
-        ):
+        if user_id <= 0:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Gumroad cart contains invalid IDs",
+                detail="Gumroad buyer information contains an invalid user ID",
             )
 
         sale = await self.gumroad_service.verify_sale(payload)
@@ -537,30 +592,61 @@ class PurchaseService:
                 detail="Gumroad buyer account was not found",
             )
 
-        tracks_result = await session.execute(
-            select(Track).where(Track.id.in_(resolved_track_ids))
+        product_permalink = GumroadService.normalize_product_permalink(
+            sale.get("product_permalink", "")
         )
-        tracks_by_id = {track.id: track for track in tracks_result.scalars().all()}
-        if len(tracks_by_id) != len(resolved_track_ids):
+        product_id = sale.get("product_id")
+        tracks_result = await session.execute(
+            select(Track).where(
+                Track.is_free.is_(False),
+            )
+        )
+        matching_tracks = [
+            track
+            for track in tracks_result.scalars().all()
+            if (
+                product_id
+                and track.gumroad_product_id == product_id
+            )
+            or (
+                product_permalink
+                and product_permalink
+                == GumroadService.normalize_product_permalink(
+                    track.gumroad_url or track.external_product_id or ""
+                )
+            )
+        ]
+        if len(matching_tracks) != 1:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Gumroad cart references an unknown track",
+                detail="Gumroad product does not match exactly one paid track",
             )
-        tracks = [tracks_by_id[track_id] for track_id in resolved_track_ids]
-        if any(track.is_free for track in tracks):
+        track = matching_tracks[0]
+        if track_ids_value:
+            try:
+                requested_track_ids = [
+                    int(value.strip()) for value in track_ids_value.split(",")
+                ]
+            except ValueError as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Gumroad checkout contains invalid track IDs",
+                ) from exc
+            if requested_track_ids != [track.id]:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Gumroad checkout track does not match the purchased product",
+                )
+        if track.is_free:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Gumroad cart can only grant paid tracks",
             )
 
-        track = tracks[0]
         track_permalink = GumroadService.normalize_product_permalink(
-            track.external_product_id or ""
+            track.gumroad_url or track.external_product_id or ""
         )
-        sale_permalink = GumroadService.normalize_product_permalink(
-            sale["product_permalink"]
-        )
-        if track_permalink is None or sale_permalink != track_permalink:
+        if product_permalink is not None and product_permalink != track_permalink:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Gumroad sale product does not match the requested track",
@@ -579,7 +665,7 @@ class PurchaseService:
         if not self.gumroad_service.verify_checkout_signature(
             user_id=user_id,
             track_id=track.id,
-            product_permalink=track_permalink,
+            product_permalink=track_permalink or product_id or "",
             signature=signature,
         ):
             raise HTTPException(
@@ -592,13 +678,13 @@ class PurchaseService:
             GumroadSale(
                 sale_id=sale["sale_id"],
                 user_id=user_id,
-                track_ids=resolved_track_ids,
+                track_ids=[track.id],
                 paid_cents=int(sale["price"]),
             )
         )
         purchases: list[Purchase] = []
         existing_purchase_ids: list[int] = []
-        for resolved_track_id in resolved_track_ids:
+        for resolved_track_id in [track.id]:
             purchase = await self.repo.get_purchase(
                 session, user_id, resolved_track_id
             )
