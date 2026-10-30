@@ -105,7 +105,7 @@ const TrackCard = ({
             <a
               href={checkoutUrl}
               onClick={(event) => onAddToCart(track, event)}
-              className="gumroad-button text-white p-4 rounded-full transition-all duration-200 transform hover:scale-110 bg-blue-600 hover:bg-blue-700"
+              className="text-white p-4 rounded-full transition-all duration-200 transform hover:scale-110 bg-blue-600 hover:bg-blue-700"
               title={t.addToCart}
             >
               <ShoppingCart size={24} />
@@ -178,7 +178,7 @@ const TrackCard = ({
               <a
                 href={checkoutUrl}
                 onClick={(event) => onAddToCart(track, event)}
-                className="gumroad-button inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-purple-600 px-4 py-3 text-sm font-semibold text-white hover:bg-purple-700"
+                className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-purple-600 px-4 py-3 text-sm font-semibold text-white hover:bg-purple-700"
               >
                 <ShoppingCart size={16} />
                 {t.addToCart}

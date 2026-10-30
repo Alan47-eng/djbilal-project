@@ -18,3 +18,8 @@ body {
 html {
   scroll-behavior: smooth;
 }
+
+a[href*="gumroad.com"] svg.gumroad-button-logo,
+.gumroad-button-logo {
+  display: none !important;
+}
