@@ -75,7 +75,7 @@ async def register(
     code = _set_verification_code(registration)
     await session.commit()
     try:
-        send_email_verification_code(user.email, code)
+        send_email_verification_code(user.email, code, lang=user.lang)
     except Exception as exc:
         raise HTTPException(
             status_code=503,
@@ -151,7 +151,7 @@ async def resend_verification_email(
         code = _set_verification_code(registration)
         await session.commit()
         try:
-            send_email_verification_code(registration.email, code)
+            send_email_verification_code(registration.email, code, lang=payload.lang)
         except Exception as exc:
             raise HTTPException(
                 status_code=503,

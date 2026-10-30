@@ -1,10 +1,14 @@
 import logging
 import os
 from typing import TypedDict, cast
+from urllib.parse import quote, urlsplit
 
 import resend
 
 logger = logging.getLogger(__name__)
+
+_DEFAULT_FRONTEND_URL = "http://localhost:3000"
+_INVALID_FRONTEND_URL_FALLBACK = "https://dj-bilal.com"
 
 _EmailPayload = TypedDict(
     "_EmailPayload",
@@ -12,7 +16,6 @@ _EmailPayload = TypedDict(
 )
 
 resend.api_key = os.getenv("RESEND_API_KEY")
-FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 _configured_from_email = os.getenv("FROM_EMAIL")
 if not _configured_from_email:
     logger.warning("FROM_EMAIL is not set; using Resend's onboarding sender")
@@ -52,33 +55,84 @@ def _send_email(
         raise
 
 
-def send_password_reset_email(email: str, token: str) -> None:
-    reset_url = f"{FRONTEND_URL.rstrip('/')}/reset-password?token={token}"
+def _get_frontend_url() -> str:
+    frontend_url = os.getenv("FRONTEND_URL", _DEFAULT_FRONTEND_URL).strip()
+    try:
+        parsed_url = urlsplit(frontend_url)
+        _ = parsed_url.port
+        if (
+            parsed_url.scheme not in {"http", "https"}
+            or not parsed_url.netloc
+            or not parsed_url.hostname
+            or parsed_url.username
+            or parsed_url.password
+            or parsed_url.query
+            or parsed_url.fragment
+        ):
+            raise ValueError("FRONTEND_URL must be an absolute HTTP(S) URL")
+    except ValueError:
+        logger.error("FRONTEND_URL is invalid; using the production frontend URL")
+        return _INVALID_FRONTEND_URL_FALLBACK
+    return frontend_url.rstrip("/")
+
+
+def _email_language(lang: str) -> str:
+    return "ar" if lang == "ar" else "en"
+
+
+def send_password_reset_email(email: str, token: str, lang: str = "en") -> None:
+    language = _email_language(lang)
+    reset_url = f"{_get_frontend_url()}/reset-password?token={quote(token, safe='')}"
+    if language == "ar":
+        subject = "DJ Bilal — إعادة تعيين كلمة المرور"
+        body = (
+            '<p dir="rtl" lang="ar">مرحبًا،</p>'
+            '<p dir="rtl" lang="ar">انقر على الرابط أدناه لإعادة تعيين كلمة المرور. '
+            "ستنتهي صلاحية هذا الرابط خلال ساعة واحدة.</p>"
+            f'<p dir="rtl" lang="ar"><a href="{reset_url}">إعادة تعيين كلمة المرور</a></p>'
+            '<p dir="rtl" lang="ar">إذا لم تطلب ذلك، فتجاهل هذه الرسالة.</p>'
+        )
+    else:
+        subject = "DJ Bilal — Password Reset"
+        body = (
+            "<p>Hello,</p>"
+            "<p>Use the link below to reset your password. "
+            "This link will expire in one hour.</p>"
+            f'<p><a href="{reset_url}">Reset my password</a></p>'
+            "<p>If you did not request this, you can ignore this email.</p>"
+        )
     payload: _EmailPayload = {
         "from": FROM_EMAIL,
         "to": [email],
-        "subject": "DJ Bilal — Şifre Sıfırlama",
-        "html": f"""
-        <p>Merhaba,</p>
-        <p>Şifrenizi sıfırlamak için aşağıdaki bağlantıya tıklayın. Bu bağlantı 1 saat içinde geçersiz olacaktır.</p>
-        <p><a href="{reset_url}">Şifremi Sıfırla</a></p>
-        <p>Eğer bu isteği siz yapmadıysanız, bu e-postayı görmezden gelin.</p>
-        """,
+        "subject": subject,
+        "html": body,
     }
     _send_email(payload, email, "password reset email")
 
 
-def send_email_verification_code(email: str, code: str) -> None:
+def send_email_verification_code(email: str, code: str, lang: str = "en") -> None:
+    if _email_language(lang) == "ar":
+        subject = "DJ Bilal — رمز التحقق من البريد الإلكتروني"
+        body = (
+            '<p dir="rtl" lang="ar">مرحبًا،</p>'
+            '<p dir="rtl" lang="ar">استخدم الرمز أدناه للتحقق من حسابك. '
+            "ستنتهي صلاحية الرمز خلال 15 دقيقة.</p>"
+            f'<p dir="rtl" lang="ar" style="font-size:32px;font-weight:bold;letter-spacing:8px">{code}</p>'
+            '<p dir="rtl" lang="ar">إذا لم تطلب ذلك، فتجاهل هذه الرسالة.</p>'
+        )
+    else:
+        subject = "DJ Bilal — Email Verification Code"
+        body = (
+            "<p>Hello,</p>"
+            "<p>Use the code below to verify your account. "
+            "The code will expire in 15 minutes.</p>"
+            f'<p style="font-size:32px;font-weight:bold;letter-spacing:8px">{code}</p>'
+            "<p>If you did not request this, you can ignore this email.</p>"
+        )
     payload: _EmailPayload = {
         "from": FROM_EMAIL,
         "to": [email],
-        "subject": "DJ Bilal — E-posta Doğrulama Kodu",
-        "html": (
-            "<p>Merhaba,</p>"
-            "<p>Hesabınızı doğrulamak için aşağıdaki kodu kullanın. "
-            "Kod 15 dakika içinde geçersiz olacaktır.</p>"
-            f'<p style="font-size:32px;font-weight:bold;letter-spacing:8px">{code}</p>'
-            "<p>Bu isteği siz yapmadıysanız bu e-postayı yok sayabilirsiniz.</p>"
-        ),
+        "subject": subject,
+        "html": body,
     }
     _send_email(payload, email, "verification email")

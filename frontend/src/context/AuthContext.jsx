@@ -68,12 +68,13 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const register = async (email, password, fullName) => {
+  const register = async (email, password, fullName, lang) => {
     try {
       await api.post('/register', {
         email,
         password,
         full_name: fullName?.trim() || null,
+        lang,
       });
       return { success: true, requiresEmailVerification: true };
     } catch (err) {

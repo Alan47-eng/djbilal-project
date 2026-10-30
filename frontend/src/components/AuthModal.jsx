@@ -77,7 +77,7 @@ const AuthModal = ({ isOpen, initialMode = 'login', onClose, onSuccess }) => {
         return;
       }
 
-      const result = await register(email, password, fullName);
+      const result = await register(email, password, fullName, lang);
       if (!result.success) {
         if (result.requiresEmailVerification) {
           setVerificationPending(true);
@@ -105,6 +105,7 @@ const AuthModal = ({ isOpen, initialMode = 'login', onClose, onSuccess }) => {
       await api.post('/verification/resend', {
         original_email: verificationOriginEmail,
         email,
+        lang,
       });
       setVerificationOriginEmail(email);
       setVerificationMessage(t.resendSuccess);
@@ -146,12 +147,14 @@ const AuthModal = ({ isOpen, initialMode = 'login', onClose, onSuccess }) => {
     }
     try {
       setResetLoading(true);
-      await api.post('/password/request', { email });
-      setResetMessage(lang === 'ar' ? 'Sıfırlama bağlantısı e-posta gönderildi.' : 'Reset link sent to your email.');
+      await api.post('/password/request', { email, lang });
+      setResetMessage(lang === 'ar'
+        ? 'إذا كان البريد مرتبطًا بحساب، فسيتم إرسال رابط إعادة التعيين.'
+        : 'If the email is associated with an account, a reset link will be sent.');
     } catch (err) {
       setResetMessage(getApiErrorMessage(
         err,
-        lang === 'ar' ? 'E-posta gönderilemedi. Tekrar deneyin.' : 'Failed to send reset email. Try again.',
+        lang === 'ar' ? 'تعذر إرسال البريد الإلكتروني. حاول مرة أخرى.' : 'Failed to send reset email. Try again.',
       ));
     } finally {
       setResetLoading(false);
@@ -331,7 +334,9 @@ const AuthModal = ({ isOpen, initialMode = 'login', onClose, onSuccess }) => {
                 className="text-sm text-slate-300 hover:text-white underline"
                 disabled={resetLoading}
               >
-                {resetLoading ? (lang === 'ar' ? 'Gönderiliyor...' : 'Sending...') : (lang === 'ar' ? 'Şifremi Unuttum?' : 'Forgot password?')}
+                {resetLoading
+                  ? (lang === 'ar' ? 'جارٍ الإرسال...' : 'Sending...')
+                  : (lang === 'ar' ? 'نسيت كلمة المرور؟' : 'Forgot Password?')}
               </button>
             </div>
           )}

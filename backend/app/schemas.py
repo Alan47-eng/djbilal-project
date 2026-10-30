@@ -96,6 +96,7 @@ class UserCreate(DTO):
     email: EmailStr
     password: str
     full_name: str | None = None
+    lang: Literal["en", "ar"] = "en"
 
     @field_validator("password")
     @classmethod
@@ -143,6 +144,7 @@ class LoginRequest(DTO):
 
 class PasswordResetRequest(DTO):
     email: EmailStr
+    lang: Literal["en", "ar"] = "en"
 
 
 class EmailVerificationRequest(DTO):
@@ -153,6 +155,7 @@ class EmailVerificationRequest(DTO):
 class EmailVerificationResendRequest(DTO):
     original_email: EmailStr
     email: EmailStr
+    lang: Literal["en", "ar"] = "en"
 
 
 class PasswordResetConfirm(DTO):

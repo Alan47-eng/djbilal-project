@@ -19,6 +19,7 @@ from app.rate_limit import limiter
 # Test database setup
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 SENT_VERIFICATION_CODES = []
+SENT_VERIFICATION_LANGUAGES = []
 
 @pytest.fixture
 async def test_db():
@@ -50,9 +51,13 @@ async def test_db():
 async def client(test_db, monkeypatch):
     """Create async test client"""
     SENT_VERIFICATION_CODES.clear()
+    SENT_VERIFICATION_LANGUAGES.clear()
     monkeypatch.setattr(
         "app.routers.auth.send_email_verification_code",
-        lambda email, code: SENT_VERIFICATION_CODES.append((email, code)),
+        lambda email, code, lang="en": (
+            SENT_VERIFICATION_CODES.append((email, code)),
+            SENT_VERIFICATION_LANGUAGES.append(lang),
+        ),
     )
     limiter.reset()
     transport = ASGITransport(app=app)
@@ -215,12 +220,34 @@ class TestRegisterEndpoint:
     async def test_register_success(self, client):
         response = await client.post(
             "/register",
-            json={"email": "user@example.com", "password": "password123"}
+            json={"email": "user@example.com", "password": "password123", "lang": "ar"}
         )
         
         assert response.status_code == 200
         assert response.json() == {"status": "verification_required"}
         assert SENT_VERIFICATION_CODES[0][0] == "user@example.com"
+        assert SENT_VERIFICATION_LANGUAGES[0] == "ar"
+
+    @pytest.mark.asyncio
+    async def test_password_reset_request_passes_language(
+        self, client, test_db, monkeypatch
+    ):
+        _, AsyncSessionLocal = test_db
+        async with AsyncSessionLocal() as session:
+            await create_user_record(session, "reset@example.com", "password123")
+
+        sent_languages = []
+        monkeypatch.setattr(
+            "app.routers.password_reset.send_password_reset_email",
+            lambda email, token, lang="en": sent_languages.append(lang),
+        )
+        response = await client.post(
+            "/password/request",
+            json={"email": "reset@example.com", "lang": "ar"},
+        )
+
+        assert response.status_code == 200
+        assert sent_languages == ["ar"]
 
     @pytest.mark.asyncio
     async def test_register_with_full_name(self, client, test_db):
@@ -261,7 +288,7 @@ class TestRegisterEndpoint:
         sent_emails = []
         monkeypatch.setattr(
             "app.routers.auth.send_email_verification_code",
-            lambda sent_email, code: sent_emails.append((sent_email, code)),
+            lambda sent_email, code, lang="en": sent_emails.append((sent_email, code)),
         )
         registration = await client.post(
             "/register",
@@ -318,10 +345,11 @@ class TestRegisterEndpoint:
 
         resent = await client.post(
             "/verification/resend",
-            json={"original_email": old_email, "email": new_email},
+            json={"original_email": old_email, "email": new_email, "lang": "ar"},
         )
         assert resent.status_code == 200
         assert SENT_VERIFICATION_CODES[-1][0] == new_email
+        assert SENT_VERIFICATION_LANGUAGES[-1] == "ar"
 
         verification = await client.post(
             "/verify-email",

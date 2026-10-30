@@ -31,7 +31,7 @@ async def request_password_reset(
     )
 
     try:
-        send_password_reset_email(user.email, token)
+        send_password_reset_email(user.email, token, lang=payload.lang)
     except Exception as exc:
         import logging
         logging.getLogger(__name__).warning(
