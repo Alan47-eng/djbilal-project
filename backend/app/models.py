@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Float, Boolean, JSON, func, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Date, DateTime, Float, Boolean, JSON, func, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import declarative_base
 
 Base = declarative_base()
@@ -14,6 +14,17 @@ class User(Base):
     email_verified = Column(Boolean, default=True, server_default="true", nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
+
+class Album(Base):
+    __tablename__ = "albums"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String(255), nullable=False, index=True)
+    cover_image_url = Column(String(1024), nullable=True)
+    release_date = Column(Date, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
 class Track(Base):
     __tablename__ = 'tracks'
 
@@ -25,6 +36,7 @@ class Track(Base):
     external_product_id = Column(String(1024), nullable=True)
     gumroad_url = Column(String(1024), nullable=True)
     gumroad_product_id = Column(String(255), nullable=True, unique=True, index=True)
+    album_id = Column(Integer, ForeignKey("albums.id", ondelete="SET NULL"), nullable=True, index=True)
     preview_url = Column(String(1024), nullable=False)
     full_file_path = Column(String(1024), nullable=False)
     is_free = Column(Boolean, default=False, nullable=False)

@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from . import auth, schemas
 from .adapters.gumroad import GumroadService
 from .interfaces import BaseStorageService
-from .models import GumroadSale, User, Track, Purchase
+from .models import Album, GumroadSale, User, Track, Purchase
 from .repositories import PurchaseDetailData, PurchaseRepository, TrackRepository, UserRepository
 from .utils import (
     build_storage_name,
@@ -170,6 +170,14 @@ class TrackService:
         self, session: AsyncSession, track_data: schemas.TrackCreate
     ) -> Track:
         """Create new track."""
+        if (
+            track_data.album_id is not None
+            and await session.get(Album, track_data.album_id) is None
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Album not found",
+            )
         return await self.repo.create(
             session,
             title=track_data.title,
@@ -179,6 +187,7 @@ class TrackService:
             external_product_id=track_data.external_product_id,
             gumroad_url=track_data.gumroad_url,
             gumroad_product_id=track_data.gumroad_product_id,
+            album_id=track_data.album_id,
             preview_url=track_data.preview_url,
             full_file_path=track_data.full_file_path,
             is_free=track_data.is_free,
@@ -211,6 +220,13 @@ class TrackService:
         update_values: dict[str, object] = track_data.model_dump(exclude_unset=True)
         if not update_values:
             return track
+
+        album_id = update_values.get("album_id")
+        if album_id is not None and await session.get(Album, album_id) is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Album not found",
+            )
 
         if "external_product_id" in update_values and "gumroad_url" not in update_values:
             legacy_product_id = update_values.pop("external_product_id")
@@ -288,6 +304,7 @@ class TrackService:
         external_product_id: str | None,
         gumroad_url: str | None,
         gumroad_product_id: str | None,
+        album_id: int | None,
         is_free: bool,
         free_download_url: str | None,
         track_file: bytes,
@@ -313,6 +330,7 @@ class TrackService:
                 external_product_id=None if is_free else external_product_id,
                 gumroad_url=None if is_free else gumroad_url,
                 gumroad_product_id=None if is_free else gumroad_product_id,
+                album_id=album_id,
                 preview_url="/media/previews/pending.mp3",
                 full_file_path="/media/tracks/pending.mp3",
                 is_free=is_free,

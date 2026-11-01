@@ -10,7 +10,7 @@ from app.main import app
 from app.models import Base
 from app.database import get_session
 from app.dependencies import get_storage_service
-from app.models import PendingRegistration, User, Track, Purchase, GumroadSale
+from app.models import Album, PendingRegistration, User, Track, Purchase, GumroadSale
 from app import auth, schemas
 from app.adapters.gumroad import GumroadService
 from app.rate_limit import limiter
@@ -91,6 +91,78 @@ async def create_user_record(session, email, password, is_admin=False, full_name
     await session.commit()
     await session.refresh(user)
     return user
+
+
+@pytest.mark.asyncio
+async def test_album_crud_and_track_album_unlink(client, test_db):
+    _, AsyncSessionLocal = test_db
+    async with AsyncSessionLocal() as session:
+        admin = await create_user_record(
+            session, "album-admin@example.com", "password123", is_admin=True
+        )
+
+    token = auth.create_access_token({"sub": admin.email})
+    headers = {"Authorization": f"Bearer {token}"}
+    created = await client.post(
+        "/albums",
+        headers=headers,
+        json={
+            "title": "Night Sessions",
+            "cover_image_url": "https://example.com/album.jpg",
+            "release_date": "2026-10-01",
+        },
+    )
+    assert created.status_code == 201
+    album = created.json()
+    assert album["title"] == "Night Sessions"
+    assert album["release_date"] == "2026-10-01"
+
+    track_response = await client.post(
+        "/tracks",
+        headers=headers,
+        json={
+            "title": "Midnight",
+            "artist": "DJ Bilal",
+            "price": 1.99,
+            "gumroad_url": "https://djbilal.gumroad.com/l/midnight",
+            "preview_url": "https://example.com/preview.mp3",
+            "full_file_path": "https://example.com/full.mp3",
+            "album_id": album["id"],
+        },
+    )
+    assert track_response.status_code == 200
+    track = track_response.json()
+    assert track["album_id"] == album["id"]
+
+    updated = await client.put(
+        f"/albums/{album['id']}",
+        headers=headers,
+        json={"title": "Night Sessions Vol. 1"},
+    )
+    assert updated.status_code == 200
+    assert updated.json()["title"] == "Night Sessions Vol. 1"
+    assert (await client.get("/albums")).json()[0]["id"] == album["id"]
+
+    deleted = await client.delete(f"/albums/{album['id']}", headers=headers)
+    assert deleted.status_code == 204
+    async with AsyncSessionLocal() as session:
+        saved_track = await session.get(Track, track["id"])
+        assert saved_track.album_id is None
+
+
+@pytest.mark.asyncio
+async def test_album_writes_require_admin(client, test_db):
+    _, AsyncSessionLocal = test_db
+    async with AsyncSessionLocal() as session:
+        user = await create_user_record(session, "album-user@example.com", "password123")
+
+    token = auth.create_access_token({"sub": user.email})
+    response = await client.post(
+        "/albums",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"title": "Unauthorized"},
+    )
+    assert response.status_code == 403
 
 
 async def verify_registered_email(client, email):

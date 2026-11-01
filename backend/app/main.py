@@ -13,6 +13,7 @@ from .config import (
 from .lifecycle import initialize_application
 from .rate_limit import limiter
 from .routers import (
+    albums_router,
     auth_router,
     media_router,
     password_reset_router,
@@ -47,6 +48,7 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.include_router(media_router)
 app.include_router(system_router)
 app.include_router(auth_router)
+app.include_router(albums_router)
 app.include_router(password_reset_router)
 app.include_router(profile_router)
 app.include_router(tracks_router)

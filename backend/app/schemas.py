@@ -1,6 +1,6 @@
 import re
 import math
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal
 from urllib.parse import urlparse, urlunsplit
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
@@ -162,6 +162,57 @@ class PasswordResetConfirm(DTO):
     token: str
     new_password: str
 
+
+class AlbumCreate(DTO):
+    title: str
+    cover_image_url: str | None = None
+    release_date: date | None = None
+
+    @field_validator("title")
+    @classmethod
+    def title_not_empty(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Album title cannot be empty")
+        return value.strip()
+
+    @field_validator("cover_image_url")
+    @classmethod
+    def cover_url_not_empty(cls, value: str | None) -> str | None:
+        if value is not None and not value.strip():
+            raise ValueError("Cover image URL cannot be empty")
+        return value.strip() if value is not None else None
+
+
+class AlbumUpdate(DTO):
+    title: str | None = None
+    cover_image_url: str | None = None
+    release_date: date | None = None
+
+    @field_validator("title")
+    @classmethod
+    def title_not_empty(cls, value: str | None) -> str | None:
+        if value is not None and not value.strip():
+            raise ValueError("Album title cannot be empty")
+        return value.strip() if value is not None else None
+
+    @field_validator("cover_image_url")
+    @classmethod
+    def cover_url_not_empty(cls, value: str | None) -> str | None:
+        if value is not None and not value.strip():
+            raise ValueError("Cover image URL cannot be empty")
+        return value.strip() if value is not None else None
+
+
+class AlbumResponse(DTO):
+    id: int
+    title: str
+    cover_image_url: str | None = None
+    release_date: date | None = None
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
+
+
 class TrackCreate(DTO):
     title: str
     artist: str
@@ -170,6 +221,7 @@ class TrackCreate(DTO):
     external_product_id: str | None = None
     gumroad_url: str | None = None
     gumroad_product_id: str | None = None
+    album_id: int | None = None
     preview_url: str
     full_file_path: str
     is_free: bool = False
@@ -205,6 +257,13 @@ class TrackCreate(DTO):
         if normalized not in ALL_TRACK_CATEGORIES:
             raise ValueError('Category must be one of: edit, remix, simple-pack, vst')
         return normalized
+
+    @field_validator("album_id")
+    @classmethod
+    def validate_album_id(cls, value: int | None) -> int | None:
+        if value is not None and value <= 0:
+            raise ValueError("album_id must be a positive integer")
+        return value
 
     @model_validator(mode='after')
     def validate_category_by_type(self) -> "TrackCreate":
@@ -248,6 +307,7 @@ class TrackUpdate(DTO):
     external_product_id: str | None = None
     gumroad_url: str | None = None
     gumroad_product_id: str | None = None
+    album_id: int | None = None
     preview_url: str | None = None
     is_free: bool | None = None
     free_download_url: str | None = None
@@ -283,6 +343,13 @@ class TrackUpdate(DTO):
             raise ValueError('Category must be one of: edit, remix, simple-pack, vst')
         return normalized
 
+    @field_validator("album_id")
+    @classmethod
+    def validate_album_id(cls, value: int | None) -> int | None:
+        if value is not None and value <= 0:
+            raise ValueError("album_id must be a positive integer")
+        return value
+
     @field_validator('external_product_id')
     @classmethod
     def validate_external_product_id(cls, value: str | None) -> str | None:
@@ -317,6 +384,7 @@ class TrackResponse(DTO):
     external_product_id: str | None = None
     gumroad_url: str | None = None
     gumroad_product_id: str | None = None
+    album_id: int | None = None
     preview_url: str
     is_free: bool = False
     free_download_url: str | None = None

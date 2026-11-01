@@ -1,276 +1,51 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React from 'react';
 import {
-  X,
-  Upload,
-  Users,
-  ShieldCheck,
-  PlusCircle,
-  LayoutGrid,
-  Music,
   Gift,
+  LayoutGrid,
   Library,
   LogIn,
-  UserPlus,
   LogOut,
-  PencilLine,
-  Trash2,
+  Music,
+  UserPlus,
+  X,
 } from 'lucide-react';
-import api from '../api';
 import { useAuth } from '../context/AuthContext';
-import { useTracks } from '../context/TrackContext';
-import { getApiErrorMessage } from '../utils/errors';
-
-const emptyForm = {
-  title: '',
-  artist: '',
-  category: 'edit',
-  price: '',
-  gumroad_url: '',
-  gumroad_product_id: '',
-  is_free: false,
-  track_file: null,
-  preview_file: null,
-  cover_file: null,
-};
+import AdminDashboard from './AdminDashboard';
 
 const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLogout }) => {
   const { user } = useAuth();
-  const { tracks, fetchTracks, updateTrack, removeTrack } = useTracks();
-  const [users, setUsers] = useState([]);
-  const [loadingUsers, setLoadingUsers] = useState(false);
-  const [updatingRoleUserId, setUpdatingRoleUserId] = useState(null);
-  const [uploading, setUploading] = useState(false);
-  const [updatingTrackId, setUpdatingTrackId] = useState(null);
-  const [trackPriceDrafts, setTrackPriceDrafts] = useState({});
-  const [trackProductDrafts, setTrackProductDrafts] = useState({});
-  const [trackProductIdDrafts, setTrackProductIdDrafts] = useState({});
-  const [message, setMessage] = useState(null);
-  const [error, setError] = useState(null);
-  const [form, setForm] = useState(emptyForm);
 
-  const isAdmin = user?.is_admin === true;
+  if (!isOpen) return null;
 
-  const menuItems = useMemo(() => ([
+  if (user?.is_admin) {
+    return (
+      <AdminDashboard
+        onClose={onClose}
+        onNavigate={onNavigate}
+        onLogout={onLogout}
+      />
+    );
+  }
+
+  const menuItems = [
     { id: 'edits', label: 'Edits', icon: <LayoutGrid size={16} /> },
     { id: 'remixes', label: 'Remixes', icon: <Music size={16} /> },
     { id: 'free', label: 'Free', icon: <Gift size={16} /> },
     ...(user ? [{ id: 'library', label: 'My Library', icon: <Library size={16} /> }] : []),
-  ]), [user]);
-
-  const stats = useMemo(() => [
-    { label: 'Tracks', value: 'Catalog' },
-    { label: 'Sales', value: 'Gumroad' },
-    { label: 'Access', value: isAdmin ? 'Admin' : 'Member' },
-  ], [isAdmin]);
-
-  useEffect(() => {
-    if (!isOpen || !isAdmin) return;
-
-    const loadUsers = async () => {
-      try {
-        setLoadingUsers(true);
-        const response = await api.get('/users');
-        setUsers(response.data);
-        setError(null);
-      } catch (err) {
-        setError(getApiErrorMessage(err, 'Could not load users'));
-      } finally {
-        setLoadingUsers(false);
-      }
-    };
-
-    loadUsers();
-  }, [isOpen, isAdmin]);
-
-  useEffect(() => {
-    if (!isOpen) {
-      setForm(emptyForm);
-      setMessage(null);
-      setError(null);
-    }
-  }, [isOpen]);
-
-  if (!isOpen) return null;
-
-  const handleChange = (key) => (event) => {
-    if (key === 'is_free') {
-      const checked = event.target.checked;
-      setForm((prev) => ({
-        ...prev,
-        is_free: checked,
-        category: checked
-          ? (prev.category === 'edit' ? 'remix' : prev.category)
-          : (['simple-pack', 'vst'].includes(prev.category) ? 'edit' : prev.category),
-        price: checked ? '0' : prev.price === '0' ? '' : prev.price,
-        gumroad_url: checked ? '' : prev.gumroad_url,
-        gumroad_product_id: checked ? '' : prev.gumroad_product_id,
-      }));
-      return;
-    }
-
-    let value;
-    if (event.target.type === 'file') {
-      value = event.target.files?.[0] || null;
-    } else if (event.target.type === 'checkbox') {
-      value = event.target.checked;
-    } else {
-      value = event.target.value;
-    }
-    setForm((prev) => ({ ...prev, [key]: value }));
-  };
-
-  const handleRoleChange = async (targetUser, role) => {
-    try {
-      setMessage(null);
-      setError(null);
-      setUpdatingRoleUserId(targetUser.id);
-      const response = await api.put(`/api/v1/users/${targetUser.id}/role`, { role });
-      setUsers((currentUsers) =>
-        currentUsers.map((item) =>
-          item.id === targetUser.id ? response.data : item
-        )
-      );
-      setMessage(
-        role === 'admin'
-          ? `${targetUser.email} artık admin`
-          : `${targetUser.email} normal kullanıcı yapıldı`
-      );
-    } catch (err) {
-      setError(getApiErrorMessage(err, 'Could not update user role'));
-    } finally {
-      setUpdatingRoleUserId(null);
-    }
-  };
-
-  const handleTrackPriceUpdate = async (trackId) => {
-    const rawPrice = trackPriceDrafts[trackId];
-    const priceValue = Number(rawPrice);
-    if (!Number.isFinite(priceValue) || priceValue < 0) {
-      setError('Price must be a valid non-negative number');
-      return;
-    }
-
-    try {
-      setUpdatingTrackId(trackId);
-      setMessage(null);
-      setError(null);
-      const response = await api.put(`/tracks/${trackId}`, { price: Number(priceValue.toFixed(2)) });
-      updateTrack(response.data);
-      setMessage('Track price updated');
-    } catch (err) {
-      setError(getApiErrorMessage(err, 'Could not update track price'));
-    } finally {
-      setUpdatingTrackId(null);
-    }
-  };
-
-  const handleTrackProductUpdate = async (trackId) => {
-    const track = tracks.find((item) => item.id === trackId);
-    try {
-      setUpdatingTrackId(trackId);
-      setMessage(null);
-      setError(null);
-      const response = await api.put(`/tracks/${trackId}`, {
-        gumroad_url: (trackProductDrafts[trackId] ?? track?.gumroad_url ?? '').trim() || null,
-        gumroad_product_id:
-          (trackProductIdDrafts[trackId] ?? track?.gumroad_product_id ?? '').trim() || null,
-      });
-      updateTrack(response.data);
-      setMessage('Gumroad product URL updated');
-    } catch (err) {
-      setError(getApiErrorMessage(err, 'Could not update Gumroad product URL'));
-    } finally {
-      setUpdatingTrackId(null);
-    }
-  };
-
-  const handleTrackDelete = async (trackId, trackTitle) => {
-    const confirmed = window.confirm(`Are you sure you want to delete "${trackTitle || 'this track'}"?`);
-    if (!confirmed) return;
-
-    try {
-      setMessage(null);
-      setError(null);
-      await api.delete(`/tracks/${trackId}`);
-      removeTrack(trackId);
-      setTrackPriceDrafts((prev) => {
-        const next = { ...prev };
-        delete next[trackId];
-        return next;
-      });
-      setMessage('Track deleted');
-    } catch (err) {
-      setError(getApiErrorMessage(err, 'Could not delete track'));
-    }
-  };
-
-  const handleSubmit = async (event) => {
-    event.preventDefault();
-    if (!form.track_file || !form.preview_file) {
-      setError('Track and preview files are required');
-      return;
-    }
-    if (!form.category) {
-      setError('Category is required');
-      return;
-    }
-    if (!form.is_free && !form.gumroad_url.trim()) {
-      setError('Gumroad product URL is required for paid tracks');
-      return;
-    }
-    if (!form.is_free && !form.price) {
-      setError('Paid tracks require a price');
-      return;
-    }
-    try {
-      setUploading(true);
-      setMessage(null);
-      setError(null);
-
-      const formData = new FormData();
-      formData.append('title', form.title);
-      formData.append('artist', form.artist);
-      formData.append('category', form.category);
-      formData.append('price', form.is_free ? '0' : form.price);
-      formData.append('is_free', form.is_free ? 'true' : 'false');
-      if (!form.is_free && form.gumroad_url) {
-        formData.append('gumroad_url', form.gumroad_url);
-      }
-      if (!form.is_free && form.gumroad_product_id) {
-        formData.append('gumroad_product_id', form.gumroad_product_id);
-      }
-      formData.append('track_file', form.track_file);
-      formData.append('preview_file', form.preview_file);
-      if (form.cover_file) {
-        formData.append('cover_file', form.cover_file);
-      }
-
-      await api.post('/tracks/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-
-      await fetchTracks();
-      setForm(emptyForm);
-      setMessage('Track added');
-    } catch (err) {
-      setError(getApiErrorMessage(err, 'Could not add track'));
-    } finally {
-      setUploading(false);
-    }
-  };
+  ];
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60" onClick={onClose}>
       <aside
-        className={`absolute left-0 top-0 flex h-full w-full ${isAdmin ? 'max-w-md' : 'max-w-sm'} flex-col border-r border-slate-700 bg-slate-900 text-slate-100 shadow-2xl`}
+        className="absolute left-0 top-0 flex h-full w-full max-w-sm flex-col border-r border-slate-700 bg-slate-900 text-slate-100 shadow-2xl"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-slate-800 px-5 py-4">
           <div>
-            <h2 className="text-xl font-bold">{isAdmin ? 'Admin Panel' : 'Menu'}</h2>
+            <h2 className="text-xl font-bold">Menu</h2>
             <p className="text-sm text-slate-400">{user ? user.email : 'DJ Bilal Music Store'}</p>
           </div>
-          <button onClick={onClose} className="rounded-full p-2 hover:bg-slate-800">
+          <button type="button" onClick={onClose} aria-label="Close menu" className="rounded-full p-2 hover:bg-slate-800">
             <X size={18} />
           </button>
         </div>
@@ -296,7 +71,7 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
           </div>
         </div>
 
-        {!user && (
+        {!user ? (
           <div className="space-y-2 border-b border-slate-800 px-5 py-4">
             <button
               type="button"
@@ -315,9 +90,7 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
               Sign Up
             </button>
           </div>
-        )}
-
-        {user && !isAdmin && (
+        ) : (
           <div className="space-y-2 border-b border-slate-800 px-5 py-4">
             <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">Account</p>
             <button
@@ -331,289 +104,9 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
           </div>
         )}
 
-        {!isAdmin ? (
-          <div className="px-5 py-4 text-sm text-slate-400">
-            Quickly navigate edits, remixes, and free tracks from here.
-          </div>
-        ) : (
-          <>
-            <div className="grid grid-cols-3 gap-3 border-b border-slate-800 px-5 py-4 text-xs">
-              {stats.map((item) => (
-                <div key={item.label} className="rounded-lg bg-slate-800 px-3 py-2">
-                  <div className="text-slate-400">{item.label}</div>
-                  <div className="font-semibold text-white">{item.value}</div>
-                </div>
-              ))}
-            </div>
-
-            <div className="flex-1 space-y-6 overflow-y-auto px-5 py-5">
-              <section className="rounded-2xl border border-slate-800 bg-slate-950 p-4">
-                <div className="mb-4 flex items-center gap-2">
-                  <Upload size={18} className="text-purple-400" />
-                  <h3 className="font-semibold">Add Track</h3>
-                </div>
-                <form className="space-y-3" onSubmit={handleSubmit}>
-                  <input
-                    value={form.title}
-                    onChange={handleChange('title')}
-                    placeholder="Title"
-                    className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
-                    required
-                  />
-                  <input
-                    value={form.artist}
-                    onChange={handleChange('artist')}
-                    placeholder="Artist"
-                    className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
-                    required
-                  />
-                  <label className="flex cursor-pointer select-none items-center gap-3 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2">
-                    <input
-                      type="checkbox"
-                      checked={form.is_free}
-                      onChange={handleChange('is_free')}
-                      className="h-4 w-4 accent-emerald-500"
-                    />
-                    <span className="text-sm text-slate-300">Free downloadable track (FREE)</span>
-                  </label>
-                  <label className="block text-sm text-slate-300">
-                    Category
-                    <select
-                      key={form.is_free ? 'free-category' : 'paid-category'}
-                      value={form.category}
-                      onChange={handleChange('category')}
-                      className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
-                      required
-                    >
-                      {form.is_free ? (
-                        <>
-                          <option value="remix">Remix</option>
-                          <option value="simple-pack">Simple Pack</option>
-                          <option value="vst">VST</option>
-                        </>
-                      ) : (
-                        <>
-                          <option value="edit">Edit</option>
-                          <option value="remix">Remix</option>
-                        </>
-                      )}
-                    </select>
-                  </label>
-                  <p className={`text-xs ${form.is_free ? 'text-emerald-300' : 'text-slate-400'}`}>
-                    {form.is_free
-                      ? 'Free seciliyken kategori: Remix, Simple Pack veya VST.'
-                      : 'Paid seciliyken kategori: Edit veya Remix.'}
-                  </p>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={form.price}
-                    onChange={handleChange('price')}
-                    placeholder={form.is_free ? '0.00 for free tracks' : 'Price'}
-                    className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
-                    required={!form.is_free}
-                    disabled={form.is_free}
-                  />
-                  {!form.is_free && (
-                    <>
-                      <input
-                        value={form.gumroad_url}
-                        onChange={handleChange('gumroad_url')}
-                        type="url"
-                        placeholder="https://djbilal.gumroad.com/l/your-product"
-                        className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
-                        required
-                      />
-                      <p className="text-xs text-slate-400">
-                        Enter this track's Gumroad URL. Each track can use a different product.
-                      </p>
-                      <input
-                        value={form.gumroad_product_id}
-                        onChange={handleChange('gumroad_product_id')}
-                        inputMode="numeric"
-                        placeholder="Gumroad product ID (optional)"
-                        className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
-                      />
-                    </>
-                  )}
-
-                  {form.is_free && (
-                    <p className="text-xs text-emerald-300">
-                      Free tracks do not require a separate URL; the full file becomes downloadable automatically.
-                    </p>
-                  )}
-                  <label className="block text-sm text-slate-300">
-                    Track file
-                    <input type="file" accept=".mp3,.wav,.m4a,.flac,.ogg,audio/*" onChange={handleChange('track_file')} className="mt-1 block w-full text-sm" required />
-                  </label>
-                  <label className="block text-sm text-slate-300">
-                    Preview file
-                    <input type="file" accept=".mp3,.wav,.m4a,.flac,.ogg,audio/*" onChange={handleChange('preview_file')} className="mt-1 block w-full text-sm" required />
-                  </label>
-                  <label className="block text-sm text-slate-300">
-                    Cover image
-                    <input type="file" accept=".png,.jpg,.jpeg,.webp,image/*" onChange={handleChange('cover_file')} className="mt-1 block w-full text-sm" />
-                  </label>
-
-                  {message && <p className="text-sm text-emerald-400">{message}</p>}
-                  {error && <p className="text-sm text-red-300">{error}</p>}
-
-                  <button
-                    type="submit"
-                    disabled={uploading}
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-purple-600 px-4 py-3 font-semibold text-white hover:bg-purple-700 disabled:opacity-60"
-                  >
-                    <PlusCircle size={16} />
-                    {uploading ? 'Adding...' : 'Add Track'}
-                  </button>
-                </form>
-              </section>
-
-              <section className="rounded-2xl border border-slate-800 bg-slate-950 p-4">
-                <div className="mb-4 flex items-center gap-2">
-                  <PencilLine size={18} className="text-purple-400" />
-                  <h3 className="font-semibold">Manage Tracks</h3>
-                </div>
-                <div className="max-h-64 space-y-3 overflow-y-auto">
-                  {tracks.length === 0 ? (
-                    <p className="text-sm text-slate-400">No tracks yet.</p>
-                  ) : (
-                    tracks.map((track) => (
-                      <div key={track.id} className="rounded-lg border border-slate-800 bg-slate-900 p-3">
-                        <div className="mb-2 flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-medium text-white">{track.title}</p>
-                            <p className="text-xs text-slate-400">{track.category} • ${Number(track.price).toFixed(2)}</p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => handleTrackDelete(track.id, track.title)}
-                            className="inline-flex items-center gap-1 rounded-lg border border-red-700 bg-red-500/10 px-2 py-1 text-[11px] font-semibold text-red-300 hover:bg-red-500/20"
-                          >
-                            <Trash2 size={12} />
-                            Delete
-                          </button>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={trackPriceDrafts[track.id] ?? track.price}
-                            onChange={(event) =>
-                              setTrackPriceDrafts((prev) => ({ ...prev, [track.id]: event.target.value }))
-                            }
-                            className="w-24 rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-sm text-white"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => handleTrackPriceUpdate(track.id)}
-                            disabled={updatingTrackId === track.id}
-                            className="inline-flex items-center gap-1 rounded-lg bg-purple-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-purple-700 disabled:opacity-60"
-                          >
-                            <PencilLine size={12} />
-                            {updatingTrackId === track.id ? 'Saving...' : 'Save price'}
-                          </button>
-                        </div>
-                        {!track.is_free && (
-                          <div className="mt-2 space-y-2">
-                            <div className="flex gap-2">
-                            <input
-                              type="url"
-                              placeholder="https://djbilal.gumroad.com/l/your-product"
-                              value={trackProductDrafts[track.id] ?? track.gumroad_url ?? track.external_product_id ?? ''}
-                              onChange={(event) =>
-                                setTrackProductDrafts((prev) => ({ ...prev, [track.id]: event.target.value }))
-                              }
-                              className="min-w-0 flex-1 rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-white"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => handleTrackProductUpdate(track.id)}
-                              disabled={updatingTrackId === track.id}
-                              className="rounded-lg border border-slate-600 px-2.5 py-1.5 text-xs font-semibold text-slate-200 hover:bg-slate-800 disabled:opacity-60"
-                            >
-                              Save product
-                            </button>
-                            </div>
-                            <input
-                              inputMode="numeric"
-                              placeholder="Gumroad product ID (optional)"
-                              value={trackProductIdDrafts[track.id] ?? track.gumroad_product_id ?? ''}
-                              onChange={(event) =>
-                                setTrackProductIdDrafts((prev) => ({ ...prev, [track.id]: event.target.value }))
-                              }
-                              className="w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-white"
-                            />
-                          </div>
-                        )}
-                      </div>
-                    ))
-                  )}
-                </div>
-              </section>
-
-              <section className="rounded-2xl border border-slate-800 bg-slate-950 p-4">
-                <div className="mb-4 flex items-center gap-2">
-                  <Users size={18} className="text-purple-400" />
-                  <h3 className="font-semibold">Users</h3>
-                </div>
-                {message && (
-                  <p className="mb-3 rounded-lg bg-emerald-500/10 px-3 py-2 text-sm text-emerald-300" role="status">
-                    {message}
-                  </p>
-                )}
-                {error && (
-                  <p className="mb-3 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300" role="alert">
-                    {error}
-                  </p>
-                )}
-                {loadingUsers ? (
-                  <p className="text-sm text-slate-400">Loading...</p>
-                ) : (
-                  <div className="space-y-2">
-                    {users.map((item) => (
-                      <div key={item.id} className="flex items-center justify-between gap-3 rounded-lg border border-slate-800 px-3 py-2">
-                        <div>
-                          <p className="text-sm font-medium text-white">{item.email}</p>
-                          <p className="text-xs text-slate-400">{item.is_admin ? 'Admin' : 'User'}</p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleRoleChange(item, item.is_admin ? 'user' : 'admin')
-                          }
-                          disabled={
-                            updatingRoleUserId === item.id ||
-                            (item.is_admin && item.id === user?.id)
-                          }
-                          title={
-                            item.is_admin && item.id === user?.id
-                              ? 'You cannot remove your own admin role'
-                              : undefined
-                          }
-                          className={`inline-flex shrink-0 items-center gap-1 rounded-lg px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50 ${
-                            item.is_admin
-                              ? 'bg-amber-700 hover:bg-amber-800'
-                              : 'bg-emerald-600 hover:bg-emerald-700'
-                          }`}
-                        >
-                          <ShieldCheck size={14} />
-                          {updatingRoleUserId === item.id
-                            ? 'Saving...'
-                            : item.is_admin
-                              ? 'Adminliği Kaldır / Normal Kullanıcı Yap'
-                              : 'Admin Yap'}
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </section>
-            </div>
-          </>
-        )}
+        <div className="px-5 py-4 text-sm text-slate-400">
+          Quickly navigate edits, remixes, and free tracks from here.
+        </div>
       </aside>
     </div>
   );
