@@ -42,6 +42,7 @@ function AppContent() {
       : 'edits'
   ); // 'edits' | 'remixes' | 'free' | 'library'
   const [gumroadCheckoutItems, setGumroadCheckoutItems] = useState([]);
+  const [checkoutPollNonce, setCheckoutPollNonce] = useState(0);
   const [albums, setAlbums] = useState([]);
   const [albumsError, setAlbumsError] = useState('');
   const [selectedAlbumId, setSelectedAlbumId] = useState(null);
@@ -83,6 +84,60 @@ function AppContent() {
 
   const isAdmin = user?.is_admin === true;
   const loading = authLoading || tracksLoading;
+  useEffect(() => {
+    if (!user) return undefined;
+
+    let expectedTrackIds;
+    try {
+      expectedTrackIds = JSON.parse(
+        window.sessionStorage.getItem('gumroadCheckoutTrackIds') || '[]'
+      );
+    } catch {
+      window.sessionStorage.removeItem('gumroadCheckoutTrackIds');
+      return undefined;
+    }
+
+    if (
+      !Array.isArray(expectedTrackIds) ||
+      expectedTrackIds.length === 0 ||
+      expectedTrackIds.some((trackId) => !Number.isInteger(trackId))
+    ) {
+      window.sessionStorage.removeItem('gumroadCheckoutTrackIds');
+      return undefined;
+    }
+
+    let cancelled = false;
+    let timeoutId;
+    const expiresAt = Date.now() + 15 * 60 * 1000;
+    const checkPurchase = async () => {
+      if (cancelled) return;
+      try {
+        const response = await api.get('/purchases');
+        if (expectedTrackIds.every((trackId) => response.data.includes(trackId))) {
+          window.sessionStorage.removeItem('gumroadCheckoutTrackIds');
+          if (window.location.pathname.replace(/\/+$/, '') !== '/purchases') {
+            window.location.assign('/purchases');
+          }
+          return;
+        }
+      } catch (error) {
+        console.error('Could not check Gumroad purchase status.', error);
+      }
+
+      if (Date.now() >= expiresAt) {
+        window.sessionStorage.removeItem('gumroadCheckoutTrackIds');
+        return;
+      }
+      timeoutId = window.setTimeout(checkPurchase, 5000);
+    };
+
+    void checkPurchase();
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [user, checkoutPollNonce]);
+
   const normalizedCategory = (track) => (track.category || '').toLowerCase();
   const paidTracks = tracks.filter((track) => !track.is_free);
   const remixTracks = paidTracks.filter((track) => {
@@ -203,12 +258,11 @@ function AppContent() {
     }
 
     try {
-      const currentTrackIds = JSON.parse(
-        window.sessionStorage.getItem('gumroadCheckoutTrackIds') || '[]'
+      window.sessionStorage.setItem(
+        'gumroadCheckoutTrackIds',
+        JSON.stringify([track.id])
       );
-      const trackIds = Array.isArray(currentTrackIds) ? currentTrackIds : [];
-      if (!trackIds.includes(track.id)) trackIds.push(track.id);
-      window.sessionStorage.setItem('gumroadCheckoutTrackIds', JSON.stringify(trackIds));
+      setCheckoutPollNonce((current) => current + 1);
     } catch (error) {
       console.error('Could not save Gumroad checkout tracking data.', error);
     }
@@ -236,6 +290,7 @@ function AppContent() {
 
   const handleLogout = () => {
     logout();
+    window.sessionStorage.removeItem('gumroadCheckoutTrackIds');
     setIsPlaying(false);
     setCurrentTrack(null);
     setGumroadCheckoutItems([]);

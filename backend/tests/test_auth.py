@@ -1040,6 +1040,16 @@ class TestCheckoutAndWebhook:
         assert track.id in purchases_response.json()
 
     @pytest.mark.asyncio
+    async def test_webhook_does_not_acknowledge_missing_signed_context(self, client):
+        response = await client.post(
+            "/api/v1/webhooks/gumroad",
+            data={"sale_id": "sale-without-context", "seller_id": "test-seller"},
+        )
+
+        assert response.status_code == 400
+        assert response.json()["detail"] == "Missing Gumroad buyer information"
+
+    @pytest.mark.asyncio
     async def test_separate_gumroad_cart_sales_activate_every_track(
         self, client, test_db, monkeypatch
     ):
@@ -1205,7 +1215,7 @@ class TestCheckoutAndWebhook:
         )
 
         assert response.status_code == 200
-        assert response.json()["status"] == "ignored"
+        assert response.json() == {"status": "ignored", "purchase_ids": []}
 
     @pytest.mark.asyncio
     async def test_webhook_rejects_gumroad_amount_that_differs_from_track(
@@ -1241,8 +1251,8 @@ class TestCheckoutAndWebhook:
             },
         )
 
-        assert response.status_code == 200
-        assert response.json()["status"] == "ignored"
+        assert response.status_code == 400
+        assert response.json()["detail"] == "Gumroad sale amount does not match the track price"
         async with AsyncSessionLocal() as session:
             purchases = await session.execute(
                 select(Purchase).where(

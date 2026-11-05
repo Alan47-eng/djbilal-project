@@ -1,19 +1,15 @@
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_session
+from ..adapters.gumroad import GumroadService
 from ..dependencies import get_purchase_service
 from ..services import PurchaseService
 
 router = APIRouter(tags=["webhooks"])
 logger = logging.getLogger(__name__)
-
-
-def _ignored_response(reason: str) -> dict[str, str | list[int]]:
-    logger.warning("Acknowledging Gumroad notification without purchase: %s", reason)
-    return {"status": "ignored", "purchase_ids": []}
 
 
 @router.post("/api/v1/webhooks/gumroad")
@@ -33,9 +29,33 @@ async def gumroad_webhook(
     for key, value in form.items():
         if isinstance(key, str) and isinstance(value, str):
             payload[key] = value
+    checkout_data = GumroadService.extract_checkout_data(payload)
+    logger.info(
+        "Received Gumroad webhook: field_names=%s sale_id_present=%s "
+        "seller_id_present=%s product_id_present=%s permalink_present=%s "
+        "checkout_user_present=%s checkout_tracks_present=%s "
+        "checkout_signature_present=%s",
+        sorted(payload),
+        bool(payload.get("sale_id")),
+        bool(payload.get("seller_id")),
+        bool(payload.get("product_id")),
+        bool(payload.get("product_permalink")),
+        bool(checkout_data.get("user_id")),
+        bool(checkout_data.get("track_ids")),
+        bool(checkout_data.get("signature")),
+    )
     try:
-        return await purchase_service.process_gumroad_ping(session, payload)
+        result = await purchase_service.process_gumroad_ping(session, payload)
     except HTTPException as exc:
-        if exc.status_code != status.HTTP_400_BAD_REQUEST:
-            raise
-        return _ignored_response(str(exc.detail))
+        logger.warning(
+            "Gumroad webhook processing failed: status=%s reason=%s",
+            exc.status_code,
+            exc.detail,
+        )
+        raise
+    logger.info(
+        "Gumroad webhook processed: status=%s purchase_count=%s",
+        result.get("status"),
+        len(result.get("purchase_ids", [])),
+    )
+    return result

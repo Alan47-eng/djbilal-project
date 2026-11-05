@@ -579,6 +579,13 @@ class PurchaseService:
         user_id_value = custom_data.get("user_id")
         track_ids_value = custom_data.get("track_ids")
         signature = custom_data.get("signature")
+        logger.info(
+            "Gumroad checkout context extracted: user_present=%s "
+            "track_ids_present=%s signature_present=%s",
+            bool(user_id_value),
+            bool(track_ids_value),
+            bool(signature),
+        )
         if not user_id_value or not signature:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -599,6 +606,11 @@ class PurchaseService:
             )
 
         sale = await self.gumroad_service.verify_sale(payload)
+        logger.info(
+            "Gumroad sale verified: permalink_present=%s product_id_present=%s",
+            bool(sale.get("product_permalink")),
+            bool(sale.get("product_id")),
+        )
         existing_sale = await session.get(GumroadSale, sale["sale_id"])
         if existing_sale:
             return {"status": "duplicate", "purchase_ids": []}
@@ -634,6 +646,10 @@ class PurchaseService:
                 )
             )
         ]
+        logger.info(
+            "Gumroad product mapping completed: match_count=%s",
+            len(matching_tracks),
+        )
         if len(matching_tracks) != 1:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -680,12 +696,14 @@ class PurchaseService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Gumroad sale amount does not match the track price",
             )
-        if not self.gumroad_service.verify_checkout_signature(
+        signature_valid = self.gumroad_service.verify_checkout_signature(
             user_id=user_id,
             track_id=track.id,
             product_permalink=track_permalink or product_id or "",
             signature=signature,
-        ):
+        )
+        logger.info("Gumroad checkout signature validation: valid=%s", signature_valid)
+        if not signature_valid:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid Gumroad checkout signature",
@@ -727,6 +745,7 @@ class PurchaseService:
                 return {"status": "duplicate", "purchase_ids": []}
             raise
 
+        logger.info("Gumroad purchase recorded: track_count=%s", len(purchase_ids))
         return {"status": "ok", "purchase_ids": purchase_ids}
 
     async def generate_license_document(
