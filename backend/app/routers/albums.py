@@ -1,13 +1,54 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .. import auth, schemas
 from ..database import get_session
+from ..dependencies import get_storage_service
+from ..interfaces import BaseStorageService
 from ..models import Album, Track, User
+from ..utils import (
+    IMAGE_EXTENSIONS,
+    MAX_COVER_UPLOAD_BYTES,
+    build_storage_name,
+    validate_upload_data,
+    validate_upload_file,
+)
 from .dependencies import require_admin
 
 router = APIRouter(prefix="/albums", tags=["albums"])
+
+
+@router.post("/cover-upload")
+async def upload_album_cover(
+    cover_file: UploadFile = File(...),
+    current_user: User = Depends(auth.get_current_user),
+    storage_service: BaseStorageService = Depends(get_storage_service),
+) -> dict[str, str]:
+    require_admin(current_user)
+    validate_upload_file(
+        cover_file, IMAGE_EXTENSIONS, MAX_COVER_UPLOAD_BYTES, "Cover image"
+    )
+    try:
+        content = await cover_file.read(MAX_COVER_UPLOAD_BYTES + 1)
+    except (OSError, ValueError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="The uploaded cover image could not be read; please retry the upload",
+        ) from exc
+    finally:
+        await cover_file.close()
+
+    validate_upload_data(
+        cover_file.filename,
+        len(content),
+        IMAGE_EXTENSIONS,
+        MAX_COVER_UPLOAD_BYTES,
+        "Cover image",
+    )
+    filename = build_storage_name(cover_file.filename or "")
+    cover_url = await storage_service.upload_file(content, "covers", filename)
+    return {"cover_image_url": cover_url}
 
 
 @router.get("", response_model=list[schemas.AlbumResponse])

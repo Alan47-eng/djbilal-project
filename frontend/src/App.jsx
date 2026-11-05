@@ -16,11 +16,13 @@ import ResetPassword from './components/ResetPassword';
 import './index.css';
 import { getApiErrorMessage } from './utils/errors';
 import { downloadTrackFile } from './utils/downloads';
+import api, { resolveAssetUrl } from './api';
 
 function buildGumroadOverlayUrl(checkoutUrl) {
   const url = new URL(checkoutUrl);
-  url.searchParams.set('wanted', 'true');
-  url.searchParams.set('overlay', 'true');
+  // Gumroad's embed script intercepts links without wanted=true; that flag bypasses its overlay.
+  url.searchParams.delete('wanted');
+  url.searchParams.delete('overlay');
   return url.toString();
 }
 
@@ -40,6 +42,9 @@ function AppContent() {
       : 'edits'
   ); // 'edits' | 'remixes' | 'free' | 'library'
   const [gumroadCheckoutItems, setGumroadCheckoutItems] = useState([]);
+  const [albums, setAlbums] = useState([]);
+  const [albumsError, setAlbumsError] = useState('');
+  const [selectedAlbumId, setSelectedAlbumId] = useState(null);
   const [downloadError, setDownloadError] = useState(null);
   const t = {
     edits: lang === 'ar' ? 'تعديلات' : 'Edits',
@@ -60,6 +65,13 @@ function AppContent() {
     freeDesc: lang === 'ar' ? 'تصفح ملفات الريمكس والحزم البسيطة وملفات VST المجانية.' : 'Browse free remix, simple pack, and VST files.',
     myPurchases: lang === 'ar' ? 'مشترياتي' : 'My Purchases',
     myPurchasesDesc: lang === 'ar' ? 'أعد تنزيل كل التراكات المشتراة في أي وقت.' : 'Re-download all licensed tracks you have purchased anytime from here.',
+    albums: lang === 'ar' ? 'الألبومات' : 'Albums',
+    albumsDesc: lang === 'ar' ? 'تصفح الألبومات واستمع إلى المقاطع داخل كل ألبوم.' : 'Browse albums and discover the tracks inside each release.',
+    albumTracks: lang === 'ar' ? 'مقاطع الألبوم' : 'Album tracks',
+    backToAlbums: lang === 'ar' ? 'العودة إلى الألبومات' : 'Back to albums',
+    noAlbums: lang === 'ar' ? 'لا توجد ألبومات بعد.' : 'No albums available yet.',
+    noAlbumTracks: lang === 'ar' ? 'لا توجد مقاطع في هذا الألبوم بعد.' : 'This album has no tracks yet.',
+    albumsLoadFailed: lang === 'ar' ? 'تعذر تحميل الألبومات.' : 'Could not load albums.',
     previewMissing: lang === 'ar' ? 'ملف المعاينة غير متوفر لهذا التراك.' : 'Preview file is missing for this track.',
     fileMissing: lang === 'ar' ? 'الملف غير موجود. يرجى إعادة رفع التراك.' : 'File not found. Please upload the track again.',
     downloadFailed: lang === 'ar' ? 'فشل التنزيل.' : 'Download failed.',
@@ -83,6 +95,21 @@ function AppContent() {
     if (category) return category === 'edit';
     return !`${track.title} ${track.artist}`.toLowerCase().includes('remix');
   });
+  useEffect(() => {
+    let cancelled = false;
+    api.get('/albums')
+      .then((response) => {
+        if (!cancelled) setAlbums(response.data);
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setAlbumsError(getApiErrorMessage(error, t.albumsLoadFailed));
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   useEffect(() => {
     if (!user) {
       setGumroadCheckoutItems([]);
@@ -363,6 +390,7 @@ function AppContent() {
             { id: 'edits', label: t.edits, icon: <LayoutGrid size={15} /> },
             { id: 'remixes', label: t.remixes, icon: <Music size={15} /> },
             { id: 'free', label: t.free, icon: <Gift size={15} /> },
+            { id: 'albums', label: t.albums, icon: <Library size={15} /> },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -431,6 +459,96 @@ function AppContent() {
                 </div>
                 {renderTrackGrid(remixTracks, t.noRemixes)}
               </>
+            )}
+
+            {activeTab === 'albums' && (
+              <section className="pb-32">
+                {selectedAlbumId ? (() => {
+                  const album = albums.find((item) => item.id === selectedAlbumId);
+                  const albumTracks = tracks.filter((track) => track.album_id === selectedAlbumId);
+                  return (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedAlbumId(null)}
+                        className="mb-5 rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-200 hover:bg-slate-800"
+                      >
+                        {t.backToAlbums}
+                      </button>
+                      <div className="mb-6 flex items-center gap-5">
+                        {album?.cover_image_url && (
+                          <img
+                            src={resolveAssetUrl(album.cover_image_url)}
+                            alt={`${album.title} cover`}
+                            className="h-24 w-24 rounded-xl object-cover"
+                          />
+                        )}
+                        <div>
+                          <p className="text-sm font-semibold text-purple-300">{t.albumTracks}</p>
+                          <h2 className="mt-1 text-2xl font-bold text-white">{album?.title}</h2>
+                          {album?.release_date && (
+                            <p className="mt-1 text-sm text-slate-400">
+                              {new Date(album.release_date).toLocaleDateString(lang === 'ar' ? 'ar' : 'en')}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      {renderTrackGrid(albumTracks, t.noAlbumTracks)}
+                    </>
+                  );
+                })() : (
+                  <>
+                    <div className="mb-6">
+                      <h2 className="text-2xl font-bold text-white">{t.albums}</h2>
+                      <p className="mt-1 text-sm text-slate-400">{t.albumsDesc}</p>
+                    </div>
+                    {albumsError ? (
+                      <div className="rounded-lg border border-red-500 bg-red-600/20 p-4 text-red-200">
+                        {albumsError}
+                      </div>
+                    ) : albums.length ? (
+                      <div className="grid grid-cols-1 gap-6 pb-32 sm:grid-cols-2 lg:grid-cols-3">
+                        {albums.map((album) => {
+                          const albumTrackCount = tracks.filter((track) => track.album_id === album.id).length;
+                          return (
+                            <button
+                              key={album.id}
+                              type="button"
+                              onClick={() => setSelectedAlbumId(album.id)}
+                              className="overflow-hidden rounded-xl border border-slate-800 bg-slate-800 text-left transition hover:border-purple-500 hover:bg-slate-700"
+                            >
+                              {album.cover_image_url ? (
+                                <img
+                                  src={resolveAssetUrl(album.cover_image_url)}
+                                  alt={`${album.title} cover`}
+                                  className="aspect-square w-full object-cover"
+                                  loading="lazy"
+                                />
+                              ) : (
+                                <div className="flex aspect-square items-center justify-center bg-gradient-to-br from-purple-700 to-blue-700">
+                                  <Music size={48} className="text-white/70" />
+                                </div>
+                              )}
+                              <div className="p-4">
+                                <h3 className="truncate text-lg font-bold text-white">{album.title}</h3>
+                                <p className="mt-1 text-sm text-slate-400">
+                                  {albumTrackCount} · {album.release_date
+                                    ? new Date(album.release_date).toLocaleDateString(lang === 'ar' ? 'ar' : 'en')
+                                    : t.albums}
+                                </p>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="rounded-2xl border border-slate-800 bg-slate-900 p-8 text-center text-slate-300">
+                        {t.noAlbums}
+                      </div>
+                    )}
+                  </>
+                )}
+              </section>
             )}
 
             {/* Free tab */}

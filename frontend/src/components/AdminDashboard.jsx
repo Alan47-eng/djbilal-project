@@ -11,6 +11,7 @@ import {
 import api from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useTracks } from '../context/TrackContext';
+import { useLanguage } from '../context/LanguageContext';
 import { getApiErrorMessage } from '../utils/errors';
 
 const initialTrackForm = {
@@ -34,14 +35,70 @@ const buttonClass =
 
 const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
   const { user } = useAuth();
+  const { lang, isRTL } = useLanguage();
   const { tracks, fetchTracks, updateTrack, removeTrack } = useTracks();
+  const t = lang === 'ar' ? {
+    dashboard: 'لوحة الإدارة', users: 'إدارة المستخدمين', albums: 'الألبومات', tracks: 'المقاطع', settings: 'الإعدادات',
+    siteSections: 'أقسام الموقع', edits: 'التعديلات', remixes: 'الريمكسات', free: 'مجاني', library: 'مكتبتي',
+    logout: 'تسجيل الخروج', close: 'إغلاق', loading: 'جارٍ تحميل البيانات...', email: 'البريد الإلكتروني',
+    name: 'الاسم', role: 'الدور', action: 'الإجراء', admin: 'مسؤول', user: 'مستخدم', saving: 'جارٍ الحفظ...',
+    demote: 'إزالة صلاحية المسؤول', promote: 'ترقية إلى مسؤول', noUsers: 'لم يتم العثور على مستخدمين.',
+    albumTitle: 'عنوان الألبوم', coverUrl: 'رابط الغلاف', coverFile: 'تحميل صورة الغلاف',
+    releaseDate: 'تاريخ الإصدار', creating: 'جارٍ الإنشاء...', createAlbum: 'إنشاء ألبوم', save: 'حفظ',
+    albumCover: 'غلاف الألبوم', noAlbums: 'لا توجد ألبومات بعد.', trackName: 'اسم المقطع', artist: 'الفنان',
+    selectAlbum: 'اختر ألبومًا', single: 'منفرد', genre: 'النوع', price: 'السعر', freeCheckbox: 'مجاني',
+    productUrl: 'رابط منتج Gumroad', productId: 'معرّف المنتج', trackFile: 'ملف المقطع',
+    previewFile: 'ملف المعاينة', addTrack: 'إضافة مقطع', adding: 'جارٍ الإضافة...', track: 'المقطع',
+    operations: 'الإجراءات', noTracks: 'لا توجد مقاطع بعد.', adminAccount: 'حساب المسؤول',
+    settingsDescription: 'تتم إدارة إعدادات الدفع والبريد الإلكتروني والتخزين من متغيرات بيئة الخادم لأسباب أمنية، ولا تظهر هنا.',
+    invalidPrice: 'يجب أن يكون سعر المقطع رقمًا صالحًا أكبر من صفر.',
+    requiredTrackFiles: 'ملف المقطع وملف المعاينة مطلوبان.',
+    paidTrackFields: 'السعر ورابط Gumroad مطلوبان للمقاطع المدفوعة.',
+    deleteAlbumConfirm: (title) => `هل تريد حذف الألبوم "${title}"؟ ستبقى المقاطع كإصدارات منفردة.`,
+    deleteTrackConfirm: (title) => `هل تريد حذف المقطع "${title}"؟`,
+    roleAdmin: 'تمت ترقية المستخدم إلى مسؤول.', roleUser: 'تمت إزالة صلاحية المسؤول.',
+    roleError: 'تعذر تحديث دور المستخدم.', loadError: 'تعذر تحميل البيانات.',
+    albumCreated: 'تم إنشاء الألبوم.', albumCreateError: 'تعذر إنشاء الألبوم.',
+    albumUpdated: 'تم تحديث الألبوم.', albumUpdateError: 'تعذر تحديث الألبوم.',
+    albumDeleted: 'تم حذف الألبوم؛ وحُفظت المقاطع كإصدارات منفردة.', albumDeleteError: 'تعذر حذف الألبوم.',
+    trackUpdated: 'تم تحديث معلومات المقطع.', trackUpdateError: 'تعذر تحديث المقطع.',
+    trackDeleted: 'تم حذف المقطع.', trackDeleteError: 'تعذر حذف المقطع.',
+    trackAdded: 'تمت إضافة المقطع إلى المكتبة.', trackAddError: 'تعذر إضافة المقطع.',
+  } : {
+    dashboard: 'Admin Dashboard', users: 'User Management', albums: 'Albums', tracks: 'Tracks', settings: 'Settings',
+    siteSections: 'Site sections', edits: 'Edits', remixes: 'Remixes', free: 'Free', library: 'My Library',
+    logout: 'Log out', close: 'Close', loading: 'Loading data...', email: 'Email', name: 'Name', role: 'Role',
+    action: 'Action', admin: 'Admin', user: 'User', saving: 'Saving...', demote: 'Remove admin role',
+    promote: 'Promote to admin', noUsers: 'No users found.', albumTitle: 'Album title',
+    coverUrl: 'Cover image URL', coverFile: 'Upload cover image', releaseDate: 'Release date',
+    creating: 'Creating...', createAlbum: 'Create album', save: 'Save', albumCover: 'Album cover',
+    noAlbums: 'No albums yet.', trackName: 'Track title', artist: 'Artist', selectAlbum: 'Select album',
+    single: 'Single', genre: 'Category', price: 'Price', freeCheckbox: 'Free',
+    productUrl: 'Gumroad product URL', productId: 'Product ID', trackFile: 'Track file',
+    previewFile: 'Preview file', addTrack: 'Add track', adding: 'Adding...', track: 'Track',
+    operations: 'Actions', noTracks: 'No tracks yet.', adminAccount: 'Administrator account',
+    settingsDescription: 'Payment, email, and storage settings are managed through server environment variables for security and are not displayed here.',
+    invalidPrice: 'Track price must be a valid number greater than zero.',
+    requiredTrackFiles: 'Track and preview files are required.',
+    paidTrackFields: 'Paid tracks require a price and Gumroad URL.',
+    deleteAlbumConfirm: (title) => `Delete album "${title}"? Its tracks will remain as singles.`,
+    deleteTrackConfirm: (title) => `Delete track "${title}"?`,
+    roleAdmin: 'User promoted to admin.', roleUser: 'Admin role removed.',
+    roleError: 'Could not update user role.', loadError: 'Could not load data.',
+    albumCreated: 'Album created.', albumCreateError: 'Could not create album.',
+    albumUpdated: 'Album updated.', albumUpdateError: 'Could not update album.',
+    albumDeleted: 'Album deleted; its tracks were kept as singles.', albumDeleteError: 'Could not delete album.',
+    trackUpdated: 'Track information updated.', trackUpdateError: 'Could not update track.',
+    trackDeleted: 'Track deleted.', trackDeleteError: 'Could not delete track.',
+    trackAdded: 'Track added to the catalog.', trackAddError: 'Could not add track.',
+  };
   const [tab, setTab] = useState('users');
   const [users, setUsers] = useState([]);
   const [albums, setAlbums] = useState([]);
   const [albumDrafts, setAlbumDrafts] = useState({});
   const [trackDrafts, setTrackDrafts] = useState({});
   const [trackForm, setTrackForm] = useState(initialTrackForm);
-  const [newAlbum, setNewAlbum] = useState({ title: '', cover_image_url: '', release_date: '' });
+  const [newAlbum, setNewAlbum] = useState({ title: '', cover_image_url: '', cover_file: null, release_date: '' });
   const [loading, setLoading] = useState(false);
   const [savingKey, setSavingKey] = useState('');
   const [notice, setNotice] = useState('');
@@ -65,7 +122,7 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
         }]),
       ));
     } catch (requestError) {
-      setError(getApiErrorMessage(requestError, 'Veriler yüklenemedi.'));
+      setError(getApiErrorMessage(requestError, t.loadError));
     } finally {
       setLoading(false);
     }
@@ -88,9 +145,9 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
     try {
       const response = await api.put(`/api/v1/users/${target.id}/role`, { role });
       setUsers((current) => current.map((item) => item.id === target.id ? response.data : item));
-      setNotice(role === 'admin' ? 'Kullanıcı admin yapıldı.' : 'Admin rolü kaldırıldı.');
+      setNotice(role === 'admin' ? t.roleAdmin : t.roleUser);
     } catch (requestError) {
-      showError(requestError, 'Kullanıcı rolü güncellenemedi.');
+      showError(requestError, t.roleError);
     } finally {
       setSavingKey('');
     }
@@ -102,16 +159,25 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
     setError('');
     setNotice('');
     try {
+      let coverImageUrl = newAlbum.cover_image_url.trim() || null;
+      if (newAlbum.cover_file) {
+        const upload = new FormData();
+        upload.append('cover_file', newAlbum.cover_file);
+        const uploadResponse = await api.post('/albums/cover-upload', upload, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        coverImageUrl = uploadResponse.data.cover_image_url;
+      }
       await api.post('/albums', {
         title: newAlbum.title.trim(),
-        cover_image_url: newAlbum.cover_image_url.trim() || null,
+        cover_image_url: coverImageUrl,
         release_date: newAlbum.release_date || null,
       });
-      setNewAlbum({ title: '', cover_image_url: '', release_date: '' });
+      setNewAlbum({ title: '', cover_image_url: '', cover_file: null, release_date: '' });
       await loadData();
-      setNotice('Albüm oluşturuldu.');
+      setNotice(t.albumCreated);
     } catch (requestError) {
-      showError(requestError, 'Albüm oluşturulamadı.');
+      showError(requestError, t.albumCreateError);
     } finally {
       setSavingKey('');
     }
@@ -123,22 +189,35 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
     setNotice('');
     try {
       const draft = albumDrafts[albumId];
+      let coverImageUrl = draft.cover_image_url.trim() || null;
+      if (draft.cover_file) {
+        const upload = new FormData();
+        upload.append('cover_file', draft.cover_file);
+        const uploadResponse = await api.post('/albums/cover-upload', upload, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        coverImageUrl = uploadResponse.data.cover_image_url;
+      }
       const response = await api.put(`/albums/${albumId}`, {
         title: draft.title.trim(),
-        cover_image_url: draft.cover_image_url.trim() || null,
+        cover_image_url: coverImageUrl,
         release_date: draft.release_date || null,
       });
       setAlbums((current) => current.map((album) => album.id === albumId ? response.data : album));
-      setNotice('Albüm güncellendi.');
+      setAlbumDrafts((current) => ({
+        ...current,
+        [albumId]: { ...draft, cover_image_url: response.data.cover_image_url || '', cover_file: null },
+      }));
+      setNotice(t.albumUpdated);
     } catch (requestError) {
-      showError(requestError, 'Albüm güncellenemedi.');
+      showError(requestError, t.albumUpdateError);
     } finally {
       setSavingKey('');
     }
   };
 
   const deleteAlbum = async (album) => {
-    if (!window.confirm(`"${album.title}" albümünü silmek istiyor musunuz? Şarkılar single olarak kalır.`)) return;
+    if (!window.confirm(t.deleteAlbumConfirm(album.title))) return;
     setSavingKey(`album-${album.id}`);
     setError('');
     setNotice('');
@@ -152,9 +231,9 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
         ]),
       ));
       await fetchTracks();
-      setNotice('Albüm silindi; şarkılar single olarak korundu.');
+      setNotice(t.albumDeleted);
     } catch (requestError) {
-      showError(requestError, 'Albüm silinemedi.');
+      showError(requestError, t.albumDeleteError);
     } finally {
       setSavingKey('');
     }
@@ -183,7 +262,7 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
     };
     const price = Number(draft.price);
     if (!Number.isFinite(price) || price < 0 || (!track.is_free && price <= 0)) {
-      setError('Şarkı fiyatı geçerli ve sıfırdan büyük olmalı.');
+      setError(t.invalidPrice);
       setNotice('');
       return;
     }
@@ -198,25 +277,25 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
         gumroad_product_id: draft.gumroad_product_id.trim() || null,
       });
       updateTrack(response.data);
-      setNotice('Şarkı bilgileri güncellendi.');
+      setNotice(t.trackUpdated);
     } catch (requestError) {
-      showError(requestError, 'Şarkı güncellenemedi.');
+      showError(requestError, t.trackUpdateError);
     } finally {
       setSavingKey('');
     }
   };
 
   const deleteTrack = async (track) => {
-    if (!window.confirm(`"${track.title}" şarkısını silmek istiyor musunuz?`)) return;
+    if (!window.confirm(t.deleteTrackConfirm(track.title))) return;
     setSavingKey(`track-${track.id}`);
     setError('');
     setNotice('');
     try {
       await api.delete(`/tracks/${track.id}`);
       removeTrack(track.id);
-      setNotice('Şarkı silindi.');
+      setNotice(t.trackDeleted);
     } catch (requestError) {
-      showError(requestError, 'Şarkı silinemedi.');
+      showError(requestError, t.trackDeleteError);
     } finally {
       setSavingKey('');
     }
@@ -225,11 +304,11 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
   const submitTrack = async (event) => {
     event.preventDefault();
     if (!trackForm.track_file || !trackForm.preview_file) {
-      setError('Şarkı dosyası ve önizleme dosyası gereklidir.');
+      setError(t.requiredTrackFiles);
       return;
     }
     if (!trackForm.is_free && (!trackForm.price || !trackForm.gumroad_url.trim())) {
-      setError('Ücretli şarkılar için fiyat ve Gumroad URL gereklidir.');
+      setError(t.paidTrackFields);
       return;
     }
     setSavingKey('new-track');
@@ -255,19 +334,19 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
       });
       setTrackForm(initialTrackForm);
       await fetchTracks();
-      setNotice('Şarkı kataloğa eklendi.');
+      setNotice(t.trackAdded);
     } catch (requestError) {
-      showError(requestError, 'Şarkı eklenemedi.');
+      showError(requestError, t.trackAddError);
     } finally {
       setSavingKey('');
     }
   };
 
   const tabs = [
-    { id: 'users', label: 'Kullanıcı Yönetimi', icon: Users },
-    { id: 'albums', label: 'Albümler', icon: AlbumIcon },
-    { id: 'tracks', label: 'Şarkılar', icon: Music },
-    { id: 'settings', label: 'Ayarlar', icon: Settings },
+    { id: 'users', label: t.users, icon: Users },
+    { id: 'albums', label: t.albums, icon: AlbumIcon },
+    { id: 'tracks', label: t.tracks, icon: Music },
+    { id: 'settings', label: t.settings, icon: Settings },
   ];
 
   return (
@@ -275,20 +354,21 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
       <section
         className="flex h-[min(94vh,960px)] w-full max-w-7xl overflow-hidden rounded-2xl border border-slate-700 bg-slate-950 text-slate-100 shadow-2xl"
         onClick={(event) => event.stopPropagation()}
-        aria-label="Admin dashboard"
+        aria-label={t.dashboard}
+        dir={isRTL ? 'rtl' : 'ltr'}
       >
         <aside className="hidden w-64 shrink-0 flex-col border-r border-slate-800 bg-slate-900/80 p-5 md:flex">
           <div className="mb-9">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-purple-300">DJ Bilal</p>
-            <h1 className="mt-2 text-xl font-bold">Yönetim Paneli</h1>
+            <h1 className="mt-2 text-xl font-bold">{t.dashboard}</h1>
           </div>
-          <nav className="space-y-2" aria-label="Admin bölümleri">
+          <nav className="space-y-2" aria-label={t.dashboard}>
             {tabs.map(({ id, label, icon: Icon }) => (
               <button
                 key={id}
                 type="button"
                 onClick={() => { setTab(id); setError(''); setNotice(''); }}
-                className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold transition-colors ${
+                className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-start text-sm font-semibold transition-colors ${
                   tab === id ? 'bg-purple-600 text-white' : 'text-slate-300 hover:bg-slate-800'
                 }`}
               >
@@ -298,18 +378,18 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
             ))}
           </nav>
           <div className="mt-8 border-t border-slate-800 pt-4">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-slate-500">Site bölümleri</p>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-slate-500">{t.siteSections}</p>
             {[
-              ['edits', 'Editler'],
-              ['remixes', 'Remixler'],
-              ['free', 'Ücretsiz'],
-              ['library', 'Kütüphanem'],
+              ['edits', t.edits],
+              ['remixes', t.remixes],
+              ['free', t.free],
+              ['library', t.library],
             ].map(([id, label]) => (
               <button
                 key={id}
                 type="button"
                 onClick={() => { onNavigate?.(id); onClose?.(); }}
-                className="block w-full rounded-lg px-3 py-2 text-left text-sm text-slate-400 hover:bg-slate-800 hover:text-white"
+                className="block w-full rounded-lg px-3 py-2 text-start text-sm text-slate-400 hover:bg-slate-800 hover:text-white"
               >
                 {label}
               </button>
@@ -318,7 +398,7 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
           <div className="mt-auto border-t border-slate-800 pt-4">
             <p className="truncate text-xs text-slate-400">{user?.email}</p>
             <button type="button" onClick={onLogout} className={`${buttonClass} mt-3 w-full bg-slate-800 text-slate-200 hover:bg-slate-700`}>
-              Oturumu kapat
+              {t.logout}
             </button>
           </div>
         </aside>
@@ -326,13 +406,13 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
         <main className="flex min-w-0 flex-1 flex-col">
           <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 px-4 py-4 sm:px-7">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-widest text-purple-300">Yönetim Paneli</p>
+              <p className="text-xs font-semibold uppercase tracking-widest text-purple-300">{t.dashboard}</p>
               <h2 className="mt-1 text-xl font-bold sm:text-2xl">{tabs.find((item) => item.id === tab)?.label}</h2>
             </div>
-            <button type="button" onClick={onClose} aria-label="Kapat" className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-white">
+            <button type="button" onClick={onClose} aria-label={t.close} className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-white">
               <X size={20} />
             </button>
-            <nav className="flex w-full gap-2 overflow-x-auto md:hidden" aria-label="Admin bölümleri">
+            <nav className="flex w-full gap-2 overflow-x-auto md:hidden" aria-label={t.dashboard}>
               {tabs.map(({ id, label, icon: Icon }) => (
                 <button key={id} type="button" onClick={() => { setTab(id); setError(''); setNotice(''); }}
                   className={`inline-flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold ${
@@ -348,7 +428,7 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
             {notice && <p role="status" className="mb-4 rounded-lg border border-emerald-700/60 bg-emerald-950/50 px-4 py-3 text-sm text-emerald-300">{notice}</p>}
             {error && <p role="alert" className="mb-4 rounded-lg border border-red-700/60 bg-red-950/50 px-4 py-3 text-sm text-red-300">{error}</p>}
             {loading ? (
-              <p className="py-12 text-center text-sm text-slate-400">Veriler yükleniyor...</p>
+              <p className="py-12 text-center text-sm text-slate-400">{t.loading}</p>
             ) : (
               <>
                 {tab === 'users' && (
@@ -356,25 +436,25 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
                     <div className="overflow-x-auto">
                       <table className="w-full min-w-[680px] text-left text-sm">
                         <thead className="bg-slate-900 text-xs uppercase tracking-wide text-slate-400">
-                          <tr><th className="px-5 py-4">E-posta</th><th className="px-5 py-4">Ad</th><th className="px-5 py-4">Rol</th><th className="px-5 py-4 text-right">İşlem</th></tr>
+                          <tr><th className="px-5 py-4">{t.email}</th><th className="px-5 py-4">{t.name}</th><th className="px-5 py-4">{t.role}</th><th className="px-5 py-4 text-end">{t.action}</th></tr>
                         </thead>
                         <tbody className="divide-y divide-slate-800">
                           {users.map((item) => (
                             <tr key={item.id} className="bg-slate-950 hover:bg-slate-900/70">
                               <td className="px-5 py-4 font-medium text-white">{item.email}</td>
                               <td className="px-5 py-4 text-slate-300">{item.full_name || '—'}</td>
-                              <td className="px-5 py-4"><span className="rounded-full bg-slate-800 px-2.5 py-1 text-xs">{item.is_admin ? 'Admin' : 'Kullanıcı'}</span></td>
-                              <td className="px-5 py-4 text-right">
+                              <td className="px-5 py-4"><span className="rounded-full bg-slate-800 px-2.5 py-1 text-xs">{item.is_admin ? t.admin : t.user}</span></td>
+                              <td className="px-5 py-4 text-end">
                                 <button type="button" disabled={savingKey === `user-${item.id}` || (item.is_admin && item.id === user?.id)}
                                   onClick={() => saveRole(item, item.is_admin ? 'user' : 'admin')}
                                   className={`${buttonClass} ${item.is_admin ? 'bg-amber-700 hover:bg-amber-600' : 'bg-emerald-700 hover:bg-emerald-600'}`}>
                                   <ShieldCheck size={15} />
-                                  {savingKey === `user-${item.id}` ? 'Kaydediliyor...' : item.is_admin ? 'Adminliği Kaldır' : 'Admin Yap'}
+                                  {savingKey === `user-${item.id}` ? t.saving : item.is_admin ? t.demote : t.promote}
                                 </button>
                               </td>
                             </tr>
                           ))}
-                          {!users.length && <tr><td colSpan="4" className="px-5 py-10 text-center text-slate-400">Kullanıcı bulunamadı.</td></tr>}
+                          {!users.length && <tr><td colSpan="4" className="px-5 py-10 text-center text-slate-400">{t.noUsers}</td></tr>}
                         </tbody>
                       </table>
                     </div>
@@ -384,29 +464,30 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
                 {tab === 'albums' && (
                   <div className="space-y-6">
                     <form onSubmit={createAlbum} className="grid gap-3 rounded-xl border border-slate-800 bg-slate-900/60 p-4 md:grid-cols-[1.2fr_1.5fr_1fr_auto] md:items-end">
-                      <label className="text-xs font-semibold text-slate-400">Albüm başlığı<input className={`${fieldClass} mt-2`} required value={newAlbum.title} onChange={(event) => setNewAlbum({ ...newAlbum, title: event.target.value })} /></label>
-                      <label className="text-xs font-semibold text-slate-400">Kapak görseli URL<input type="url" className={`${fieldClass} mt-2`} value={newAlbum.cover_image_url} onChange={(event) => setNewAlbum({ ...newAlbum, cover_image_url: event.target.value })} /></label>
-                      <label className="text-xs font-semibold text-slate-400">Yayın tarihi<input type="date" className={`${fieldClass} mt-2`} value={newAlbum.release_date} onChange={(event) => setNewAlbum({ ...newAlbum, release_date: event.target.value })} /></label>
-                      <button disabled={savingKey === 'new-album'} className={`${buttonClass} bg-purple-600 text-white hover:bg-purple-500`}>{savingKey === 'new-album' ? 'Ekleniyor...' : 'Albüm Oluştur'}</button>
+                      <label className="text-xs font-semibold text-slate-400">{t.albumTitle}<input className={`${fieldClass} mt-2`} required value={newAlbum.title} onChange={(event) => setNewAlbum({ ...newAlbum, title: event.target.value })} /></label>
+                      <label className="text-xs font-semibold text-slate-400">{t.coverUrl}<input type="url" className={`${fieldClass} mt-2`} value={newAlbum.cover_image_url} onChange={(event) => setNewAlbum({ ...newAlbum, cover_image_url: event.target.value })} /></label>
+                      <label className="text-xs font-semibold text-slate-400">{t.coverFile}<input type="file" accept="image/png,image/jpeg,image/webp" className="mt-2 block w-full text-sm" onChange={(event) => setNewAlbum({ ...newAlbum, cover_file: event.target.files?.[0] || null })} /></label>
+                      <label className="text-xs font-semibold text-slate-400">{t.releaseDate}<input type="date" className={`${fieldClass} mt-2`} value={newAlbum.release_date} onChange={(event) => setNewAlbum({ ...newAlbum, release_date: event.target.value })} /></label>
+                      <button disabled={savingKey === 'new-album'} className={`${buttonClass} bg-purple-600 text-white hover:bg-purple-500`}>{savingKey === 'new-album' ? t.creating : t.createAlbum}</button>
                     </form>
                     <div className="overflow-hidden rounded-xl border border-slate-800">
                       <div className="overflow-x-auto">
                         <table className="w-full min-w-[850px] text-left text-sm">
-                          <thead className="bg-slate-900 text-xs uppercase tracking-wide text-slate-400"><tr><th className="px-4 py-4">Albüm</th><th className="px-4 py-4">Kapak URL</th><th className="px-4 py-4">Yayın tarihi</th><th className="px-4 py-4 text-right">İşlemler</th></tr></thead>
+                          <thead className="bg-slate-900 text-xs uppercase tracking-wide text-slate-400"><tr><th className="px-4 py-4">{t.albums}</th><th className="px-4 py-4">{t.albumCover}</th><th className="px-4 py-4">{t.releaseDate}</th><th className="px-4 py-4 text-end">{t.operations}</th></tr></thead>
                           <tbody className="divide-y divide-slate-800">
                             {albums.map((album) => {
-                              const draft = albumDrafts[album.id] || {};
+                              const draft = albumDrafts[album.id] || { title: album.title, cover_image_url: album.cover_image_url || '', release_date: album.release_date || '', cover_file: null };
                               return <tr key={album.id} className="bg-slate-950">
                                 <td className="px-4 py-3"><input className={fieldClass} value={draft.title || ''} onChange={(event) => setAlbumDrafts((current) => ({ ...current, [album.id]: { ...draft, title: event.target.value } }))} /></td>
-                                <td className="px-4 py-3"><input type="url" className={fieldClass} value={draft.cover_image_url || ''} onChange={(event) => setAlbumDrafts((current) => ({ ...current, [album.id]: { ...draft, cover_image_url: event.target.value } }))} /></td>
+                                <td className="px-4 py-3"><input type="url" aria-label={t.coverUrl} className={`${fieldClass} mb-2`} value={draft.cover_image_url || ''} onChange={(event) => setAlbumDrafts((current) => ({ ...current, [album.id]: { ...draft, cover_image_url: event.target.value } }))} /><input type="file" accept="image/png,image/jpeg,image/webp" aria-label={t.coverFile} className="block w-full text-xs" onChange={(event) => setAlbumDrafts((current) => ({ ...current, [album.id]: { ...draft, cover_file: event.target.files?.[0] || null } }))} /></td>
                                 <td className="px-4 py-3"><input type="date" className={fieldClass} value={draft.release_date || ''} onChange={(event) => setAlbumDrafts((current) => ({ ...current, [album.id]: { ...draft, release_date: event.target.value } }))} /></td>
                                 <td className="px-4 py-3"><div className="flex justify-end gap-2">
-                                  <button type="button" disabled={savingKey === `album-${album.id}`} onClick={() => saveAlbum(album.id)} className={`${buttonClass} bg-slate-800 text-white hover:bg-slate-700`}>Kaydet</button>
-                                  <button type="button" disabled={savingKey === `album-${album.id}`} onClick={() => deleteAlbum(album)} aria-label={`${album.title} albümünü sil`} className={`${buttonClass} bg-red-950 text-red-300 hover:bg-red-900`}><Trash2 size={16} /></button>
+                                  <button type="button" disabled={savingKey === `album-${album.id}`} onClick={() => saveAlbum(album.id)} className={`${buttonClass} bg-slate-800 text-white hover:bg-slate-700`}>{t.save}</button>
+                                  <button type="button" disabled={savingKey === `album-${album.id}`} onClick={() => deleteAlbum(album)} aria-label={`${t.albums}: ${album.title}`} className={`${buttonClass} bg-red-950 text-red-300 hover:bg-red-900`}><Trash2 size={16} /></button>
                                 </div></td>
                               </tr>;
                             })}
-                            {!albums.length && <tr><td colSpan="4" className="px-4 py-10 text-center text-slate-400">Henüz albüm yok.</td></tr>}
+                            {!albums.length && <tr><td colSpan="4" className="px-4 py-10 text-center text-slate-400">{t.noAlbums}</td></tr>}
                           </tbody>
                         </table>
                       </div>
@@ -417,19 +498,19 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
                 {tab === 'tracks' && (
                   <div className="space-y-6">
                     <form onSubmit={submitTrack} className="grid gap-3 rounded-xl border border-slate-800 bg-slate-900/60 p-4 sm:grid-cols-2 lg:grid-cols-3">
-                      <label className="text-xs font-semibold text-slate-400">Şarkı adı<input className={`${fieldClass} mt-2`} required value={trackForm.title} onChange={(event) => setTrackForm({ ...trackForm, title: event.target.value })} /></label>
-                      <label className="text-xs font-semibold text-slate-400">Sanatçı<input className={`${fieldClass} mt-2`} required value={trackForm.artist} onChange={(event) => setTrackForm({ ...trackForm, artist: event.target.value })} /></label>
-                      <label className="text-xs font-semibold text-slate-400">Albüm seç
+                      <label className="text-xs font-semibold text-slate-400">{t.trackName}<input className={`${fieldClass} mt-2`} required value={trackForm.title} onChange={(event) => setTrackForm({ ...trackForm, title: event.target.value })} /></label>
+                      <label className="text-xs font-semibold text-slate-400">{t.artist}<input className={`${fieldClass} mt-2`} required value={trackForm.artist} onChange={(event) => setTrackForm({ ...trackForm, artist: event.target.value })} /></label>
+                      <label className="text-xs font-semibold text-slate-400">{t.selectAlbum}
                         <select className={`${fieldClass} mt-2`} value={trackForm.album_id} onChange={(event) => setTrackForm({ ...trackForm, album_id: event.target.value })}>
-                          <option value="">Single (albümsüz)</option>{albums.map((album) => <option key={album.id} value={album.id}>{album.title}</option>)}
+                          <option value="">{t.single}</option>{albums.map((album) => <option key={album.id} value={album.id}>{album.title}</option>)}
                         </select>
                       </label>
-                      <label className="text-xs font-semibold text-slate-400">Tür<select className={`${fieldClass} mt-2`} value={trackForm.category} onChange={(event) => setTrackForm({ ...trackForm, category: event.target.value })}>
+                      <label className="text-xs font-semibold text-slate-400">{t.genre}<select className={`${fieldClass} mt-2`} value={trackForm.category} onChange={(event) => setTrackForm({ ...trackForm, category: event.target.value })}>
                         {trackForm.is_free
                           ? <><option value="remix">Remix</option><option value="simple-pack">Simple Pack</option><option value="vst">VST</option></>
                           : <><option value="edit">Edit</option><option value="remix">Remix</option></>}
                       </select></label>
-                      <label className="text-xs font-semibold text-slate-400">Fiyat<input type="number" step="0.01" min="0" required={!trackForm.is_free} disabled={trackForm.is_free} className={`${fieldClass} mt-2`} value={trackForm.is_free ? '0' : trackForm.price} onChange={(event) => setTrackForm({ ...trackForm, price: event.target.value })} /></label>
+                      <label className="text-xs font-semibold text-slate-400">{t.price}<input type="number" step="0.01" min="0" required={!trackForm.is_free} disabled={trackForm.is_free} className={`${fieldClass} mt-2`} value={trackForm.is_free ? '0' : trackForm.price} onChange={(event) => setTrackForm({ ...trackForm, price: event.target.value })} /></label>
                       <label className="flex items-center gap-2 self-end rounded-lg border border-slate-700 p-3 text-sm text-slate-300"><input type="checkbox" checked={trackForm.is_free} onChange={(event) => {
                         const isFree = event.target.checked;
                         setTrackForm({
@@ -441,21 +522,21 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
                               ? 'edit'
                               : trackForm.category,
                         });
-                      }} />Ücretsiz</label>
+                      }} />{t.freeCheckbox}</label>
                       {!trackForm.is_free && <>
-                        <label className="text-xs font-semibold text-slate-400 sm:col-span-2">Gumroad ürün URL<input type="url" required className={`${fieldClass} mt-2`} value={trackForm.gumroad_url} onChange={(event) => setTrackForm({ ...trackForm, gumroad_url: event.target.value })} /></label>
-                        <label className="text-xs font-semibold text-slate-400">Gumroad ürün ID<input className={`${fieldClass} mt-2`} value={trackForm.gumroad_product_id} onChange={(event) => setTrackForm({ ...trackForm, gumroad_product_id: event.target.value })} /></label>
+                       <label className="text-xs font-semibold text-slate-400 sm:col-span-2">{t.productUrl}<input type="url" required className={`${fieldClass} mt-2`} value={trackForm.gumroad_url} onChange={(event) => setTrackForm({ ...trackForm, gumroad_url: event.target.value })} /></label>
+                       <label className="text-xs font-semibold text-slate-400">{t.productId}<input className={`${fieldClass} mt-2`} value={trackForm.gumroad_product_id} onChange={(event) => setTrackForm({ ...trackForm, gumroad_product_id: event.target.value })} /></label>
                       </>}
-                      <label className="text-xs font-semibold text-slate-400">Şarkı dosyası<input type="file" accept="audio/*" required className="mt-2 block w-full text-sm" onChange={(event) => setTrackForm({ ...trackForm, track_file: event.target.files?.[0] || null })} /></label>
-                      <label className="text-xs font-semibold text-slate-400">Önizleme dosyası<input type="file" accept="audio/*" required className="mt-2 block w-full text-sm" onChange={(event) => setTrackForm({ ...trackForm, preview_file: event.target.files?.[0] || null })} /></label>
-                      <label className="text-xs font-semibold text-slate-400">Kapak görseli<input type="file" accept="image/*" className="mt-2 block w-full text-sm" onChange={(event) => setTrackForm({ ...trackForm, cover_file: event.target.files?.[0] || null })} /></label>
-                      <div className="sm:col-span-2 lg:col-span-3"><button disabled={savingKey === 'new-track'} className={`${buttonClass} bg-purple-600 px-5 text-white hover:bg-purple-500`}>{savingKey === 'new-track' ? 'Ekleniyor...' : 'Şarkı Ekle'}</button></div>
+                      <label className="text-xs font-semibold text-slate-400">{t.trackFile}<input type="file" accept="audio/*" required className="mt-2 block w-full text-sm" onChange={(event) => setTrackForm({ ...trackForm, track_file: event.target.files?.[0] || null })} /></label>
+                      <label className="text-xs font-semibold text-slate-400">{t.previewFile}<input type="file" accept="audio/*" required className="mt-2 block w-full text-sm" onChange={(event) => setTrackForm({ ...trackForm, preview_file: event.target.files?.[0] || null })} /></label>
+                      <label className="text-xs font-semibold text-slate-400">{t.albumCover}<input type="file" accept="image/*" className="mt-2 block w-full text-sm" onChange={(event) => setTrackForm({ ...trackForm, cover_file: event.target.files?.[0] || null })} /></label>
+                      <div className="sm:col-span-2 lg:col-span-3"><button disabled={savingKey === 'new-track'} className={`${buttonClass} bg-purple-600 px-5 text-white hover:bg-purple-500`}>{savingKey === 'new-track' ? t.adding : t.addTrack}</button></div>
                     </form>
 
                     <div className="overflow-hidden rounded-xl border border-slate-800">
                       <div className="overflow-x-auto">
                         <table className="w-full min-w-[1100px] text-left text-sm">
-                          <thead className="bg-slate-900 text-xs uppercase tracking-wide text-slate-400"><tr><th className="px-4 py-4">Şarkı</th><th className="px-4 py-4">Albüm</th><th className="px-4 py-4">Fiyat</th><th className="px-4 py-4">Gumroad URL</th><th className="px-4 py-4">Ürün ID</th><th className="px-4 py-4 text-right">İşlemler</th></tr></thead>
+                          <thead className="bg-slate-900 text-xs uppercase tracking-wide text-slate-400"><tr><th className="px-4 py-4">{t.track}</th><th className="px-4 py-4">{t.albums}</th><th className="px-4 py-4">{t.price}</th><th className="px-4 py-4">Gumroad URL</th><th className="px-4 py-4">{t.productId}</th><th className="px-4 py-4 text-end">{t.operations}</th></tr></thead>
                           <tbody className="divide-y divide-slate-800">
                             {tracks.map((track) => {
                               const draft = trackDrafts[track.id] || {
@@ -466,17 +547,17 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
                               };
                               return <tr key={track.id} className="bg-slate-950">
                                 <td className="px-4 py-3"><p className="font-semibold text-white">{track.title}</p><p className="text-xs text-slate-400">{track.artist} · {track.category}</p></td>
-                                <td className="px-4 py-3"><select className={fieldClass} value={draft.album_id} onChange={(event) => updateTrackDraft(track, 'album_id', event.target.value)}><option value="">Single</option>{albums.map((album) => <option key={album.id} value={album.id}>{album.title}</option>)}</select></td>
-                                <td className="px-4 py-3"><input aria-label={`${track.title} fiyatı`} type="number" step="0.01" min="0" disabled={track.is_free} className="w-24 rounded-lg border border-slate-700 bg-slate-900 px-2 py-2 text-sm text-white disabled:opacity-50" value={track.is_free ? '0' : draft.price} onChange={(event) => updateTrackDraft(track, 'price', event.target.value)} /></td>
+                                <td className="px-4 py-3"><select className={fieldClass} value={draft.album_id} onChange={(event) => updateTrackDraft(track, 'album_id', event.target.value)}><option value="">{t.single}</option>{albums.map((album) => <option key={album.id} value={album.id}>{album.title}</option>)}</select></td>
+                                <td className="px-4 py-3"><input aria-label={`${track.title} ${t.price}`} type="number" step="0.01" min="0" disabled={track.is_free} className="w-24 rounded-lg border border-slate-700 bg-slate-900 px-2 py-2 text-sm text-white disabled:opacity-50" value={track.is_free ? '0' : draft.price} onChange={(event) => updateTrackDraft(track, 'price', event.target.value)} /></td>
                                 <td className="px-4 py-3"><input aria-label={`${track.title} Gumroad URL`} className="w-56 rounded-lg border border-slate-700 bg-slate-900 px-2 py-2 text-xs text-white" value={draft.gumroad_url} disabled={track.is_free} onChange={(event) => updateTrackDraft(track, 'gumroad_url', event.target.value)} /></td>
                                 <td className="px-4 py-3"><input aria-label={`${track.title} Gumroad ID`} className="w-32 rounded-lg border border-slate-700 bg-slate-900 px-2 py-2 text-xs text-white" value={draft.gumroad_product_id} disabled={track.is_free} onChange={(event) => updateTrackDraft(track, 'gumroad_product_id', event.target.value)} /></td>
                                 <td className="px-4 py-3"><div className="flex justify-end gap-2">
-                                  <button type="button" disabled={savingKey === `track-${track.id}`} onClick={() => saveTrack(track)} className={`${buttonClass} bg-slate-800 text-white hover:bg-slate-700`}>Kaydet</button>
-                                  <button type="button" disabled={savingKey === `track-${track.id}`} onClick={() => deleteTrack(track)} aria-label={`${track.title} şarkısını sil`} className={`${buttonClass} bg-red-950 text-red-300 hover:bg-red-900`}><Trash2 size={16} /></button>
+                                  <button type="button" disabled={savingKey === `track-${track.id}`} onClick={() => saveTrack(track)} className={`${buttonClass} bg-slate-800 text-white hover:bg-slate-700`}>{t.save}</button>
+                                  <button type="button" disabled={savingKey === `track-${track.id}`} onClick={() => deleteTrack(track)} aria-label={`${track.title} ${t.track}`} className={`${buttonClass} bg-red-950 text-red-300 hover:bg-red-900`}><Trash2 size={16} /></button>
                                 </div></td>
                               </tr>;
                             })}
-                            {!tracks.length && <tr><td colSpan="6" className="px-4 py-10 text-center text-slate-400">Henüz şarkı yok.</td></tr>}
+                            {!tracks.length && <tr><td colSpan="6" className="px-4 py-10 text-center text-slate-400">{t.noTracks}</td></tr>}
                           </tbody>
                         </table>
                       </div>
@@ -486,14 +567,14 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
 
                 {tab === 'settings' && (
                   <div className="grid gap-4 md:grid-cols-3">
-                    <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-5"><p className="text-sm text-slate-400">Kullanıcılar</p><p className="mt-2 text-3xl font-bold">{users.length}</p></div>
-                    <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-5"><p className="text-sm text-slate-400">Albümler</p><p className="mt-2 text-3xl font-bold">{albums.length}</p></div>
-                    <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-5"><p className="text-sm text-slate-400">Şarkılar</p><p className="mt-2 text-3xl font-bold">{tracks.length}</p></div>
+                    <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-5"><p className="text-sm text-slate-400">{t.users}</p><p className="mt-2 text-3xl font-bold">{users.length}</p></div>
+                    <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-5"><p className="text-sm text-slate-400">{t.albums}</p><p className="mt-2 text-3xl font-bold">{albums.length}</p></div>
+                    <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-5"><p className="text-sm text-slate-400">{t.tracks}</p><p className="mt-2 text-3xl font-bold">{tracks.length}</p></div>
                     <section className="rounded-xl border border-slate-800 bg-slate-900/60 p-5 md:col-span-3">
-                      <h3 className="font-semibold">Yönetici hesabı</h3>
+                      <h3 className="font-semibold">{t.adminAccount}</h3>
                       <p className="mt-2 text-sm text-slate-300">{user?.email}</p>
                       <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-400">
-                        Ödeme, e-posta ve depolama yapılandırmaları güvenlik amacıyla sunucu ortam değişkenlerinde yönetilir. Bu değerler yönetim panelinde görüntülenmez.
+                        {t.settingsDescription}
                       </p>
                     </section>
                   </div>
