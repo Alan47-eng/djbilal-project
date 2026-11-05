@@ -221,6 +221,11 @@ class GumroadService:
             "product_permalink": verified_permalink,
             "product_id": product_id or ping_product_id or "",
             "price": str(self._parse_cents(sale.get("price")) or 0),
+            "email": (
+                sale.get("email", "").strip().lower()
+                if isinstance(sale.get("email"), str)
+                else ""
+            ),
         }
 
     @staticmethod

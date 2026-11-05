@@ -586,41 +586,57 @@ class PurchaseService:
             bool(track_ids_value),
             bool(signature),
         )
-        if not user_id_value or not signature:
+        has_user_id = bool(user_id_value)
+        has_signature = bool(signature)
+        if has_user_id != has_signature:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Missing Gumroad buyer information",
-            )
-
-        try:
-            user_id = int(user_id_value)
-        except ValueError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Gumroad buyer information contains an invalid user ID",
-            ) from exc
-        if user_id <= 0:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Gumroad buyer information contains an invalid user ID",
+                detail="Incomplete Gumroad checkout signature context",
             )
 
         sale = await self.gumroad_service.verify_sale(payload)
         logger.info(
-            "Gumroad sale verified: permalink_present=%s product_id_present=%s",
+            "Gumroad sale verified: permalink_present=%s product_id_present=%s "
+            "buyer_email_present=%s",
             bool(sale.get("product_permalink")),
             bool(sale.get("product_id")),
+            bool(sale.get("email")),
         )
         existing_sale = await session.get(GumroadSale, sale["sale_id"])
         if existing_sale:
             return {"status": "duplicate", "purchase_ids": []}
 
-        user = await UserRepository().get_by_id(session, user_id)
+        user_repository = UserRepository()
+        if has_user_id:
+            try:
+                user_id = int(user_id_value)
+            except ValueError as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Gumroad buyer information contains an invalid user ID",
+                ) from exc
+            if user_id <= 0:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Gumroad buyer information contains an invalid user ID",
+                )
+            user = await user_repository.get_by_id(session, user_id)
+        else:
+            buyer_email = sale.get("email", "").strip().lower()
+            user = (
+                await user_repository.get_by_email(session, buyer_email)
+                if buyer_email
+                else None
+            )
+            if user and not user.email_verified:
+                user = None
+
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Gumroad buyer account was not found",
+                detail="Verified Gumroad buyer account was not found",
             )
+        user_id = user.id
 
         product_permalink = GumroadService.normalize_product_permalink(
             sale.get("product_permalink", "")
@@ -696,17 +712,22 @@ class PurchaseService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Gumroad sale amount does not match the track price",
             )
-        signature_valid = self.gumroad_service.verify_checkout_signature(
-            user_id=user_id,
-            track_id=track.id,
-            product_permalink=track_permalink or product_id or "",
-            signature=signature,
-        )
-        logger.info("Gumroad checkout signature validation: valid=%s", signature_valid)
-        if not signature_valid:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid Gumroad checkout signature",
+        if has_signature:
+            signature_valid = self.gumroad_service.verify_checkout_signature(
+                user_id=user_id,
+                track_id=track.id,
+                product_permalink=track_permalink or product_id or "",
+                signature=signature,
+            )
+            logger.info("Gumroad checkout signature validation: valid=%s", signature_valid)
+            if not signature_valid:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid Gumroad checkout signature",
+                )
+        else:
+            logger.info(
+                "Gumroad purchase matched to a verified buyer email and product"
             )
 
         license_type = custom_data.get("license_type")

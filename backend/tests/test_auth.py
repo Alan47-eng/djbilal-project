@@ -1040,14 +1040,45 @@ class TestCheckoutAndWebhook:
         assert track.id in purchases_response.json()
 
     @pytest.mark.asyncio
-    async def test_webhook_does_not_acknowledge_missing_signed_context(self, client):
+    async def test_webhook_grants_purchase_using_verified_sale_email_without_context(
+        self, client, test_db, monkeypatch
+    ):
+        _, AsyncSessionLocal = test_db
+        async with AsyncSessionLocal() as session:
+            user = await create_user_record(session, "paid@example.com", "password123")
+            track = await create_track_record(session)
+
+        async def verify_sale(_self, _payload):
+            return {
+                "sale_id": "sale-without-context",
+                "price": "999",
+                "product_permalink": "https://gumroad.com/l/test-product",
+                "email": "paid@example.com",
+            }
+
+        monkeypatch.setattr(
+            "app.adapters.gumroad.GumroadService.verify_sale",
+            verify_sale,
+        )
         response = await client.post(
             "/api/v1/webhooks/gumroad",
             data={"sale_id": "sale-without-context", "seller_id": "test-seller"},
         )
 
-        assert response.status_code == 400
-        assert response.json()["detail"] == "Missing Gumroad buyer information"
+        assert response.status_code == 200
+        assert response.json()["status"] == "ok"
+
+        login_response = await client.post(
+            "/login",
+            json={"email": user.email, "password": "password123"},
+        )
+        token = login_response.json()["access_token"]
+        purchases_response = await client.get(
+            "/purchases",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert purchases_response.status_code == 200
+        assert purchases_response.json() == [track.id]
 
     @pytest.mark.asyncio
     async def test_separate_gumroad_cart_sales_activate_every_track(

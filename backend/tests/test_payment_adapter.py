@@ -78,6 +78,7 @@ async def test_verify_sale_checks_gumroad_api_record(monkeypatch):
                     "product_id": "123456",
                     "price": 500,
                     "refunded": False,
+                    "email": "buyer@example.com",
                 },
             }
 
@@ -109,6 +110,7 @@ async def test_verify_sale_checks_gumroad_api_record(monkeypatch):
         "price": "500",
         "product_permalink": "https://gumroad.com/l/product-1",
         "product_id": "123456",
+        "email": "buyer@example.com",
     }
     assert request_arguments["url"] == "https://api.gumroad.com/v2/sales/sale-1"
     assert request_arguments["params"] == {"access_token": "api-token"}
