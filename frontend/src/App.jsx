@@ -175,7 +175,7 @@ function AppContent() {
   const renderTrackGrid = (tracksToRender, emptyMessage) => {
     if (tracksToRender.length === 0) {
       return (
-        <div className="rounded-2xl border border-slate-800 bg-slate-900 p-8 text-center text-slate-300">
+        <div className="rounded-2xl border border-dashed border-[#ddd8ce] bg-white p-8 text-center text-[#626a72]">
           {emptyMessage}
         </div>
       );
@@ -282,20 +282,20 @@ function AppContent() {
   };
 
   return (
-    <div className={`min-h-screen bg-[#17191c] text-[#f3f0e9] ${isRTL ? 'text-right' : ''}`}>
+    <div className={`min-h-screen bg-[#f7f5f0] text-[#222831] ${isRTL ? 'text-right' : ''}`}>
       {/* Header */}
-      <header className="sticky top-0 z-40 border-b border-[#383c40] bg-[#202327]/95 shadow-sm backdrop-blur-sm">
+      <header className="sticky top-0 z-40 border-b border-[#e5e1d9] bg-white/95 shadow-sm backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={() => setMenuOpen(true)}
-              className="rounded-lg border border-[#41464b] p-2 text-[#c5c7c8] hover:bg-[#303438] hover:text-white"
+              className="rounded-lg border border-[#dedbd4] p-2 text-[#4c535b] transition-colors hover:bg-[#f1eee8] hover:text-[#222831]"
               aria-label="Open menu"
             >
               <Menu size={20} />
             </button>
-            <div className="rounded-lg bg-[#d27b57] p-2">
+            <div className="rounded-xl bg-[#ed7755] p-2 shadow-sm">
               <Music size={28} className="text-white" />
             </div>
             <button
@@ -306,43 +306,43 @@ function AppContent() {
               }}
               className="text-left"
             >
-              <h1 className="text-lg font-bold text-[#f3f0e9] sm:text-2xl">
+              <h1 className="text-lg font-bold tracking-tight text-[#222831] sm:text-2xl">
                 DJ Bilal Music Store
               </h1>
             </button>
           </div>
 
           <div className="flex items-center gap-2 sm:gap-4">
-            <div className="flex items-center rounded-lg border border-[#41464b] bg-[#17191c] p-1 text-xs">
+            <div className="flex items-center rounded-lg border border-[#dedbd4] bg-[#f7f5f0] p-1 text-xs">
               <button
                 type="button"
                 onClick={() => setLang('en')}
-                className={`rounded px-2 py-1 font-semibold ${lang === 'en' ? 'bg-[#d27b57] text-white' : 'text-slate-300'}`}
+                className={`rounded px-2 py-1 font-semibold ${lang === 'en' ? 'bg-[#222831] text-white' : 'text-[#626970] hover:text-[#222831]'}`}
               >
                 EN
               </button>
               <button
                 type="button"
                 onClick={() => setLang('ar')}
-                className={`rounded px-2 py-1 font-semibold ${lang === 'ar' ? 'bg-[#d27b57] text-white' : 'text-slate-300'}`}
+                className={`rounded px-2 py-1 font-semibold ${lang === 'ar' ? 'bg-[#222831] text-white' : 'text-[#626970] hover:text-[#222831]'}`}
               >
                 AR
               </button>
             </div>
             {user ? (
               <>
-                <div className="hidden md:flex items-center gap-2 text-slate-300">
-                  <User size={18} className="text-[#e39a76]" />
+                <div className="hidden md:flex items-center gap-2 text-[#555d65]">
+                  <User size={18} className="text-[#ed7755]" />
                   <span>{user.email}</span>
                   {isAdmin && (
-                    <span className="rounded-full bg-[#d27b57]/15 px-2 py-0.5 text-xs font-semibold text-[#e6a184]">
+                    <span className="rounded-full bg-[#fff0e9] px-2.5 py-1 text-xs font-semibold text-[#b94c31]">
                       <span className="inline-flex items-center gap-1"><ShieldCheck size={12} /> Admin</span>
                     </span>
                   )}
                 </div>
                 <button
                   onClick={handleLogout}
-                  className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-3 sm:px-4 py-2 rounded-lg transition-colors duration-200 font-semibold text-sm sm:text-base"
+                  className="flex items-center gap-2 rounded-lg bg-[#222831] px-3 py-2 text-sm font-semibold text-white transition-colors duration-200 hover:bg-[#39414b] sm:px-4 sm:text-base"
                 >
                   <LogOut size={18} />
                   <span className="hidden sm:inline">{t.logout}</span>
@@ -352,14 +352,14 @@ function AppContent() {
               <>
                 <button
                   onClick={() => setAuthModal({ isOpen: true, mode: 'login' })}
-                  className="flex items-center gap-2 rounded-lg bg-[#383c40] px-3 py-2 text-sm font-semibold text-white transition-colors duration-200 hover:bg-[#484d52] sm:px-4 sm:text-base"
+                  className="flex items-center gap-2 rounded-lg border border-[#dedbd4] bg-white px-3 py-2 text-sm font-semibold text-[#303740] transition-colors duration-200 hover:bg-[#f3f1ec] sm:px-4 sm:text-base"
                 >
                   <LogIn size={18} />
                   <span className="hidden sm:inline">{t.signIn}</span>
                 </button>
                 <button
                   onClick={() => setAuthModal({ isOpen: true, mode: 'register' })}
-                  className="flex items-center gap-2 rounded-lg bg-[#d27b57] px-3 py-2 text-sm font-semibold text-white transition-colors duration-200 hover:bg-[#e08b66] sm:px-4 sm:text-base"
+                  className="flex items-center gap-2 rounded-lg bg-[#ed7755] px-3 py-2 text-sm font-semibold text-white shadow-sm transition-colors duration-200 hover:bg-[#d96343] sm:px-4 sm:text-base"
                 >
                   <UserPlus size={18} />
                   <span className="hidden sm:inline">{t.signUp}</span>
@@ -373,7 +373,7 @@ function AppContent() {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         {downloadError && (
-          <div className="mb-6 rounded-lg border border-red-500 bg-red-600/20 px-4 py-3 text-sm text-red-200">
+            <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
             {downloadError}
           </div>
         )}
@@ -385,7 +385,7 @@ function AppContent() {
                setActiveTab('albums');
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
-             className="inline-flex items-center gap-2 rounded-lg border border-[#41464b] bg-[#222529] px-3 py-2 text-sm font-semibold text-[#d4d2cc]"
+             className="inline-flex items-center gap-2 rounded-lg border border-[#dedbd4] bg-white px-3 py-2 text-sm font-semibold text-[#343b43] shadow-sm transition hover:border-[#ed7755]"
           >
             <LayoutGrid size={15} />
             {t.home}
@@ -395,8 +395,8 @@ function AppContent() {
             onClick={() => setActiveTab('about')}
             className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold ${
               activeTab === 'about'
-                ? 'border-[#d27b57] bg-[#d27b57]/15 text-[#f0b095]'
-                : 'border-[#41464b] bg-[#222529] text-[#c5c7c8] hover:bg-[#303438]'
+                ? 'border-[#ed7755] bg-[#fff0e9] text-[#b94c31]'
+                : 'border-[#dedbd4] bg-white text-[#4e5660] hover:bg-[#f3f1ec]'
             }`}
           >
             <Info size={15} />
@@ -408,8 +408,8 @@ function AppContent() {
               onClick={() => setActiveTab('library')}
               className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold ${
                 activeTab === 'library'
-                  ? 'border-[#d27b57] bg-[#d27b57]/15 text-[#f0b095]'
-                  : 'border-[#41464b] bg-[#222529] text-[#c5c7c8] hover:bg-[#303438]'
+                ? 'border-[#ed7755] bg-[#fff0e9] text-[#b94c31]'
+                : 'border-[#dedbd4] bg-white text-[#4e5660] hover:bg-[#f3f1ec]'
               }`}
             >
               <Library size={15} />
@@ -419,7 +419,7 @@ function AppContent() {
         </div>
 
         {/* Tab Navigation */}
-        <nav className="mb-6 sm:mb-8 flex max-w-full items-center gap-1 overflow-x-auto rounded-2xl border border-[#34383d] bg-[#202327] p-1">
+        <nav className="mb-6 sm:mb-8 flex max-w-full items-center gap-1 overflow-x-auto rounded-xl border border-[#e4e0d8] bg-white p-1 shadow-sm">
           {[
              { id: 'albums', label: t.albums, icon: <Library size={15} /> },
              { id: 'free', label: t.free, icon: <Gift size={15} /> },
@@ -436,8 +436,8 @@ function AppContent() {
               }}
               className={`inline-flex shrink-0 items-center gap-2 rounded-xl px-3 sm:px-4 py-2 text-sm font-semibold transition-all duration-200 ${
                 activeTab === tab.id
-                  ? 'bg-[#d27b57] text-white shadow-sm'
-                  : 'text-[#aeb2b5] hover:bg-[#303438] hover:text-white'
+                  ? 'bg-[#ed7755] text-white shadow-sm'
+                  : 'text-[#646b72] hover:bg-[#f3f1ec] hover:text-[#222831]'
               }`}
             >
               {tab.icon}
@@ -449,11 +449,11 @@ function AppContent() {
         {loading ? (
           <div className="flex justify-center items-center h-96">
             <div className="animate-spin">
-              <Music size={48} className="text-[#e39a76]" />
+              <Music size={48} className="text-[#ed7755]" />
             </div>
           </div>
         ) : tracksError ? (
-          <div className="bg-red-600/20 border border-red-500 text-red-200 p-4 rounded-lg">
+          <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-700">
             {tracksError}
           </div>
         ) : (
@@ -463,7 +463,7 @@ function AppContent() {
                 <button
                   type="button"
                   onClick={() => setMenuOpen(true)}
-                  className="inline-flex items-center gap-2 rounded-xl bg-[#d27b57] px-4 py-3 font-semibold text-white hover:bg-[#e08b66]"
+                  className="inline-flex items-center gap-2 rounded-xl bg-[#ed7755] px-4 py-3 font-semibold text-white shadow-sm transition hover:bg-[#d96343]"
                 >
                   <ShieldCheck size={16} />
                   {t.openAdmin}
@@ -481,7 +481,7 @@ function AppContent() {
                       <button
                         type="button"
                         onClick={() => setSelectedAlbumId(null)}
-                         className="mb-5 rounded-lg border border-[#41464b] px-4 py-2 text-sm text-slate-200 hover:bg-[#303438]"
+                         className="mb-5 rounded-lg border border-[#dedbd4] bg-white px-4 py-2 text-sm text-[#3d454e] transition hover:bg-[#f1eee8]"
                       >
                         {t.backToAlbums}
                       </button>
@@ -490,12 +490,12 @@ function AppContent() {
                           <img
                             src={resolveAssetUrl(album.cover_image_url)}
                             alt={`${album.title} cover`}
-                            className="h-24 w-24 rounded-xl object-cover"
+                            className="h-24 w-24 rounded-xl object-cover shadow-sm ring-1 ring-black/5"
                           />
                         )}
                         <div>
-                           <p className="text-sm font-semibold text-[#e39a76]">{t.albumTracks}</p>
-                          <h2 className="mt-1 text-2xl font-bold text-white">{album?.title}</h2>
+                           <p className="text-sm font-semibold text-[#c65a3d]">{t.albumTracks}</p>
+                          <h2 className="mt-1 text-2xl font-bold text-[#222831]">{album?.title}</h2>
                           {album?.release_date && (
                             <p className="mt-1 text-sm text-slate-400">
                               {new Date(album.release_date).toLocaleDateString(lang === 'ar' ? 'ar' : 'en')}
@@ -509,11 +509,11 @@ function AppContent() {
                 })() : (
                   <>
                     <div className="mb-6">
-                      <h2 className="text-2xl font-bold text-white">{t.albums}</h2>
-                      <p className="mt-1 text-sm text-slate-400">{t.albumsDesc}</p>
+                      <h2 className="text-2xl font-bold tracking-tight text-[#222831]">{t.albums}</h2>
+                      <p className="mt-1 text-sm text-[#68717a]">{t.albumsDesc}</p>
                     </div>
                     {albumsError ? (
-                      <div className="rounded-lg border border-red-500 bg-red-600/20 p-4 text-red-200">
+                      <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-700">
                         {albumsError}
                       </div>
                     ) : albums.length ? (
@@ -525,7 +525,7 @@ function AppContent() {
                               key={album.id}
                               type="button"
                               onClick={() => setSelectedAlbumId(album.id)}
-                               className="overflow-hidden rounded-xl border border-[#383c40] bg-[#222529] text-left transition hover:border-[#8b5a47] hover:bg-[#292d31]"
+                                className="group overflow-hidden rounded-xl border border-[#e4e0d8] bg-white text-left shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-[#f0b39e] hover:shadow-md"
                             >
                               {album.cover_image_url ? (
                                 <img
@@ -535,13 +535,13 @@ function AppContent() {
                                   loading="lazy"
                                 />
                               ) : (
-                                <div className="flex aspect-square items-center justify-center bg-[#2b2e32]">
-                                  <Music size={48} className="text-[#b9a296]" />
+                                <div className="flex aspect-square items-center justify-center bg-[#f1eee8]">
+                                  <Music size={48} className="text-[#d17b5c]" />
                                 </div>
                               )}
                               <div className="p-4">
-                                <h3 className="truncate text-lg font-bold text-white">{album.title}</h3>
-                                <p className="mt-1 text-sm text-slate-400">
+                                <h3 className="truncate text-lg font-bold text-[#222831] group-hover:text-[#b94c31]">{album.title}</h3>
+                                <p className="mt-1 text-sm text-[#727981]">
                                   {albumTrackCount} · {album.release_date
                                     ? new Date(album.release_date).toLocaleDateString(lang === 'ar' ? 'ar' : 'en')
                                     : t.albums}
@@ -552,7 +552,7 @@ function AppContent() {
                         })}
                       </div>
                     ) : (
-                      <div className="rounded-2xl border border-slate-800 bg-slate-900 p-8 text-center text-slate-300">
+                      <div className="rounded-2xl border border-dashed border-[#ddd8ce] bg-white p-8 text-center text-[#626a72]">
                         {t.noAlbums}
                       </div>
                     )}
@@ -565,12 +565,12 @@ function AppContent() {
             {activeTab === 'free' && (
               <section>
                 <div className="mb-6">
-                  <p className="mb-1 inline-flex items-center gap-2 rounded-full bg-[#d27b57]/15 px-3 py-1 text-xs font-semibold text-[#e6a184]">
+                  <p className="mb-1 inline-flex items-center gap-2 rounded-full bg-[#fff0e9] px-3 py-1 text-xs font-semibold text-[#b94c31]">
                     <Gift size={12} />
                     {t.free}
                   </p>
-                  <h2 className="mt-2 text-2xl font-bold text-white">{t.freeDownloads}</h2>
-                  <p className="text-slate-400 mt-1 text-sm max-w-xl">
+                  <h2 className="mt-2 text-2xl font-bold text-[#222831]">{t.freeDownloads}</h2>
+                  <p className="mt-1 max-w-xl text-sm text-[#68717a]">
                     {t.freeDesc}
                   </p>
                 </div>
@@ -589,12 +589,12 @@ function AppContent() {
             {activeTab === 'library' && (
               <section className="pb-32">
                 <div className="mb-6">
-                  <p className="mb-1 inline-flex items-center gap-2 rounded-full bg-[#d27b57]/15 px-3 py-1 text-xs font-semibold text-[#e6a184]">
+                  <p className="mb-1 inline-flex items-center gap-2 rounded-full bg-[#e6f4f1] px-3 py-1 text-xs font-semibold text-[#167965]">
                     <Library size={12} />
                     {t.myLibrary}
                   </p>
-                  <h2 className="mt-2 text-2xl font-bold text-white">{t.myPurchases}</h2>
-                  <p className="text-slate-400 mt-1 text-sm max-w-xl">
+                  <h2 className="mt-2 text-2xl font-bold text-[#222831]">{t.myPurchases}</h2>
+                  <p className="mt-1 max-w-xl text-sm text-[#68717a]">
                     {t.myPurchasesDesc}
                   </p>
                 </div>
@@ -605,7 +605,7 @@ function AppContent() {
         )}
       </main>
 
-      <footer className="border-t border-[#383c40] bg-[#202327]">
+      <footer className="border-t border-[#e5e1d9] bg-white">
         <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 sm:px-6 py-6 text-sm text-slate-400 md:flex-row md:items-center md:justify-between">
           <p>© {new Date().getFullYear()} DJ Bilal Music Store</p>
           <div className="flex flex-wrap items-center gap-4">
@@ -647,7 +647,7 @@ function AppContent() {
 
       {/* Player */}
       {currentTrack && (
-        <div className="fixed bottom-0 left-0 right-0 border-t border-[#41464b] bg-[#25292d]">
+        <div className="fixed bottom-0 left-0 right-0 border-t border-[#e0dcd4] bg-white shadow-[0_-8px_24px_rgba(34,40,49,0.08)]">
           <AudioPlayer track={currentTrack} isPlaying={isPlaying} onPlayPause={setIsPlaying} />
         </div>
       )}

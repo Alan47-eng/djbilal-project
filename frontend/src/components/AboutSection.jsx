@@ -123,14 +123,14 @@ DJ Bilal Hamsho هو مشروع موسيقي متكامل يجمع بين DJing�
   };
   return (
     <section className="max-w-4xl mx-auto">
-      <div className="rounded-3xl border border-slate-700 bg-gradient-to-br from-slate-800 to-slate-900 overflow-hidden shadow-2xl">
+      <div className="overflow-hidden rounded-3xl border border-[#e4e0d8] bg-white shadow-sm">
         {/* Hero banner */}
-        <div className="h-32 bg-gradient-to-r from-violet-950 via-indigo-950 to-slate-900 sm:h-36" />
+        <div className="h-32 bg-[#e8f3f0] sm:h-36" />
 
         <div className="px-4 sm:px-8 pb-8 sm:pb-10">
           {/* Avatar */}
           <div className="flex flex-col gap-4 -mt-14 mb-6 sm:-mt-16 sm:flex-row sm:items-end sm:gap-6">
-            <div className="relative h-28 w-28 flex-shrink-0 overflow-hidden rounded-2xl border-4 border-slate-800 bg-gradient-to-br from-purple-600 to-blue-600 shadow-xl sm:h-36 sm:w-36">
+            <div className="relative h-28 w-28 flex-shrink-0 overflow-hidden rounded-2xl border-4 border-white bg-[#ed7755] shadow-md sm:h-36 sm:w-36">
               {profilePhotoUrl ? (
                 <img src={resolveAssetUrl(profilePhotoUrl)} alt="DJ Bilal" className="w-full h-full object-cover" />
               ) : (
@@ -141,7 +141,7 @@ DJ Bilal Hamsho هو مشروع موسيقي متكامل يجمع بين DJing�
               {user?.is_admin && (
                 <label
                   title={lang === 'ar' ? 'تغيير الصورة' : 'Change profile photo'}
-                  className="absolute bottom-1 right-1 cursor-pointer rounded-full bg-slate-950/90 p-2 text-white shadow hover:bg-purple-700"
+                  className="absolute bottom-1 right-1 cursor-pointer rounded-full bg-[#222831]/90 p-2 text-white shadow hover:bg-[#39414b]"
                 >
                   <Camera size={16} />
                   <input
@@ -156,34 +156,34 @@ DJ Bilal Hamsho هو مشروع موسيقي متكامل يجمع بين DJing�
               )}
             </div>
             <div className="pb-1 sm:pb-2">
-              <h2 className="text-2xl sm:text-3xl font-extrabold text-white">DJ Bilal</h2>
-              <p className="text-purple-400 font-medium text-sm">{t.role}</p>
+              <h2 className="text-2xl font-extrabold text-[#222831] sm:text-3xl">DJ Bilal</h2>
+              <p className="text-sm font-medium text-[#c65a3d]">{t.role}</p>
             </div>
             {photoError && (
-              <p role="alert" className="mb-4 text-sm text-red-300">{photoError}</p>
+              <p role="alert" className="mb-4 text-sm text-red-700">{photoError}</p>
             )}
           </div>
 
           {/* Tagline */}
-          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-purple-500/40 bg-purple-600/10 px-3 sm:px-4 py-2 text-xs sm:text-sm font-semibold text-purple-300">
+          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-[#f0c2b2] bg-[#fff0e9] px-3 py-2 text-xs font-semibold text-[#b94c31] sm:px-4 sm:text-sm">
             {t.tagline}
           </div>
 
           {/* Bio */}
-          <p className="text-slate-300 leading-relaxed text-base mb-8 max-w-2xl">
+          <p className="mb-8 max-w-2xl text-base leading-relaxed text-[#4f5861]">
             {t.bio}
           </p>
 
           <div className="mb-8 grid gap-4 md:grid-cols-2">
-            <div className="rounded-xl border border-slate-700 bg-slate-800 p-4">
-              <h3 className="text-sm font-bold uppercase tracking-wide text-slate-200">{t.howWorks}</h3>
-              <p className="mt-2 text-sm text-slate-300">
+            <div className="rounded-xl border border-[#e4e0d8] bg-[#fbfaf7] p-4">
+              <h3 className="text-sm font-bold uppercase tracking-wide text-[#303740]">{t.howWorks}</h3>
+              <p className="mt-2 text-sm text-[#626a72]">
                 {t.howWorksDesc}
               </p>
             </div>
-            <div className="rounded-xl border border-slate-700 bg-slate-800 p-4">
-              <h3 className="text-sm font-bold uppercase tracking-wide text-slate-200">{t.contact}</h3>
-              <p className="mt-2 text-sm text-slate-300">
+            <div className="rounded-xl border border-[#e4e0d8] bg-[#fbfaf7] p-4">
+              <h3 className="text-sm font-bold uppercase tracking-wide text-[#303740]">{t.contact}</h3>
+              <p className="mt-2 text-sm text-[#626a72]">
                 Support e-mail: <strong>gbilal1717@gmail.com</strong>
               </p>
             </div>
@@ -196,16 +196,16 @@ DJ Bilal Hamsho هو مشروع موسيقي متكامل يجمع بين DJing�
               { label: t.released, value: '200+' },
               { label: t.clients, value: '500+' },
             ].map((stat) => (
-              <div key={stat.label} className="rounded-xl bg-slate-800 p-4 text-center border border-slate-700">
-                <div className="text-2xl font-extrabold text-purple-400">{stat.value}</div>
-                <div className="text-xs text-slate-400 mt-1">{stat.label}</div>
+              <div key={stat.label} className="rounded-xl border border-[#e4e0d8] bg-white p-4 text-center shadow-sm">
+                <div className="text-2xl font-extrabold text-[#c65a3d]">{stat.value}</div>
+                <div className="mt-1 text-xs text-[#727981]">{stat.label}</div>
               </div>
             ))}
           </div>
 
           {/* Social links */}
           <div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-3">{t.follow}</p>
+            <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-[#7b8289]">{t.follow}</p>
             <div className="flex items-center gap-4 flex-wrap">
               {SOCIAL_LINKS.map((link) => (
                 <a
@@ -213,7 +213,7 @@ DJ Bilal Hamsho هو مشروع موسيقي متكامل يجمع بين DJing�
                   href={link.href}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className={`flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-800 px-4 py-2.5 text-slate-300 transition-all duration-200 hover:border-slate-500 hover:bg-slate-700 ${link.color}`}
+                  className={`flex items-center gap-2 rounded-xl border border-[#dedbd4] bg-white px-4 py-2.5 text-[#4f5861] shadow-sm transition-all duration-200 hover:border-[#ed7755] hover:bg-[#fffaf6] ${link.color}`}
                 >
                   {link.icon}
                   <span className="text-sm font-medium">{link.label}</span>

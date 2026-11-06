@@ -30,7 +30,7 @@ const initialTrackForm = {
 };
 
 const fieldClass =
-  'w-full rounded-lg border border-[#41464b] bg-[#191c1f] px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-[#d27b57] focus:outline-none';
+  'w-full rounded-lg border border-[#dedbd4] bg-white px-3 py-2 text-sm text-[#222831] placeholder:text-[#92979c] focus:border-[#ed7755] focus:outline-none';
 const buttonClass =
   'inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50';
 
@@ -353,14 +353,14 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-2 sm:p-5" onClick={onClose}>
       <section
-        className="flex h-[min(94vh,960px)] w-full max-w-7xl overflow-hidden rounded-2xl border border-[#41464b] bg-[#1d2023] text-slate-100 shadow-2xl"
+        className="flex h-[min(94vh,960px)] w-full max-w-7xl overflow-hidden rounded-2xl border border-[#e1ddd5] bg-[#fbfaf7] text-[#222831] shadow-2xl"
         onClick={(event) => event.stopPropagation()}
         aria-label={t.dashboard}
         dir={isRTL ? 'rtl' : 'ltr'}
       >
-        <aside className="hidden w-64 shrink-0 flex-col border-r border-[#383c40] bg-[#222529] p-5 md:flex">
+        <aside className="hidden w-64 shrink-0 flex-col border-r border-[#e5e1d9] bg-white p-5 md:flex">
           <div className="mb-9">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#e39a76]">DJ Bilal</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#c65a3d]">DJ Bilal</p>
             <h1 className="mt-2 text-xl font-bold">{t.dashboard}</h1>
           </div>
           <nav className="space-y-2" aria-label={t.dashboard}>
@@ -370,7 +370,7 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
                 type="button"
                 onClick={() => { setTab(id); setError(''); setNotice(''); }}
                 className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-start text-sm font-semibold transition-colors ${
-                  tab === id ? 'bg-[#d27b57] text-white' : 'text-slate-300 hover:bg-[#303438]'
+                  tab === id ? 'bg-[#ed7755] text-white' : 'text-[#59616a] hover:bg-[#f4f1eb]'
                 }`}
               >
                 <Icon size={18} />
@@ -378,7 +378,7 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
               </button>
             ))}
           </nav>
-          <div className="mt-8 border-t border-[#383c40] pt-4">
+          <div className="mt-8 border-t border-[#e5e1d9] pt-4">
             <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-slate-500">{t.siteSections}</p>
             {[
               ['albums', t.albums],
@@ -389,34 +389,34 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
                 key={id}
                 type="button"
                 onClick={() => { onNavigate?.(id); onClose?.(); }}
-                className="block w-full rounded-lg px-3 py-2 text-start text-sm text-[#aeb2b5] hover:bg-[#303438] hover:text-white"
+                className="block w-full rounded-lg px-3 py-2 text-start text-sm text-[#626a72] hover:bg-[#f4f1eb] hover:text-[#222831]"
               >
                 {label}
               </button>
             ))}
           </div>
-          <div className="mt-auto border-t border-[#383c40] pt-4">
+          <div className="mt-auto border-t border-[#e5e1d9] pt-4">
             <p className="truncate text-xs text-slate-400">{user?.email}</p>
-            <button type="button" onClick={onLogout} className={`${buttonClass} mt-3 w-full bg-slate-800 text-slate-200 hover:bg-slate-700`}>
+            <button type="button" onClick={onLogout} className={`${buttonClass} mt-3 w-full bg-[#222831] text-white hover:bg-[#39414b]`}>
               {t.logout}
             </button>
           </div>
         </aside>
 
         <main className="flex min-w-0 flex-1 flex-col">
-          <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 px-4 py-4 sm:px-7">
+          <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[#e5e1d9] bg-white px-4 py-4 sm:px-7">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-widest text-[#e39a76]">{t.dashboard}</p>
+              <p className="text-xs font-semibold uppercase tracking-widest text-[#c65a3d]">{t.dashboard}</p>
               <h2 className="mt-1 text-xl font-bold sm:text-2xl">{tabs.find((item) => item.id === tab)?.label}</h2>
             </div>
-            <button type="button" onClick={onClose} aria-label={t.close} className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-white">
+            <button type="button" onClick={onClose} aria-label={t.close} className="rounded-lg p-2 text-[#69717a] hover:bg-[#f1eee8] hover:text-[#222831]">
               <X size={20} />
             </button>
             <nav className="flex w-full gap-2 overflow-x-auto md:hidden" aria-label={t.dashboard}>
               {tabs.map(({ id, label, icon: Icon }) => (
                 <button key={id} type="button" onClick={() => { setTab(id); setError(''); setNotice(''); }}
                   className={`inline-flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold ${
-                    tab === id ? 'bg-[#d27b57] text-white' : 'bg-[#303438] text-slate-300'
+                    tab === id ? 'bg-[#ed7755] text-white' : 'bg-[#f1eee8] text-[#4f5861]'
                   }`}>
                   <Icon size={15} />{label}
                 </button>
@@ -425,36 +425,36 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
           </header>
 
           <div className="flex-1 overflow-y-auto p-4 sm:p-7">
-            {notice && <p role="status" className="mb-4 rounded-lg border border-emerald-700/60 bg-emerald-950/50 px-4 py-3 text-sm text-emerald-300">{notice}</p>}
-            {error && <p role="alert" className="mb-4 rounded-lg border border-red-700/60 bg-red-950/50 px-4 py-3 text-sm text-red-300">{error}</p>}
+            {notice && <p role="status" className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{notice}</p>}
+            {error && <p role="alert" className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
             {loading ? (
-              <p className="py-12 text-center text-sm text-slate-400">{t.loading}</p>
+              <p className="py-12 text-center text-sm text-[#69717a]">{t.loading}</p>
             ) : (
               <>
                 {tab === 'users' && (
-                  <div className="overflow-hidden rounded-xl border border-slate-800">
+                  <div className="overflow-hidden rounded-xl border border-[#e4e0d8] bg-white shadow-sm">
                     <div className="overflow-x-auto">
                       <table className="w-full min-w-[680px] text-left text-sm">
-                        <thead className="bg-slate-900 text-xs uppercase tracking-wide text-slate-400">
+                        <thead className="bg-[#f1eee8] text-xs uppercase tracking-wide text-[#69717a]">
                           <tr><th className="px-5 py-4">{t.email}</th><th className="px-5 py-4">{t.name}</th><th className="px-5 py-4">{t.role}</th><th className="px-5 py-4 text-end">{t.action}</th></tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-800">
+                        <tbody className="divide-y divide-[#eeeae2]">
                           {users.map((item) => (
-                            <tr key={item.id} className="bg-slate-950 hover:bg-slate-900/70">
-                              <td className="px-5 py-4 font-medium text-white">{item.email}</td>
-                              <td className="px-5 py-4 text-slate-300">{item.full_name || '—'}</td>
-                              <td className="px-5 py-4"><span className="rounded-full bg-slate-800 px-2.5 py-1 text-xs">{item.is_admin ? t.admin : t.user}</span></td>
+                            <tr key={item.id} className="bg-white hover:bg-[#fbfaf7]">
+                              <td className="px-5 py-4 font-medium text-[#222831]">{item.email}</td>
+                              <td className="px-5 py-4 text-[#59616a]">{item.full_name || '—'}</td>
+                              <td className="px-5 py-4"><span className="rounded-full bg-[#f1eee8] px-2.5 py-1 text-xs text-[#4f5861]">{item.is_admin ? t.admin : t.user}</span></td>
                               <td className="px-5 py-4 text-end">
                                 <button type="button" disabled={savingKey === `user-${item.id}` || (item.is_admin && item.id === user?.id)}
                                   onClick={() => saveRole(item, item.is_admin ? 'user' : 'admin')}
-                                  className={`${buttonClass} ${item.is_admin ? 'bg-amber-700 hover:bg-amber-600' : 'bg-emerald-700 hover:bg-emerald-600'}`}>
+                                  className={`${buttonClass} text-white ${item.is_admin ? 'bg-amber-600 hover:bg-amber-700' : 'bg-[#167965] hover:bg-[#126453]'}`}>
                                   <ShieldCheck size={15} />
                                   {savingKey === `user-${item.id}` ? t.saving : item.is_admin ? t.demote : t.promote}
                                 </button>
                               </td>
                             </tr>
                           ))}
-                          {!users.length && <tr><td colSpan="4" className="px-5 py-10 text-center text-slate-400">{t.noUsers}</td></tr>}
+                          {!users.length && <tr><td colSpan="4" className="px-5 py-10 text-center text-[#727981]">{t.noUsers}</td></tr>}
                         </tbody>
                       </table>
                     </div>
@@ -463,32 +463,32 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
 
                 {tab === 'albums' && (
                   <div className="space-y-6">
-                    <form onSubmit={createAlbum} className="grid gap-3 rounded-xl border border-[#41423c] bg-[#252622] p-4 md:grid-cols-[1.2fr_1.5fr_1fr_auto] md:items-end">
+                    <form onSubmit={createAlbum} className="grid gap-3 rounded-xl border border-[#e4e0d8] bg-white p-4 shadow-sm md:grid-cols-[1.2fr_1.5fr_1fr_auto] md:items-end">
                       <label className="text-xs font-semibold text-slate-400">{t.albumTitle}<input className={`${fieldClass} mt-2`} required value={newAlbum.title} onChange={(event) => setNewAlbum({ ...newAlbum, title: event.target.value })} /></label>
                       <label className="text-xs font-semibold text-slate-400">{t.coverUrl}<input type="url" className={`${fieldClass} mt-2`} value={newAlbum.cover_image_url} onChange={(event) => setNewAlbum({ ...newAlbum, cover_image_url: event.target.value })} /></label>
                       <label className="text-xs font-semibold text-slate-400">{t.coverFile}<input type="file" accept="image/png,image/jpeg,image/webp" className="mt-2 block w-full text-sm" onChange={(event) => setNewAlbum({ ...newAlbum, cover_file: event.target.files?.[0] || null })} /></label>
                       <label className="text-xs font-semibold text-slate-400">{t.releaseDate}<input type="date" className={`${fieldClass} mt-2`} value={newAlbum.release_date} onChange={(event) => setNewAlbum({ ...newAlbum, release_date: event.target.value })} /></label>
-                      <button disabled={savingKey === 'new-album'} className={`${buttonClass} bg-[#59604c] text-white hover:bg-[#687057]`}>{savingKey === 'new-album' ? t.creating : t.createAlbum}</button>
+                      <button disabled={savingKey === 'new-album'} className={`${buttonClass} bg-[#ed7755] text-white hover:bg-[#d96343]`}>{savingKey === 'new-album' ? t.creating : t.createAlbum}</button>
                     </form>
-                    <div className="overflow-hidden rounded-xl border border-slate-800">
+                    <div className="overflow-hidden rounded-xl border border-[#e4e0d8] bg-white shadow-sm">
                       <div className="overflow-x-auto">
                         <table className="w-full min-w-[850px] text-left text-sm">
-                          <thead className="bg-slate-900 text-xs uppercase tracking-wide text-slate-400"><tr><th className="px-4 py-4">{t.albums}</th><th className="px-4 py-4">{t.albumCover}</th><th className="px-4 py-4">{t.releaseDate}</th><th className="px-4 py-4 text-end">{t.operations}</th></tr></thead>
-                          <tbody className="divide-y divide-slate-800">
+                          <thead className="bg-[#f1eee8] text-xs uppercase tracking-wide text-[#69717a]"><tr><th className="px-4 py-4">{t.albums}</th><th className="px-4 py-4">{t.albumCover}</th><th className="px-4 py-4">{t.releaseDate}</th><th className="px-4 py-4 text-end">{t.operations}</th></tr></thead>
+                          <tbody className="divide-y divide-[#eeeae2]">
                             {albums.map((album) => {
                               const draft = albumDrafts[album.id] || { title: album.title, cover_image_url: album.cover_image_url || '', release_date: album.release_date || '', cover_file: null };
-                              return <tr key={album.id} className="bg-slate-950">
+                              return <tr key={album.id} className="bg-white">
                                 <td className="px-4 py-3"><input className={fieldClass} value={draft.title || ''} onChange={(event) => setAlbumDrafts((current) => ({ ...current, [album.id]: { ...draft, title: event.target.value } }))} /></td>
                                 <td className="px-4 py-3"><input type="url" aria-label={t.coverUrl} className={`${fieldClass} mb-2`} value={draft.cover_image_url || ''} onChange={(event) => setAlbumDrafts((current) => ({ ...current, [album.id]: { ...draft, cover_image_url: event.target.value } }))} /><input type="file" accept="image/png,image/jpeg,image/webp" aria-label={t.coverFile} className="block w-full text-xs" onChange={(event) => setAlbumDrafts((current) => ({ ...current, [album.id]: { ...draft, cover_file: event.target.files?.[0] || null } }))} /></td>
                                 <td className="px-4 py-3"><input type="date" className={fieldClass} value={draft.release_date || ''} onChange={(event) => setAlbumDrafts((current) => ({ ...current, [album.id]: { ...draft, release_date: event.target.value } }))} /></td>
                                 <td className="px-4 py-3"><div className="flex justify-end gap-2">
-                                  <button type="button" onClick={() => { setTrackForm({ ...initialTrackForm, album_id: String(album.id) }); setTab('tracks'); setError(''); setNotice(''); }} className={`${buttonClass} bg-[#59604c] text-white hover:bg-[#687057]`}><Plus size={15} />{t.addTrackToAlbum}</button>
-                                  <button type="button" disabled={savingKey === `album-${album.id}`} onClick={() => saveAlbum(album.id)} className={`${buttonClass} bg-slate-800 text-white hover:bg-slate-700`}>{t.save}</button>
-                                  <button type="button" disabled={savingKey === `album-${album.id}`} onClick={() => deleteAlbum(album)} aria-label={`${t.albums}: ${album.title}`} className={`${buttonClass} bg-red-950 text-red-300 hover:bg-red-900`}><Trash2 size={16} /></button>
+                                  <button type="button" onClick={() => { setTrackForm({ ...initialTrackForm, album_id: String(album.id) }); setTab('tracks'); setError(''); setNotice(''); }} className={`${buttonClass} bg-[#167965] text-white hover:bg-[#126453]`}><Plus size={15} />{t.addTrackToAlbum}</button>
+                                  <button type="button" disabled={savingKey === `album-${album.id}`} onClick={() => saveAlbum(album.id)} className={`${buttonClass} bg-[#222831] text-white hover:bg-[#39414b]`}>{t.save}</button>
+                                  <button type="button" disabled={savingKey === `album-${album.id}`} onClick={() => deleteAlbum(album)} aria-label={`${t.albums}: ${album.title}`} className={`${buttonClass} bg-red-50 text-red-700 hover:bg-red-100`}><Trash2 size={16} /></button>
                                 </div></td>
                               </tr>;
                             })}
-                            {!albums.length && <tr><td colSpan="4" className="px-4 py-10 text-center text-slate-400">{t.noAlbums}</td></tr>}
+                            {!albums.length && <tr><td colSpan="4" className="px-4 py-10 text-center text-[#727981]">{t.noAlbums}</td></tr>}
                           </tbody>
                         </table>
                       </div>
@@ -498,7 +498,7 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
 
                 {tab === 'tracks' && (
                   <div className="space-y-6">
-                    <form onSubmit={submitTrack} className="grid gap-3 rounded-xl border border-[#41423c] bg-[#252622] p-4 sm:grid-cols-2 lg:grid-cols-3">
+                    <form onSubmit={submitTrack} className="grid gap-3 rounded-xl border border-[#e4e0d8] bg-white p-4 shadow-sm sm:grid-cols-2 lg:grid-cols-3">
                       <label className="text-xs font-semibold text-slate-400">{t.trackName}<input className={`${fieldClass} mt-2`} required value={trackForm.title} onChange={(event) => setTrackForm({ ...trackForm, title: event.target.value })} /></label>
                       <label className="text-xs font-semibold text-slate-400">{t.artist}<input className={`${fieldClass} mt-2`} required value={trackForm.artist} onChange={(event) => setTrackForm({ ...trackForm, artist: event.target.value })} /></label>
                       <label className="text-xs font-semibold text-slate-400">{t.selectAlbum}
@@ -526,14 +526,14 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
                       <label className="text-xs font-semibold text-slate-400">{t.trackFile}<input type="file" accept="audio/*" required className="mt-2 block w-full text-sm" onChange={(event) => setTrackForm({ ...trackForm, track_file: event.target.files?.[0] || null })} /></label>
                       <label className="text-xs font-semibold text-slate-400">{t.previewFile}<input type="file" accept="audio/*" required className="mt-2 block w-full text-sm" onChange={(event) => setTrackForm({ ...trackForm, preview_file: event.target.files?.[0] || null })} /></label>
                       <label className="text-xs font-semibold text-slate-400">{t.albumCover}<input type="file" accept="image/*" className="mt-2 block w-full text-sm" onChange={(event) => setTrackForm({ ...trackForm, cover_file: event.target.files?.[0] || null })} /></label>
-                      <div className="sm:col-span-2 lg:col-span-3"><button disabled={savingKey === 'new-track'} className={`${buttonClass} bg-[#59604c] px-5 text-white hover:bg-[#687057]`}>{savingKey === 'new-track' ? t.adding : t.addTrack}</button></div>
+                      <div className="sm:col-span-2 lg:col-span-3"><button disabled={savingKey === 'new-track'} className={`${buttonClass} bg-[#ed7755] px-5 text-white hover:bg-[#d96343]`}>{savingKey === 'new-track' ? t.adding : t.addTrack}</button></div>
                     </form>
 
-                    <div className="overflow-hidden rounded-xl border border-slate-800">
+                    <div className="overflow-hidden rounded-xl border border-[#e4e0d8] bg-white shadow-sm">
                       <div className="overflow-x-auto">
                         <table className="w-full min-w-[1100px] text-left text-sm">
-                          <thead className="bg-slate-900 text-xs uppercase tracking-wide text-slate-400"><tr><th className="px-4 py-4">{t.track}</th><th className="px-4 py-4">{t.albums}</th><th className="px-4 py-4">{t.price}</th><th className="px-4 py-4">Gumroad URL</th><th className="px-4 py-4">{t.productId}</th><th className="px-4 py-4 text-end">{t.operations}</th></tr></thead>
-                          <tbody className="divide-y divide-slate-800">
+                          <thead className="bg-[#f1eee8] text-xs uppercase tracking-wide text-[#69717a]"><tr><th className="px-4 py-4">{t.track}</th><th className="px-4 py-4">{t.albums}</th><th className="px-4 py-4">{t.price}</th><th className="px-4 py-4">Gumroad URL</th><th className="px-4 py-4">{t.productId}</th><th className="px-4 py-4 text-end">{t.operations}</th></tr></thead>
+                          <tbody className="divide-y divide-[#eeeae2]">
                             {tracks.map((track) => {
                               const draft = trackDrafts[track.id] || {
                                 album_id: String(track.album_id || ''),
@@ -541,19 +541,19 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
                                 gumroad_url: track.gumroad_url || track.external_product_id || '',
                                 gumroad_product_id: track.gumroad_product_id || '',
                               };
-                              return <tr key={track.id} className="bg-slate-950">
-                                <td className="px-4 py-3"><p className="font-semibold text-white">{track.title}</p><p className="text-xs text-slate-400">{track.artist} · {track.is_free ? t.free : t.paid}</p></td>
+                              return <tr key={track.id} className="bg-white">
+                                <td className="px-4 py-3"><p className="font-semibold text-[#222831]">{track.title}</p><p className="text-xs text-[#727981]">{track.artist} · {track.is_free ? t.free : t.paid}</p></td>
                                 <td className="px-4 py-3"><select className={fieldClass} value={draft.album_id} onChange={(event) => updateTrackDraft(track, 'album_id', event.target.value)}><option value="">{t.single}</option>{albums.map((album) => <option key={album.id} value={album.id}>{album.title}</option>)}</select></td>
-                                <td className="px-4 py-3"><input aria-label={`${track.title} ${t.price}`} type="number" step="0.01" min="0" disabled={track.is_free} className="w-24 rounded-lg border border-slate-700 bg-slate-900 px-2 py-2 text-sm text-white disabled:opacity-50" value={track.is_free ? '0' : draft.price} onChange={(event) => updateTrackDraft(track, 'price', event.target.value)} /></td>
-                                <td className="px-4 py-3"><input aria-label={`${track.title} Gumroad URL`} className="w-56 rounded-lg border border-slate-700 bg-slate-900 px-2 py-2 text-xs text-white" value={draft.gumroad_url} disabled={track.is_free} onChange={(event) => updateTrackDraft(track, 'gumroad_url', event.target.value)} /></td>
-                                <td className="px-4 py-3"><input aria-label={`${track.title} Gumroad ID`} className="w-32 rounded-lg border border-slate-700 bg-slate-900 px-2 py-2 text-xs text-white" value={draft.gumroad_product_id} disabled={track.is_free} onChange={(event) => updateTrackDraft(track, 'gumroad_product_id', event.target.value)} /></td>
+                                <td className="px-4 py-3"><input aria-label={`${track.title} ${t.price}`} type="number" step="0.01" min="0" disabled={track.is_free} className="w-24 rounded-lg border border-[#dedbd4] bg-white px-2 py-2 text-sm text-[#222831] disabled:bg-[#f1eee8]" value={track.is_free ? '0' : draft.price} onChange={(event) => updateTrackDraft(track, 'price', event.target.value)} /></td>
+                                <td className="px-4 py-3"><input aria-label={`${track.title} Gumroad URL`} className="w-56 rounded-lg border border-[#dedbd4] bg-white px-2 py-2 text-xs text-[#222831]" value={draft.gumroad_url} disabled={track.is_free} onChange={(event) => updateTrackDraft(track, 'gumroad_url', event.target.value)} /></td>
+                                <td className="px-4 py-3"><input aria-label={`${track.title} Gumroad ID`} className="w-32 rounded-lg border border-[#dedbd4] bg-white px-2 py-2 text-xs text-[#222831]" value={draft.gumroad_product_id} disabled={track.is_free} onChange={(event) => updateTrackDraft(track, 'gumroad_product_id', event.target.value)} /></td>
                                 <td className="px-4 py-3"><div className="flex justify-end gap-2">
-                                  <button type="button" disabled={savingKey === `track-${track.id}`} onClick={() => saveTrack(track)} className={`${buttonClass} bg-slate-800 text-white hover:bg-slate-700`}>{t.save}</button>
-                                  <button type="button" disabled={savingKey === `track-${track.id}`} onClick={() => deleteTrack(track)} aria-label={`${track.title} ${t.track}`} className={`${buttonClass} bg-red-950 text-red-300 hover:bg-red-900`}><Trash2 size={16} /></button>
+                                  <button type="button" disabled={savingKey === `track-${track.id}`} onClick={() => saveTrack(track)} className={`${buttonClass} bg-[#222831] text-white hover:bg-[#39414b]`}>{t.save}</button>
+                                  <button type="button" disabled={savingKey === `track-${track.id}`} onClick={() => deleteTrack(track)} aria-label={`${track.title} ${t.track}`} className={`${buttonClass} bg-red-50 text-red-700 hover:bg-red-100`}><Trash2 size={16} /></button>
                                 </div></td>
                               </tr>;
                             })}
-                            {!tracks.length && <tr><td colSpan="6" className="px-4 py-10 text-center text-slate-400">{t.noTracks}</td></tr>}
+                            {!tracks.length && <tr><td colSpan="6" className="px-4 py-10 text-center text-[#727981]">{t.noTracks}</td></tr>}
                           </tbody>
                         </table>
                       </div>
@@ -563,13 +563,13 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
 
                 {tab === 'settings' && (
                   <div className="grid gap-4 md:grid-cols-3">
-                    <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-5"><p className="text-sm text-slate-400">{t.users}</p><p className="mt-2 text-3xl font-bold">{users.length}</p></div>
-                    <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-5"><p className="text-sm text-slate-400">{t.albums}</p><p className="mt-2 text-3xl font-bold">{albums.length}</p></div>
-                    <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-5"><p className="text-sm text-slate-400">{t.tracks}</p><p className="mt-2 text-3xl font-bold">{tracks.length}</p></div>
-                    <section className="rounded-xl border border-slate-800 bg-slate-900/60 p-5 md:col-span-3">
+                    <div className="rounded-xl border border-[#e4e0d8] bg-white p-5 shadow-sm"><p className="text-sm text-[#69717a]">{t.users}</p><p className="mt-2 text-3xl font-bold">{users.length}</p></div>
+                    <div className="rounded-xl border border-[#e4e0d8] bg-white p-5 shadow-sm"><p className="text-sm text-[#69717a]">{t.albums}</p><p className="mt-2 text-3xl font-bold">{albums.length}</p></div>
+                    <div className="rounded-xl border border-[#e4e0d8] bg-white p-5 shadow-sm"><p className="text-sm text-[#69717a]">{t.tracks}</p><p className="mt-2 text-3xl font-bold">{tracks.length}</p></div>
+                    <section className="rounded-xl border border-[#e4e0d8] bg-white p-5 shadow-sm md:col-span-3">
                       <h3 className="font-semibold">{t.adminAccount}</h3>
-                      <p className="mt-2 text-sm text-slate-300">{user?.email}</p>
-                      <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-400">
+                      <p className="mt-2 text-sm text-[#4f5861]">{user?.email}</p>
+                      <p className="mt-4 max-w-2xl text-sm leading-6 text-[#69717a]">
                         {t.settingsDescription}
                       </p>
                     </section>

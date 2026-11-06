@@ -80,7 +80,7 @@ const AudioPlayer = ({ track, isPlaying, onPlayPause }) => {
 
   if (!track) {
     return (
-      <div className="fixed bottom-0 left-0 right-0 bg-slate-800 border-t border-slate-700 p-4 text-center text-slate-400">
+      <div className="fixed bottom-0 left-0 right-0 border-t border-[#e4e0d8] bg-white p-4 text-center text-[#727981]">
         {t.selectTrack}
       </div>
     );
@@ -88,17 +88,17 @@ const AudioPlayer = ({ track, isPlaying, onPlayPause }) => {
 
   return (
     <div
-      className="fixed bottom-0 left-0 right-0 bg-slate-800 border-t border-slate-700 shadow-2xl z-50"
+      className="fixed bottom-0 left-0 right-0 z-50 border-t border-[#e4e0d8] bg-white shadow-[0_-8px_24px_rgba(34,40,49,0.08)]"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
       {/* Progress Bar */}
       <div
         onClick={handleProgressClick}
-        className="h-1 bg-slate-700 hover:h-2 transition-all duration-200 cursor-pointer"
+        className="h-1 cursor-pointer bg-[#e6e2da] transition-all duration-200 hover:h-2"
         style={{
-          background: `linear-gradient(to right, #a855f7 0%, #a855f7 ${
+          background: `linear-gradient(to right, #ed7755 0%, #ed7755 ${
             duration ? (currentTime / duration) * 100 : 0
-          }%, #475569 ${duration ? (currentTime / duration) * 100 : 0}%, #475569 100%)`,
+          }%, #e6e2da ${duration ? (currentTime / duration) * 100 : 0}%, #e6e2da 100%)`,
         }}
       />
 
@@ -106,8 +106,8 @@ const AudioPlayer = ({ track, isPlaying, onPlayPause }) => {
       <div className="flex flex-col gap-3 px-4 sm:px-6 py-3 sm:py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
         {/* Track Info */}
         <div className="w-full sm:flex-1 min-w-0">
-          <h4 className="text-white font-semibold truncate">{track.title}</h4>
-          <p className="text-slate-400 text-sm truncate">{track.artist}</p>
+          <h4 className="truncate font-semibold text-[#222831]">{track.title}</h4>
+          <p className="truncate text-sm text-[#727981]">{track.artist}</p>
         </div>
 
         {/* Controls */}
@@ -115,7 +115,7 @@ const AudioPlayer = ({ track, isPlaying, onPlayPause }) => {
           {/* Play/Pause Button */}
           <button
             onClick={() => onPlayPause(!isPlaying)}
-            className="bg-purple-600 hover:bg-purple-700 text-white p-3 rounded-full transition-all duration-200 flex-shrink-0"
+            className="flex-shrink-0 rounded-full bg-[#ed7755] p-3 text-white transition-all duration-200 hover:bg-[#d96343]"
           >
             {isPlaying ? (
               <Pause size={20} fill="currentColor" />
@@ -125,7 +125,7 @@ const AudioPlayer = ({ track, isPlaying, onPlayPause }) => {
           </button>
 
           {/* Time Display */}
-          <div className="text-slate-300 text-xs sm:text-sm whitespace-nowrap">
+          <div className="whitespace-nowrap text-xs text-[#59616a] sm:text-sm">
             {formatTime(currentTime)} / {formatTime(duration)}
           </div>
 
@@ -133,7 +133,7 @@ const AudioPlayer = ({ track, isPlaying, onPlayPause }) => {
           <div className="hidden sm:flex items-center gap-2">
             <button
               onClick={() => setIsMuted(!isMuted)}
-              className="text-slate-400 hover:text-white transition-colors"
+              className="text-[#737b83] transition-colors hover:text-[#222831]"
             >
               {isMuted || volume === 0 ? (
                 <VolumeX size={20} />
@@ -151,13 +151,13 @@ const AudioPlayer = ({ track, isPlaying, onPlayPause }) => {
                 setVolume(newVolume);
                 setIsMuted(newVolume === 0);
               }}
-              className="w-20 h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-purple-600"
+              className="h-1 w-20 cursor-pointer appearance-none rounded-lg bg-[#e6e2da] accent-[#ed7755]"
             />
           </div>
         </div>
       </div>
       {playbackError && (
-        <div className="px-6 pb-3 text-sm text-red-300">{playbackError}</div>
+        <div className="px-6 pb-3 text-sm text-red-700">{playbackError}</div>
       )}
 
       {/* Hidden Audio Element */}
