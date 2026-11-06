@@ -34,7 +34,7 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
   return (
     <div className="fixed inset-0 z-50 bg-black/60" onClick={onClose}>
       <aside
-        className="absolute left-0 top-0 flex h-full w-full max-w-sm flex-col border-r border-slate-700 bg-slate-900 text-slate-100 shadow-2xl"
+        className="absolute left-0 top-0 flex h-full w-full max-w-sm flex-col border-r border-[#383c40] bg-[#202327] text-slate-100 shadow-2xl"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-slate-800 px-5 py-4">
@@ -57,8 +57,8 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
                 onClick={() => onNavigate?.(item.id)}
                 className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold transition-colors ${
                   activeTab === item.id
-                    ? 'border-[#777b65] bg-[#555b49]/40 text-[#e1dbc9]'
-                    : 'border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700'
+                    ? 'border-[#d27b57] bg-[#d27b57]/15 text-[#f0b095]'
+                    : 'border-[#41464b] bg-[#292d31] text-slate-200 hover:bg-[#363b40]'
                 }`}
               >
                 {item.icon}
@@ -73,7 +73,7 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
             <button
               type="button"
               onClick={() => onOpenAuth?.('login')}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-slate-700 px-4 py-2.5 font-semibold text-white hover:bg-slate-600"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#383c40] px-4 py-2.5 font-semibold text-white hover:bg-[#484d52]"
             >
               <LogIn size={16} />
               Sign In
@@ -81,7 +81,7 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
             <button
               type="button"
               onClick={() => onOpenAuth?.('register')}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#59604c] px-4 py-2.5 font-semibold text-white hover:bg-[#687057]"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#d27b57] px-4 py-2.5 font-semibold text-white hover:bg-[#e08b66]"
             >
               <UserPlus size={16} />
               Sign Up

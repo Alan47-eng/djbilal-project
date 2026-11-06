@@ -9,7 +9,7 @@
 }
 
 body {
-  @apply bg-[#191a18] text-[#eeeae1];
+  @apply bg-[#17191c] text-[#f3f0e9];
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
     sans-serif;

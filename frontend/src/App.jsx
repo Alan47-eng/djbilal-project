@@ -282,20 +282,20 @@ function AppContent() {
   };
 
   return (
-    <div className={`min-h-screen bg-[#191a18] text-[#eeeae1] ${isRTL ? 'text-right' : ''}`}>
+    <div className={`min-h-screen bg-[#17191c] text-[#f3f0e9] ${isRTL ? 'text-right' : ''}`}>
       {/* Header */}
-      <header className="sticky top-0 z-40 border-b border-[#393a35] bg-[#222320]/95 shadow-sm backdrop-blur-sm">
+      <header className="sticky top-0 z-40 border-b border-[#383c40] bg-[#202327]/95 shadow-sm backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={() => setMenuOpen(true)}
-              className="rounded-lg border border-slate-700 p-2 text-slate-300 hover:bg-slate-700 hover:text-white"
+              className="rounded-lg border border-[#41464b] p-2 text-[#c5c7c8] hover:bg-[#303438] hover:text-white"
               aria-label="Open menu"
             >
               <Menu size={20} />
             </button>
-            <div className="rounded-lg bg-[#4b5041] p-2">
+            <div className="rounded-lg bg-[#d27b57] p-2">
               <Music size={28} className="text-white" />
             </div>
             <button
@@ -306,25 +306,25 @@ function AppContent() {
               }}
               className="text-left"
             >
-              <h1 className="text-lg font-bold text-[#e7dfd0] sm:text-2xl">
+              <h1 className="text-lg font-bold text-[#f3f0e9] sm:text-2xl">
                 DJ Bilal Music Store
               </h1>
             </button>
           </div>
 
           <div className="flex items-center gap-2 sm:gap-4">
-            <div className="flex items-center rounded-lg border border-slate-700 bg-slate-900/80 p-1 text-xs">
+            <div className="flex items-center rounded-lg border border-[#41464b] bg-[#17191c] p-1 text-xs">
               <button
                 type="button"
                 onClick={() => setLang('en')}
-                className={`rounded px-2 py-1 font-semibold ${lang === 'en' ? 'bg-[#555b49] text-white' : 'text-slate-300'}`}
+                className={`rounded px-2 py-1 font-semibold ${lang === 'en' ? 'bg-[#d27b57] text-white' : 'text-slate-300'}`}
               >
                 EN
               </button>
               <button
                 type="button"
                 onClick={() => setLang('ar')}
-                className={`rounded px-2 py-1 font-semibold ${lang === 'ar' ? 'bg-[#555b49] text-white' : 'text-slate-300'}`}
+                className={`rounded px-2 py-1 font-semibold ${lang === 'ar' ? 'bg-[#d27b57] text-white' : 'text-slate-300'}`}
               >
                 AR
               </button>
@@ -332,10 +332,10 @@ function AppContent() {
             {user ? (
               <>
                 <div className="hidden md:flex items-center gap-2 text-slate-300">
-                  <User size={18} className="text-[#b9aa89]" />
+                  <User size={18} className="text-[#e39a76]" />
                   <span>{user.email}</span>
                   {isAdmin && (
-                    <span className="rounded-full bg-[#555b49]/40 px-2 py-0.5 text-xs font-semibold text-[#d3c7ac]">
+                    <span className="rounded-full bg-[#d27b57]/15 px-2 py-0.5 text-xs font-semibold text-[#e6a184]">
                       <span className="inline-flex items-center gap-1"><ShieldCheck size={12} /> Admin</span>
                     </span>
                   )}
@@ -352,14 +352,14 @@ function AppContent() {
               <>
                 <button
                   onClick={() => setAuthModal({ isOpen: true, mode: 'login' })}
-                  className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-white px-3 sm:px-4 py-2 rounded-lg transition-colors duration-200 font-semibold text-sm sm:text-base"
+                  className="flex items-center gap-2 rounded-lg bg-[#383c40] px-3 py-2 text-sm font-semibold text-white transition-colors duration-200 hover:bg-[#484d52] sm:px-4 sm:text-base"
                 >
                   <LogIn size={18} />
                   <span className="hidden sm:inline">{t.signIn}</span>
                 </button>
                 <button
                   onClick={() => setAuthModal({ isOpen: true, mode: 'register' })}
-                  className="flex items-center gap-2 rounded-lg bg-[#59604c] px-3 py-2 text-sm font-semibold text-white transition-colors duration-200 hover:bg-[#687057] sm:px-4 sm:text-base"
+                  className="flex items-center gap-2 rounded-lg bg-[#d27b57] px-3 py-2 text-sm font-semibold text-white transition-colors duration-200 hover:bg-[#e08b66] sm:px-4 sm:text-base"
                 >
                   <UserPlus size={18} />
                   <span className="hidden sm:inline">{t.signUp}</span>
@@ -385,7 +385,7 @@ function AppContent() {
                setActiveTab('albums');
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
-             className="inline-flex items-center gap-2 rounded-lg border border-[#45463f] bg-[#252622] px-3 py-2 text-sm font-semibold text-[#d7d1c5]"
+             className="inline-flex items-center gap-2 rounded-lg border border-[#41464b] bg-[#222529] px-3 py-2 text-sm font-semibold text-[#d4d2cc]"
           >
             <LayoutGrid size={15} />
             {t.home}
@@ -395,8 +395,8 @@ function AppContent() {
             onClick={() => setActiveTab('about')}
             className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold ${
               activeTab === 'about'
-                ? 'border-[#777b65] bg-[#555b49]/35 text-[#e1dbc9]'
-                : 'border-slate-700 bg-slate-900 text-slate-300 hover:bg-slate-800'
+                ? 'border-[#d27b57] bg-[#d27b57]/15 text-[#f0b095]'
+                : 'border-[#41464b] bg-[#222529] text-[#c5c7c8] hover:bg-[#303438]'
             }`}
           >
             <Info size={15} />
@@ -408,8 +408,8 @@ function AppContent() {
               onClick={() => setActiveTab('library')}
               className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold ${
                 activeTab === 'library'
-                  ? 'border-[#777b65] bg-[#555b49]/35 text-[#e1dbc9]'
-                  : 'border-slate-700 bg-slate-900 text-slate-300 hover:bg-slate-800'
+                  ? 'border-[#d27b57] bg-[#d27b57]/15 text-[#f0b095]'
+                  : 'border-[#41464b] bg-[#222529] text-[#c5c7c8] hover:bg-[#303438]'
               }`}
             >
               <Library size={15} />
@@ -419,7 +419,7 @@ function AppContent() {
         </div>
 
         {/* Tab Navigation */}
-        <nav className="mb-6 sm:mb-8 flex max-w-full items-center gap-1 overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900 p-1">
+        <nav className="mb-6 sm:mb-8 flex max-w-full items-center gap-1 overflow-x-auto rounded-2xl border border-[#34383d] bg-[#202327] p-1">
           {[
              { id: 'albums', label: t.albums, icon: <Library size={15} /> },
              { id: 'free', label: t.free, icon: <Gift size={15} /> },
@@ -436,8 +436,8 @@ function AppContent() {
               }}
               className={`inline-flex shrink-0 items-center gap-2 rounded-xl px-3 sm:px-4 py-2 text-sm font-semibold transition-all duration-200 ${
                 activeTab === tab.id
-                  ? 'bg-[#59604c] text-white shadow-sm'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                  ? 'bg-[#d27b57] text-white shadow-sm'
+                  : 'text-[#aeb2b5] hover:bg-[#303438] hover:text-white'
               }`}
             >
               {tab.icon}
@@ -449,7 +449,7 @@ function AppContent() {
         {loading ? (
           <div className="flex justify-center items-center h-96">
             <div className="animate-spin">
-              <Music size={48} className="text-[#b9aa89]" />
+              <Music size={48} className="text-[#e39a76]" />
             </div>
           </div>
         ) : tracksError ? (
@@ -463,7 +463,7 @@ function AppContent() {
                 <button
                   type="button"
                   onClick={() => setMenuOpen(true)}
-                  className="inline-flex items-center gap-2 rounded-xl bg-[#59604c] px-4 py-3 font-semibold text-white hover:bg-[#687057]"
+                  className="inline-flex items-center gap-2 rounded-xl bg-[#d27b57] px-4 py-3 font-semibold text-white hover:bg-[#e08b66]"
                 >
                   <ShieldCheck size={16} />
                   {t.openAdmin}
@@ -481,7 +481,7 @@ function AppContent() {
                       <button
                         type="button"
                         onClick={() => setSelectedAlbumId(null)}
-                        className="mb-5 rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-200 hover:bg-slate-800"
+                         className="mb-5 rounded-lg border border-[#41464b] px-4 py-2 text-sm text-slate-200 hover:bg-[#303438]"
                       >
                         {t.backToAlbums}
                       </button>
@@ -494,7 +494,7 @@ function AppContent() {
                           />
                         )}
                         <div>
-                          <p className="text-sm font-semibold text-[#c3b898]">{t.albumTracks}</p>
+                           <p className="text-sm font-semibold text-[#e39a76]">{t.albumTracks}</p>
                           <h2 className="mt-1 text-2xl font-bold text-white">{album?.title}</h2>
                           {album?.release_date && (
                             <p className="mt-1 text-sm text-slate-400">
@@ -525,7 +525,7 @@ function AppContent() {
                               key={album.id}
                               type="button"
                               onClick={() => setSelectedAlbumId(album.id)}
-                               className="overflow-hidden rounded-xl border border-[#41423c] bg-[#242521] text-left transition hover:border-[#777b65] hover:bg-[#2b2c27]"
+                               className="overflow-hidden rounded-xl border border-[#383c40] bg-[#222529] text-left transition hover:border-[#8b5a47] hover:bg-[#292d31]"
                             >
                               {album.cover_image_url ? (
                                 <img
@@ -535,8 +535,8 @@ function AppContent() {
                                   loading="lazy"
                                 />
                               ) : (
-                                <div className="flex aspect-square items-center justify-center bg-[#34362f]">
-                                  <Music size={48} className="text-[#aaa58f]" />
+                                <div className="flex aspect-square items-center justify-center bg-[#2b2e32]">
+                                  <Music size={48} className="text-[#b9a296]" />
                                 </div>
                               )}
                               <div className="p-4">
@@ -565,7 +565,7 @@ function AppContent() {
             {activeTab === 'free' && (
               <section>
                 <div className="mb-6">
-                  <p className="mb-1 inline-flex items-center gap-2 rounded-full bg-[#555b49]/30 px-3 py-1 text-xs font-semibold text-[#c8c3a9]">
+                  <p className="mb-1 inline-flex items-center gap-2 rounded-full bg-[#d27b57]/15 px-3 py-1 text-xs font-semibold text-[#e6a184]">
                     <Gift size={12} />
                     {t.free}
                   </p>
@@ -589,7 +589,7 @@ function AppContent() {
             {activeTab === 'library' && (
               <section className="pb-32">
                 <div className="mb-6">
-                  <p className="mb-1 inline-flex items-center gap-2 rounded-full bg-[#555b49]/30 px-3 py-1 text-xs font-semibold text-[#c8c3a9]">
+                  <p className="mb-1 inline-flex items-center gap-2 rounded-full bg-[#d27b57]/15 px-3 py-1 text-xs font-semibold text-[#e6a184]">
                     <Library size={12} />
                     {t.myLibrary}
                   </p>
@@ -605,7 +605,7 @@ function AppContent() {
         )}
       </main>
 
-      <footer className="border-t border-slate-800 bg-slate-900">
+      <footer className="border-t border-[#383c40] bg-[#202327]">
         <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 sm:px-6 py-6 text-sm text-slate-400 md:flex-row md:items-center md:justify-between">
           <p>© {new Date().getFullYear()} DJ Bilal Music Store</p>
           <div className="flex flex-wrap items-center gap-4">
@@ -647,7 +647,7 @@ function AppContent() {
 
       {/* Player */}
       {currentTrack && (
-        <div className="fixed bottom-0 left-0 right-0 bg-slate-800 border-t border-slate-700">
+        <div className="fixed bottom-0 left-0 right-0 border-t border-[#41464b] bg-[#25292d]">
           <AudioPlayer track={currentTrack} isPlaying={isPlaying} onPlayPause={setIsPlaying} />
         </div>
       )}

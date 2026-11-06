@@ -109,8 +109,8 @@ const FreeTracksList = ({ tracks, onPlay }) => {
             onClick={() => setActiveCategory(item.id)}
             className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors ${
               activeCategory === item.id
-                ? 'bg-[#59604c] text-white'
-                : 'bg-[#292a26] text-slate-300 hover:bg-[#363731]'
+                ? 'bg-[#d27b57] text-white'
+                : 'bg-[#292d31] text-slate-300 hover:bg-[#363b40]'
             }`}
           >
             {item.label}
@@ -125,7 +125,7 @@ const FreeTracksList = ({ tracks, onPlay }) => {
       )}
 
       {filteredTracks.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-900 p-8 text-center text-slate-500">
+        <div className="rounded-2xl border border-dashed border-[#41464b] bg-[#202327] p-8 text-center text-slate-400">
           {t.noCategory}
         </div>
       ) : (
@@ -133,10 +133,10 @@ const FreeTracksList = ({ tracks, onPlay }) => {
           {filteredTracks.map((track) => (
           <div
             key={track.id}
-            className="flex items-center gap-4 rounded-2xl border border-[#41423c] bg-[#242521] p-4 transition-all duration-200 hover:border-[#777b65]"
+            className="flex items-center gap-4 rounded-2xl border border-[#383c40] bg-[#222529] p-4 transition-all duration-200 hover:border-[#8b5a47]"
           >
             {/* Cover */}
-            <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-xl bg-[#34362f]">
+            <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-xl bg-[#2b2e32]">
               {track.cover_image_url ? (
                 <img
                   src={resolveAssetUrl(track.cover_image_url)}
@@ -145,11 +145,11 @@ const FreeTracksList = ({ tracks, onPlay }) => {
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
-                  <Gift size={24} className="text-[#b9b29a]" />
+                  <Gift size={24} className="text-[#c2a99a]" />
                 </div>
               )}
               {/* FREE badge */}
-              <span className="absolute left-1 top-1 rounded-md bg-[#59604c] px-1.5 py-0.5 text-[10px] font-extrabold leading-none text-white shadow">
+              <span className="absolute left-1 top-1 rounded-md bg-[#d27b57] px-1.5 py-0.5 text-[10px] font-extrabold leading-none text-white shadow">
                 {t.free}
               </span>
             </div>
@@ -165,7 +165,7 @@ const FreeTracksList = ({ tracks, onPlay }) => {
               <button
                 type="button"
                 onClick={() => onPlay(track)}
-                className="rounded-lg border border-slate-700 bg-slate-800 p-2 text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
+                className="rounded-lg border border-[#41464b] bg-[#292d31] p-2 text-slate-300 transition-colors hover:bg-[#363b40] hover:text-white"
                 title={t.preview}
               >
                 <Play size={16} fill="currentColor" />
@@ -174,7 +174,7 @@ const FreeTracksList = ({ tracks, onPlay }) => {
                 type="button"
                 onClick={() => handleFreeDownload(track)}
                 disabled={downloading === track.id}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-[#59604c] px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#687057] disabled:opacity-60"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-[#d27b57] px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#e08b66] disabled:opacity-60"
               >
                 <Download size={15} />
                 {downloading === track.id ? t.downloading : t.download}
