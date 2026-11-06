@@ -7,6 +7,7 @@ import {
   Trash2,
   Users,
   X,
+  Plus,
 } from 'lucide-react';
 import api from '../api';
 import { useAuth } from '../context/AuthContext';
@@ -29,7 +30,7 @@ const initialTrackForm = {
 };
 
 const fieldClass =
-  'w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-purple-500 focus:outline-none';
+  'w-full rounded-lg border border-[#45463f] bg-[#1f201d] px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-[#858a70] focus:outline-none';
 const buttonClass =
   'inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50';
 
@@ -39,17 +40,17 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
   const { tracks, fetchTracks, updateTrack, removeTrack } = useTracks();
   const t = lang === 'ar' ? {
     dashboard: 'لوحة الإدارة', users: 'إدارة المستخدمين', albums: 'الألبومات', tracks: 'المقاطع', settings: 'الإعدادات',
-    siteSections: 'أقسام الموقع', edits: 'التعديلات', remixes: 'الريمكسات', free: 'مجاني', library: 'مكتبتي',
+    siteSections: 'أقسام الموقع', free: 'مجاني', library: 'مكتبتي',
     logout: 'تسجيل الخروج', close: 'إغلاق', loading: 'جارٍ تحميل البيانات...', email: 'البريد الإلكتروني',
     name: 'الاسم', role: 'الدور', action: 'الإجراء', admin: 'مسؤول', user: 'مستخدم', saving: 'جارٍ الحفظ...',
     demote: 'إزالة صلاحية المسؤول', promote: 'ترقية إلى مسؤول', noUsers: 'لم يتم العثور على مستخدمين.',
     albumTitle: 'عنوان الألبوم', coverUrl: 'رابط الغلاف', coverFile: 'تحميل صورة الغلاف',
     releaseDate: 'تاريخ الإصدار', creating: 'جارٍ الإنشاء...', createAlbum: 'إنشاء ألبوم', save: 'حفظ',
     albumCover: 'غلاف الألبوم', noAlbums: 'لا توجد ألبومات بعد.', trackName: 'اسم المقطع', artist: 'الفنان',
-    selectAlbum: 'اختر ألبومًا', single: 'منفرد', genre: 'النوع', price: 'السعر', freeCheckbox: 'مجاني',
+    selectAlbum: 'اختر ألبومًا', single: 'منفرد', price: 'السعر', freeCheckbox: 'مجاني',
     productUrl: 'رابط منتج Gumroad', productId: 'معرّف المنتج', trackFile: 'ملف المقطع',
     previewFile: 'ملف المعاينة', addTrack: 'إضافة مقطع', adding: 'جارٍ الإضافة...', track: 'المقطع',
-    operations: 'الإجراءات', noTracks: 'لا توجد مقاطع بعد.', adminAccount: 'حساب المسؤول',
+    operations: 'الإجراءات', noTracks: 'لا توجد مقاطع بعد.', adminAccount: 'حساب المسؤول', addTrackToAlbum: 'إضافة أغنية', paid: 'مدفوع',
     settingsDescription: 'تتم إدارة إعدادات الدفع والبريد الإلكتروني والتخزين من متغيرات بيئة الخادم لأسباب أمنية، ولا تظهر هنا.',
     invalidPrice: 'يجب أن يكون سعر المقطع رقمًا صالحًا أكبر من صفر.',
     requiredTrackFiles: 'ملف المقطع وملف المعاينة مطلوبان.',
@@ -66,17 +67,17 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
     trackAdded: 'تمت إضافة المقطع إلى المكتبة.', trackAddError: 'تعذر إضافة المقطع.',
   } : {
     dashboard: 'Admin Dashboard', users: 'User Management', albums: 'Albums', tracks: 'Tracks', settings: 'Settings',
-    siteSections: 'Site sections', edits: 'Edits', remixes: 'Remixes', free: 'Free', library: 'My Library',
+    siteSections: 'Site sections', free: 'Free', library: 'My Library',
     logout: 'Log out', close: 'Close', loading: 'Loading data...', email: 'Email', name: 'Name', role: 'Role',
     action: 'Action', admin: 'Admin', user: 'User', saving: 'Saving...', demote: 'Remove admin role',
     promote: 'Promote to admin', noUsers: 'No users found.', albumTitle: 'Album title',
     coverUrl: 'Cover image URL', coverFile: 'Upload cover image', releaseDate: 'Release date',
     creating: 'Creating...', createAlbum: 'Create album', save: 'Save', albumCover: 'Album cover',
     noAlbums: 'No albums yet.', trackName: 'Track title', artist: 'Artist', selectAlbum: 'Select album',
-    single: 'Single', genre: 'Category', price: 'Price', freeCheckbox: 'Free',
+    single: 'Single', price: 'Price', freeCheckbox: 'Free',
     productUrl: 'Gumroad product URL', productId: 'Product ID', trackFile: 'Track file',
     previewFile: 'Preview file', addTrack: 'Add track', adding: 'Adding...', track: 'Track',
-    operations: 'Actions', noTracks: 'No tracks yet.', adminAccount: 'Administrator account',
+    operations: 'Actions', noTracks: 'No tracks yet.', adminAccount: 'Administrator account', addTrackToAlbum: 'Add song', paid: 'Paid',
     settingsDescription: 'Payment, email, and storage settings are managed through server environment variables for security and are not displayed here.',
     invalidPrice: 'Track price must be a valid number greater than zero.',
     requiredTrackFiles: 'Track and preview files are required.',
@@ -352,14 +353,14 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-2 sm:p-5" onClick={onClose}>
       <section
-        className="flex h-[min(94vh,960px)] w-full max-w-7xl overflow-hidden rounded-2xl border border-slate-700 bg-slate-950 text-slate-100 shadow-2xl"
+        className="flex h-[min(94vh,960px)] w-full max-w-7xl overflow-hidden rounded-2xl border border-[#45463f] bg-[#1d1e1b] text-slate-100 shadow-2xl"
         onClick={(event) => event.stopPropagation()}
         aria-label={t.dashboard}
         dir={isRTL ? 'rtl' : 'ltr'}
       >
-        <aside className="hidden w-64 shrink-0 flex-col border-r border-slate-800 bg-slate-900/80 p-5 md:flex">
+        <aside className="hidden w-64 shrink-0 flex-col border-r border-[#393a35] bg-[#242521] p-5 md:flex">
           <div className="mb-9">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-purple-300">DJ Bilal</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#c3b898]">DJ Bilal</p>
             <h1 className="mt-2 text-xl font-bold">{t.dashboard}</h1>
           </div>
           <nav className="space-y-2" aria-label={t.dashboard}>
@@ -369,7 +370,7 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
                 type="button"
                 onClick={() => { setTab(id); setError(''); setNotice(''); }}
                 className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-start text-sm font-semibold transition-colors ${
-                  tab === id ? 'bg-purple-600 text-white' : 'text-slate-300 hover:bg-slate-800'
+                  tab === id ? 'bg-[#59604c] text-white' : 'text-slate-300 hover:bg-[#34352f]'
                 }`}
               >
                 <Icon size={18} />
@@ -380,8 +381,7 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
           <div className="mt-8 border-t border-slate-800 pt-4">
             <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-slate-500">{t.siteSections}</p>
             {[
-              ['edits', t.edits],
-              ['remixes', t.remixes],
+              ['albums', t.albums],
               ['free', t.free],
               ['library', t.library],
             ].map(([id, label]) => (
@@ -389,7 +389,7 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
                 key={id}
                 type="button"
                 onClick={() => { onNavigate?.(id); onClose?.(); }}
-                className="block w-full rounded-lg px-3 py-2 text-start text-sm text-slate-400 hover:bg-slate-800 hover:text-white"
+                className="block w-full rounded-lg px-3 py-2 text-start text-sm text-slate-400 hover:bg-[#34352f] hover:text-white"
               >
                 {label}
               </button>
@@ -406,7 +406,7 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
         <main className="flex min-w-0 flex-1 flex-col">
           <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 px-4 py-4 sm:px-7">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-widest text-purple-300">{t.dashboard}</p>
+              <p className="text-xs font-semibold uppercase tracking-widest text-[#c3b898]">{t.dashboard}</p>
               <h2 className="mt-1 text-xl font-bold sm:text-2xl">{tabs.find((item) => item.id === tab)?.label}</h2>
             </div>
             <button type="button" onClick={onClose} aria-label={t.close} className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-white">
@@ -416,7 +416,7 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
               {tabs.map(({ id, label, icon: Icon }) => (
                 <button key={id} type="button" onClick={() => { setTab(id); setError(''); setNotice(''); }}
                   className={`inline-flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold ${
-                    tab === id ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-300'
+                    tab === id ? 'bg-[#59604c] text-white' : 'bg-[#34352f] text-slate-300'
                   }`}>
                   <Icon size={15} />{label}
                 </button>
@@ -463,12 +463,12 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
 
                 {tab === 'albums' && (
                   <div className="space-y-6">
-                    <form onSubmit={createAlbum} className="grid gap-3 rounded-xl border border-slate-800 bg-slate-900/60 p-4 md:grid-cols-[1.2fr_1.5fr_1fr_auto] md:items-end">
+                    <form onSubmit={createAlbum} className="grid gap-3 rounded-xl border border-[#41423c] bg-[#252622] p-4 md:grid-cols-[1.2fr_1.5fr_1fr_auto] md:items-end">
                       <label className="text-xs font-semibold text-slate-400">{t.albumTitle}<input className={`${fieldClass} mt-2`} required value={newAlbum.title} onChange={(event) => setNewAlbum({ ...newAlbum, title: event.target.value })} /></label>
                       <label className="text-xs font-semibold text-slate-400">{t.coverUrl}<input type="url" className={`${fieldClass} mt-2`} value={newAlbum.cover_image_url} onChange={(event) => setNewAlbum({ ...newAlbum, cover_image_url: event.target.value })} /></label>
                       <label className="text-xs font-semibold text-slate-400">{t.coverFile}<input type="file" accept="image/png,image/jpeg,image/webp" className="mt-2 block w-full text-sm" onChange={(event) => setNewAlbum({ ...newAlbum, cover_file: event.target.files?.[0] || null })} /></label>
                       <label className="text-xs font-semibold text-slate-400">{t.releaseDate}<input type="date" className={`${fieldClass} mt-2`} value={newAlbum.release_date} onChange={(event) => setNewAlbum({ ...newAlbum, release_date: event.target.value })} /></label>
-                      <button disabled={savingKey === 'new-album'} className={`${buttonClass} bg-purple-600 text-white hover:bg-purple-500`}>{savingKey === 'new-album' ? t.creating : t.createAlbum}</button>
+                      <button disabled={savingKey === 'new-album'} className={`${buttonClass} bg-[#59604c] text-white hover:bg-[#687057]`}>{savingKey === 'new-album' ? t.creating : t.createAlbum}</button>
                     </form>
                     <div className="overflow-hidden rounded-xl border border-slate-800">
                       <div className="overflow-x-auto">
@@ -482,6 +482,7 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
                                 <td className="px-4 py-3"><input type="url" aria-label={t.coverUrl} className={`${fieldClass} mb-2`} value={draft.cover_image_url || ''} onChange={(event) => setAlbumDrafts((current) => ({ ...current, [album.id]: { ...draft, cover_image_url: event.target.value } }))} /><input type="file" accept="image/png,image/jpeg,image/webp" aria-label={t.coverFile} className="block w-full text-xs" onChange={(event) => setAlbumDrafts((current) => ({ ...current, [album.id]: { ...draft, cover_file: event.target.files?.[0] || null } }))} /></td>
                                 <td className="px-4 py-3"><input type="date" className={fieldClass} value={draft.release_date || ''} onChange={(event) => setAlbumDrafts((current) => ({ ...current, [album.id]: { ...draft, release_date: event.target.value } }))} /></td>
                                 <td className="px-4 py-3"><div className="flex justify-end gap-2">
+                                  <button type="button" onClick={() => { setTrackForm({ ...initialTrackForm, album_id: String(album.id) }); setTab('tracks'); setError(''); setNotice(''); }} className={`${buttonClass} bg-[#59604c] text-white hover:bg-[#687057]`}><Plus size={15} />{t.addTrackToAlbum}</button>
                                   <button type="button" disabled={savingKey === `album-${album.id}`} onClick={() => saveAlbum(album.id)} className={`${buttonClass} bg-slate-800 text-white hover:bg-slate-700`}>{t.save}</button>
                                   <button type="button" disabled={savingKey === `album-${album.id}`} onClick={() => deleteAlbum(album)} aria-label={`${t.albums}: ${album.title}`} className={`${buttonClass} bg-red-950 text-red-300 hover:bg-red-900`}><Trash2 size={16} /></button>
                                 </div></td>
@@ -497,7 +498,7 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
 
                 {tab === 'tracks' && (
                   <div className="space-y-6">
-                    <form onSubmit={submitTrack} className="grid gap-3 rounded-xl border border-slate-800 bg-slate-900/60 p-4 sm:grid-cols-2 lg:grid-cols-3">
+                    <form onSubmit={submitTrack} className="grid gap-3 rounded-xl border border-[#41423c] bg-[#252622] p-4 sm:grid-cols-2 lg:grid-cols-3">
                       <label className="text-xs font-semibold text-slate-400">{t.trackName}<input className={`${fieldClass} mt-2`} required value={trackForm.title} onChange={(event) => setTrackForm({ ...trackForm, title: event.target.value })} /></label>
                       <label className="text-xs font-semibold text-slate-400">{t.artist}<input className={`${fieldClass} mt-2`} required value={trackForm.artist} onChange={(event) => setTrackForm({ ...trackForm, artist: event.target.value })} /></label>
                       <label className="text-xs font-semibold text-slate-400">{t.selectAlbum}
@@ -505,11 +506,6 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
                           <option value="">{t.single}</option>{albums.map((album) => <option key={album.id} value={album.id}>{album.title}</option>)}
                         </select>
                       </label>
-                      <label className="text-xs font-semibold text-slate-400">{t.genre}<select className={`${fieldClass} mt-2`} value={trackForm.category} onChange={(event) => setTrackForm({ ...trackForm, category: event.target.value })}>
-                        {trackForm.is_free
-                          ? <><option value="remix">Remix</option><option value="simple-pack">Simple Pack</option><option value="vst">VST</option></>
-                          : <><option value="edit">Edit</option><option value="remix">Remix</option></>}
-                      </select></label>
                       <label className="text-xs font-semibold text-slate-400">{t.price}<input type="number" step="0.01" min="0" required={!trackForm.is_free} disabled={trackForm.is_free} className={`${fieldClass} mt-2`} value={trackForm.is_free ? '0' : trackForm.price} onChange={(event) => setTrackForm({ ...trackForm, price: event.target.value })} /></label>
                       <label className="flex items-center gap-2 self-end rounded-lg border border-slate-700 p-3 text-sm text-slate-300"><input type="checkbox" checked={trackForm.is_free} onChange={(event) => {
                         const isFree = event.target.checked;
@@ -530,7 +526,7 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
                       <label className="text-xs font-semibold text-slate-400">{t.trackFile}<input type="file" accept="audio/*" required className="mt-2 block w-full text-sm" onChange={(event) => setTrackForm({ ...trackForm, track_file: event.target.files?.[0] || null })} /></label>
                       <label className="text-xs font-semibold text-slate-400">{t.previewFile}<input type="file" accept="audio/*" required className="mt-2 block w-full text-sm" onChange={(event) => setTrackForm({ ...trackForm, preview_file: event.target.files?.[0] || null })} /></label>
                       <label className="text-xs font-semibold text-slate-400">{t.albumCover}<input type="file" accept="image/*" className="mt-2 block w-full text-sm" onChange={(event) => setTrackForm({ ...trackForm, cover_file: event.target.files?.[0] || null })} /></label>
-                      <div className="sm:col-span-2 lg:col-span-3"><button disabled={savingKey === 'new-track'} className={`${buttonClass} bg-purple-600 px-5 text-white hover:bg-purple-500`}>{savingKey === 'new-track' ? t.adding : t.addTrack}</button></div>
+                      <div className="sm:col-span-2 lg:col-span-3"><button disabled={savingKey === 'new-track'} className={`${buttonClass} bg-[#59604c] px-5 text-white hover:bg-[#687057]`}>{savingKey === 'new-track' ? t.adding : t.addTrack}</button></div>
                     </form>
 
                     <div className="overflow-hidden rounded-xl border border-slate-800">
@@ -546,7 +542,7 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
                                 gumroad_product_id: track.gumroad_product_id || '',
                               };
                               return <tr key={track.id} className="bg-slate-950">
-                                <td className="px-4 py-3"><p className="font-semibold text-white">{track.title}</p><p className="text-xs text-slate-400">{track.artist} · {track.category}</p></td>
+                                <td className="px-4 py-3"><p className="font-semibold text-white">{track.title}</p><p className="text-xs text-slate-400">{track.artist} · {track.is_free ? t.free : t.paid}</p></td>
                                 <td className="px-4 py-3"><select className={fieldClass} value={draft.album_id} onChange={(event) => updateTrackDraft(track, 'album_id', event.target.value)}><option value="">{t.single}</option>{albums.map((album) => <option key={album.id} value={album.id}>{album.title}</option>)}</select></td>
                                 <td className="px-4 py-3"><input aria-label={`${track.title} ${t.price}`} type="number" step="0.01" min="0" disabled={track.is_free} className="w-24 rounded-lg border border-slate-700 bg-slate-900 px-2 py-2 text-sm text-white disabled:opacity-50" value={track.is_free ? '0' : draft.price} onChange={(event) => updateTrackDraft(track, 'price', event.target.value)} /></td>
                                 <td className="px-4 py-3"><input aria-label={`${track.title} Gumroad URL`} className="w-56 rounded-lg border border-slate-700 bg-slate-900 px-2 py-2 text-xs text-white" value={draft.gumroad_url} disabled={track.is_free} onChange={(event) => updateTrackDraft(track, 'gumroad_url', event.target.value)} /></td>

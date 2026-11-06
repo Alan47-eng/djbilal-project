@@ -22,10 +22,10 @@ function escapeSvgText(value) {
 function buildCoverArt(track) {
   const seed = hashString(`${track.title}:${track.artist}`);
   const colors = [
-    ['#7c3aed', '#2563eb'],
-    ['#0f172a', '#7c3aed'],
-    ['#1d4ed8', '#06b6d4'],
-    ['#4c1d95', '#ec4899'],
+    ['#55594b', '#292b26'],
+    ['#625849', '#302e29'],
+    ['#4c5550', '#292d2a'],
+    ['#65594d', '#332f2b'],
   ];
   const [start, end] = colors[seed % colors.length];
   const title = track.title || 'Track';
@@ -73,9 +73,9 @@ const TrackCard = ({
   };
 
   return (
-    <div className="bg-slate-800 rounded-lg overflow-hidden hover:bg-slate-700 transition-colors duration-300 group cursor-pointer">
+    <div className="group cursor-pointer overflow-hidden rounded-lg border border-[#41423c] bg-[#242521] transition-colors duration-300 hover:bg-[#2b2c27]">
       {/* Track Cover / Placeholder */}
-      <div className="aspect-square bg-gradient-to-br from-purple-600 to-blue-600 relative overflow-hidden">
+      <div className="relative aspect-square overflow-hidden bg-[#34362f]">
         <img
           src={resolveAssetUrl(track.cover_image_url) || buildCoverArt(track)}
           alt={`${track.title} cover`}
@@ -87,7 +87,7 @@ const TrackCard = ({
         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center gap-4">
           <button
             onClick={() => onPlay(track)}
-            className="bg-purple-600 hover:bg-purple-700 text-white p-4 rounded-full transition-all duration-200 transform hover:scale-110"
+            className="rounded-full bg-[#59604c] p-4 text-white transition-all duration-200 hover:scale-105 hover:bg-[#687057]"
             title={t.playPreview}
           >
             <Play size={24} fill="currentColor" />
@@ -96,7 +96,7 @@ const TrackCard = ({
             <button
               type="button"
               onClick={() => onDownload(track)}
-              className="text-white p-4 rounded-full transition-all duration-200 transform hover:scale-110 bg-emerald-600 hover:bg-emerald-700"
+              className="rounded-full bg-[#59604c] p-4 text-white transition-all duration-200 hover:scale-105 hover:bg-[#687057]"
               title={t.downloadTrack}
             >
               <Download size={24} />
@@ -105,7 +105,7 @@ const TrackCard = ({
             <a
               href={checkoutUrl}
               onClick={(event) => onAddToCart(track, event)}
-              className="text-white p-4 rounded-full transition-all duration-200 transform hover:scale-110 bg-blue-600 hover:bg-blue-700"
+              className="rounded-full bg-[#59604c] p-4 text-white transition-all duration-200 hover:scale-105 hover:bg-[#687057]"
               title={t.addToCart}
             >
               <ShoppingCart size={24} />
@@ -115,7 +115,7 @@ const TrackCard = ({
               type="button"
               onClick={() => onBuy(track)}
               disabled={checkoutLoading}
-              className="text-white p-4 rounded-full transition-all duration-200 transform hover:scale-110 bg-blue-600 hover:bg-blue-700 disabled:opacity-60"
+              className="rounded-full bg-[#59604c] p-4 text-white transition-all duration-200 hover:scale-105 hover:bg-[#687057] disabled:opacity-60"
               title={t.addToCart}
             >
               <ShoppingCart size={24} />
@@ -126,7 +126,7 @@ const TrackCard = ({
         {/* FREE badge */}
         {track.is_free && (
           <div className="absolute top-3 left-3">
-            <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-500 px-2.5 py-1 text-xs font-extrabold text-white shadow-lg">
+            <span className="inline-flex items-center gap-1 rounded-lg bg-[#59604c] px-2.5 py-1 text-xs font-extrabold text-white shadow-sm">
               <Gift size={12} />
               {t.free.toUpperCase()}
             </span>
@@ -136,7 +136,7 @@ const TrackCard = ({
 
       {/* Track Info */}
       <div className="p-4">
-        <h3 className="font-bold text-lg text-white truncate group-hover:text-purple-400 transition-colors">
+        <h3 className="truncate text-lg font-bold text-white transition-colors group-hover:text-[#d1c5a5]">
           {track.title}
         </h3>
         <p className="text-slate-400 text-sm truncate mb-3">
@@ -147,17 +147,17 @@ const TrackCard = ({
             {new Date(track.created_at).toLocaleDateString()}
           </span>
           {isFree ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600/20 px-3 py-1 text-sm font-semibold text-emerald-400">
+            <span className="inline-flex items-center gap-1 rounded-full bg-[#59604c]/35 px-3 py-1 text-sm font-semibold text-[#d3d0b9]">
               <Gift size={16} />
               {t.free}
             </span>
           ) : isPurchased ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600/20 px-3 py-1 text-sm font-semibold text-emerald-400">
+            <span className="inline-flex items-center gap-1 rounded-full bg-[#59604c]/35 px-3 py-1 text-sm font-semibold text-[#d3d0b9]">
               <BadgeCheck size={16} />
               {t.purchased}
             </span>
           ) : (
-            <span className="text-xl font-bold text-purple-400">
+            <span className="text-xl font-bold text-[#d1c5a5]">
               ${track.price.toFixed(2)}
             </span>
           )}
@@ -168,7 +168,7 @@ const TrackCard = ({
             <button
               type="button"
               onClick={() => onDownload(track)}
-              className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-700"
+              className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-[#59604c] px-4 py-3 text-sm font-semibold text-white hover:bg-[#687057]"
             >
               <Download size={16} />
               {t.download}
@@ -178,7 +178,7 @@ const TrackCard = ({
               <a
                 href={checkoutUrl}
                 onClick={(event) => onAddToCart(track, event)}
-                className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-purple-600 px-4 py-3 text-sm font-semibold text-white hover:bg-purple-700"
+                className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-[#59604c] px-4 py-3 text-sm font-semibold text-white hover:bg-[#687057]"
               >
                 <ShoppingCart size={16} />
                 {t.addToCart}
@@ -188,7 +188,7 @@ const TrackCard = ({
                 type="button"
                 onClick={() => onBuy(track)}
                 disabled={checkoutLoading}
-                className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-purple-600 px-4 py-3 text-sm font-semibold text-white hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-[#59604c] px-4 py-3 text-sm font-semibold text-white hover:bg-[#687057] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <ShoppingCart size={16} />
                 {checkoutLoading ? t.preparingCheckout : t.addToCart}

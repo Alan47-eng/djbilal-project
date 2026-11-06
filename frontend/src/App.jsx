@@ -39,8 +39,8 @@ function AppContent() {
   const [activeTab, setActiveTab] = useState(() =>
     typeof window !== 'undefined' && window.location.pathname.replace(/\/+$/, '') === '/purchases'
       ? 'library'
-      : 'edits'
-  ); // 'edits' | 'remixes' | 'free' | 'library'
+      : 'albums'
+  ); // 'albums' | 'free' | 'library' | 'about'
   const [gumroadCheckoutItems, setGumroadCheckoutItems] = useState([]);
   const [checkoutPollNonce, setCheckoutPollNonce] = useState(0);
   const [albums, setAlbums] = useState([]);
@@ -48,22 +48,16 @@ function AppContent() {
   const [selectedAlbumId, setSelectedAlbumId] = useState(null);
   const [downloadError, setDownloadError] = useState(null);
   const t = {
-    edits: lang === 'ar' ? 'تعديلات' : 'Edits',
-    remixes: lang === 'ar' ? 'ريمكسات' : 'Remixes',
     free: lang === 'ar' ? 'مجاني' : 'Free',
     myLibrary: lang === 'ar' ? 'مكتبتي' : 'My Library',
     signIn: lang === 'ar' ? 'تسجيل الدخول' : 'Sign In',
     signUp: lang === 'ar' ? 'إنشاء حساب' : 'Sign Up',
     logout: lang === 'ar' ? 'تسجيل الخروج' : 'Logout',
     openAdmin: lang === 'ar' ? 'فتح لوحة الإدارة' : 'Open Admin Panel',
-    editsDesc: lang === 'ar' ? 'تعديلات أصلية ونسخ مميزة.' : 'Original edits and premium versions.',
-    remixesDesc: lang === 'ar' ? 'قائمة الريمكسات مع المعاينة الفورية والدفع.' : 'Remix catalog with instant preview and checkout.',
-    noEdits: lang === 'ar' ? 'لا توجد تعديلات بعد.' : 'No edits added yet.',
-    noRemixes: lang === 'ar' ? 'لا توجد ريمكسات بعد.' : 'No remixes added yet.',
     aboutMe: lang === 'ar' ? 'من أنا' : 'About Me',
     home: lang === 'ar' ? 'الرئيسية' : 'Home',
     freeDownloads: lang === 'ar' ? 'تنزيلات مجانية' : 'Free Downloads',
-    freeDesc: lang === 'ar' ? 'تصفح ملفات الريمكس والحزم البسيطة وملفات VST المجانية.' : 'Browse free remix, simple pack, and VST files.',
+    freeDesc: lang === 'ar' ? 'تصفح المقاطع والملفات المجانية.' : 'Browse free tracks and downloads.',
     myPurchases: lang === 'ar' ? 'مشترياتي' : 'My Purchases',
     myPurchasesDesc: lang === 'ar' ? 'أعد تنزيل كل التراكات المشتراة في أي وقت.' : 'Re-download all licensed tracks you have purchased anytime from here.',
     albums: lang === 'ar' ? 'الألبومات' : 'Albums',
@@ -84,6 +78,7 @@ function AppContent() {
 
   const isAdmin = user?.is_admin === true;
   const loading = authLoading || tracksLoading;
+  const paidTracks = tracks.filter((track) => !track.is_free);
   useEffect(() => {
     if (!user) return undefined;
 
@@ -138,18 +133,6 @@ function AppContent() {
     };
   }, [user, checkoutPollNonce]);
 
-  const normalizedCategory = (track) => (track.category || '').toLowerCase();
-  const paidTracks = tracks.filter((track) => !track.is_free);
-  const remixTracks = paidTracks.filter((track) => {
-    const category = normalizedCategory(track);
-    if (category) return category === 'remix';
-    return `${track.title} ${track.artist}`.toLowerCase().includes('remix');
-  });
-  const editTracks = paidTracks.filter((track) => {
-    const category = normalizedCategory(track);
-    if (category) return category === 'edit';
-    return !`${track.title} ${track.artist}`.toLowerCase().includes('remix');
-  });
   useEffect(() => {
     let cancelled = false;
     api.get('/albums')
@@ -299,9 +282,9 @@ function AppContent() {
   };
 
   return (
-    <div className={`min-h-screen bg-slate-900 text-slate-100 ${isRTL ? 'text-right' : ''}`}>
+    <div className={`min-h-screen bg-[#191a18] text-[#eeeae1] ${isRTL ? 'text-right' : ''}`}>
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-slate-800/95 backdrop-blur-sm border-b border-slate-700 shadow-lg">
+      <header className="sticky top-0 z-40 border-b border-[#393a35] bg-[#222320]/95 shadow-sm backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <button
@@ -312,18 +295,18 @@ function AppContent() {
             >
               <Menu size={20} />
             </button>
-            <div className="bg-gradient-to-br from-purple-600 to-blue-600 p-2 rounded-lg">
+            <div className="rounded-lg bg-[#4b5041] p-2">
               <Music size={28} className="text-white" />
             </div>
             <button
               type="button"
               onClick={() => {
-                setActiveTab('edits');
+                setActiveTab('albums');
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
               className="text-left"
             >
-              <h1 className="text-lg sm:text-2xl font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
+              <h1 className="text-lg font-bold text-[#e7dfd0] sm:text-2xl">
                 DJ Bilal Music Store
               </h1>
             </button>
@@ -334,14 +317,14 @@ function AppContent() {
               <button
                 type="button"
                 onClick={() => setLang('en')}
-                className={`rounded px-2 py-1 font-semibold ${lang === 'en' ? 'bg-purple-600 text-white' : 'text-slate-300'}`}
+                className={`rounded px-2 py-1 font-semibold ${lang === 'en' ? 'bg-[#555b49] text-white' : 'text-slate-300'}`}
               >
                 EN
               </button>
               <button
                 type="button"
                 onClick={() => setLang('ar')}
-                className={`rounded px-2 py-1 font-semibold ${lang === 'ar' ? 'bg-purple-600 text-white' : 'text-slate-300'}`}
+                className={`rounded px-2 py-1 font-semibold ${lang === 'ar' ? 'bg-[#555b49] text-white' : 'text-slate-300'}`}
               >
                 AR
               </button>
@@ -349,10 +332,10 @@ function AppContent() {
             {user ? (
               <>
                 <div className="hidden md:flex items-center gap-2 text-slate-300">
-                  <User size={18} className="text-purple-400" />
+                  <User size={18} className="text-[#b9aa89]" />
                   <span>{user.email}</span>
                   {isAdmin && (
-                    <span className="rounded-full bg-purple-600/20 px-2 py-0.5 text-xs font-semibold text-purple-300">
+                    <span className="rounded-full bg-[#555b49]/40 px-2 py-0.5 text-xs font-semibold text-[#d3c7ac]">
                       <span className="inline-flex items-center gap-1"><ShieldCheck size={12} /> Admin</span>
                     </span>
                   )}
@@ -376,7 +359,7 @@ function AppContent() {
                 </button>
                 <button
                   onClick={() => setAuthModal({ isOpen: true, mode: 'register' })}
-                  className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-3 sm:px-4 py-2 rounded-lg transition-colors duration-200 font-semibold text-sm sm:text-base"
+                  className="flex items-center gap-2 rounded-lg bg-[#59604c] px-3 py-2 text-sm font-semibold text-white transition-colors duration-200 hover:bg-[#687057] sm:px-4 sm:text-base"
                 >
                   <UserPlus size={18} />
                   <span className="hidden sm:inline">{t.signUp}</span>
@@ -399,14 +382,10 @@ function AppContent() {
           <button
             type="button"
             onClick={() => {
-              setActiveTab('edits');
+               setActiveTab('albums');
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
-            className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold ${
-              activeTab === 'edits' || activeTab === 'remixes' || activeTab === 'free'
-                ? 'border-slate-700 bg-slate-900 text-slate-200'
-                : 'border-slate-700 bg-slate-900 text-slate-400'
-            }`}
+             className="inline-flex items-center gap-2 rounded-lg border border-[#45463f] bg-[#252622] px-3 py-2 text-sm font-semibold text-[#d7d1c5]"
           >
             <LayoutGrid size={15} />
             {t.home}
@@ -416,7 +395,7 @@ function AppContent() {
             onClick={() => setActiveTab('about')}
             className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold ${
               activeTab === 'about'
-                ? 'border-purple-500 bg-purple-600/20 text-purple-200'
+                ? 'border-[#777b65] bg-[#555b49]/35 text-[#e1dbc9]'
                 : 'border-slate-700 bg-slate-900 text-slate-300 hover:bg-slate-800'
             }`}
           >
@@ -429,7 +408,7 @@ function AppContent() {
               onClick={() => setActiveTab('library')}
               className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold ${
                 activeTab === 'library'
-                  ? 'border-purple-500 bg-purple-600/20 text-purple-200'
+                  ? 'border-[#777b65] bg-[#555b49]/35 text-[#e1dbc9]'
                   : 'border-slate-700 bg-slate-900 text-slate-300 hover:bg-slate-800'
               }`}
             >
@@ -442,10 +421,8 @@ function AppContent() {
         {/* Tab Navigation */}
         <nav className="mb-6 sm:mb-8 flex max-w-full items-center gap-1 overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900 p-1">
           {[
-            { id: 'edits', label: t.edits, icon: <LayoutGrid size={15} /> },
-            { id: 'remixes', label: t.remixes, icon: <Music size={15} /> },
-            { id: 'free', label: t.free, icon: <Gift size={15} /> },
-            { id: 'albums', label: t.albums, icon: <Library size={15} /> },
+             { id: 'albums', label: t.albums, icon: <Library size={15} /> },
+             { id: 'free', label: t.free, icon: <Gift size={15} /> },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -459,7 +436,7 @@ function AppContent() {
               }}
               className={`inline-flex shrink-0 items-center gap-2 rounded-xl px-3 sm:px-4 py-2 text-sm font-semibold transition-all duration-200 ${
                 activeTab === tab.id
-                  ? 'bg-purple-600 text-white shadow'
+                  ? 'bg-[#59604c] text-white shadow-sm'
                   : 'text-slate-400 hover:text-white hover:bg-slate-800'
               }`}
             >
@@ -472,7 +449,7 @@ function AppContent() {
         {loading ? (
           <div className="flex justify-center items-center h-96">
             <div className="animate-spin">
-              <Music size={48} className="text-purple-400" />
+              <Music size={48} className="text-[#b9aa89]" />
             </div>
           </div>
         ) : tracksError ? (
@@ -486,34 +463,12 @@ function AppContent() {
                 <button
                   type="button"
                   onClick={() => setMenuOpen(true)}
-                  className="inline-flex items-center gap-2 rounded-xl bg-purple-600 px-4 py-3 font-semibold text-white hover:bg-purple-700"
+                  className="inline-flex items-center gap-2 rounded-xl bg-[#59604c] px-4 py-3 font-semibold text-white hover:bg-[#687057]"
                 >
                   <ShieldCheck size={16} />
                   {t.openAdmin}
                 </button>
               </section>
-            )}
-
-            {/* Edits tab */}
-            {activeTab === 'edits' && (
-              <>
-                <div className="mb-6">
-                  <h2 className="text-2xl font-bold text-white">{t.edits}</h2>
-                  <p className="mt-1 text-sm text-slate-400">{t.editsDesc}</p>
-                </div>
-                {renderTrackGrid(editTracks, t.noEdits)}
-              </>
-            )}
-
-            {/* Remixes tab */}
-            {activeTab === 'remixes' && (
-              <>
-                <div className="mb-6">
-                  <h2 className="text-2xl font-bold text-white">{t.remixes}</h2>
-                  <p className="mt-1 text-sm text-slate-400">{t.remixesDesc}</p>
-                </div>
-                {renderTrackGrid(remixTracks, t.noRemixes)}
-              </>
             )}
 
             {activeTab === 'albums' && (
@@ -539,7 +494,7 @@ function AppContent() {
                           />
                         )}
                         <div>
-                          <p className="text-sm font-semibold text-purple-300">{t.albumTracks}</p>
+                          <p className="text-sm font-semibold text-[#c3b898]">{t.albumTracks}</p>
                           <h2 className="mt-1 text-2xl font-bold text-white">{album?.title}</h2>
                           {album?.release_date && (
                             <p className="mt-1 text-sm text-slate-400">
@@ -570,7 +525,7 @@ function AppContent() {
                               key={album.id}
                               type="button"
                               onClick={() => setSelectedAlbumId(album.id)}
-                              className="overflow-hidden rounded-xl border border-slate-800 bg-slate-800 text-left transition hover:border-purple-500 hover:bg-slate-700"
+                               className="overflow-hidden rounded-xl border border-[#41423c] bg-[#242521] text-left transition hover:border-[#777b65] hover:bg-[#2b2c27]"
                             >
                               {album.cover_image_url ? (
                                 <img
@@ -580,8 +535,8 @@ function AppContent() {
                                   loading="lazy"
                                 />
                               ) : (
-                                <div className="flex aspect-square items-center justify-center bg-gradient-to-br from-purple-700 to-blue-700">
-                                  <Music size={48} className="text-white/70" />
+                                <div className="flex aspect-square items-center justify-center bg-[#34362f]">
+                                  <Music size={48} className="text-[#aaa58f]" />
                                 </div>
                               )}
                               <div className="p-4">
@@ -610,7 +565,7 @@ function AppContent() {
             {activeTab === 'free' && (
               <section>
                 <div className="mb-6">
-                  <p className="mb-1 inline-flex items-center gap-2 rounded-full bg-emerald-600/20 px-3 py-1 text-xs font-semibold text-emerald-300">
+                  <p className="mb-1 inline-flex items-center gap-2 rounded-full bg-[#555b49]/30 px-3 py-1 text-xs font-semibold text-[#c8c3a9]">
                     <Gift size={12} />
                     {t.free}
                   </p>
@@ -634,7 +589,7 @@ function AppContent() {
             {activeTab === 'library' && (
               <section className="pb-32">
                 <div className="mb-6">
-                  <p className="mb-1 inline-flex items-center gap-2 rounded-full bg-purple-600/20 px-3 py-1 text-xs font-semibold text-purple-300">
+                  <p className="mb-1 inline-flex items-center gap-2 rounded-full bg-[#555b49]/30 px-3 py-1 text-xs font-semibold text-[#c8c3a9]">
                     <Library size={12} />
                     {t.myLibrary}
                   </p>

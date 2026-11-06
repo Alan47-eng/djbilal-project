@@ -1,11 +1,9 @@
 import React from 'react';
 import {
   Gift,
-  LayoutGrid,
   Library,
   LogIn,
   LogOut,
-  Music,
   UserPlus,
   X,
 } from 'lucide-react';
@@ -28,8 +26,7 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
   }
 
   const menuItems = [
-    { id: 'edits', label: 'Edits', icon: <LayoutGrid size={16} /> },
-    { id: 'remixes', label: 'Remixes', icon: <Music size={16} /> },
+    { id: 'albums', label: 'Albums', icon: <Library size={16} /> },
     { id: 'free', label: 'Free', icon: <Gift size={16} /> },
     ...(user ? [{ id: 'library', label: 'My Library', icon: <Library size={16} /> }] : []),
   ];
@@ -60,7 +57,7 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
                 onClick={() => onNavigate?.(item.id)}
                 className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold transition-colors ${
                   activeTab === item.id
-                    ? 'border-purple-500 bg-purple-600/20 text-purple-200'
+                    ? 'border-[#777b65] bg-[#555b49]/40 text-[#e1dbc9]'
                     : 'border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700'
                 }`}
               >
@@ -84,7 +81,7 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
             <button
               type="button"
               onClick={() => onOpenAuth?.('register')}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-purple-600 px-4 py-2.5 font-semibold text-white hover:bg-purple-700"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#59604c] px-4 py-2.5 font-semibold text-white hover:bg-[#687057]"
             >
               <UserPlus size={16} />
               Sign Up
@@ -105,7 +102,7 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
         )}
 
         <div className="px-5 py-4 text-sm text-slate-400">
-          Quickly navigate edits, remixes, and free tracks from here.
+          Quickly browse albums and free tracks from here.
         </div>
       </aside>
     </div>

@@ -15,7 +15,6 @@ const FreeTracksList = ({ tracks, onPlay }) => {
     noFreeTracks: lang === 'ar' ? 'لا توجد تراكات مجانية بعد.' : 'No free tracks have been added yet.',
     intro: lang === 'ar' ? 'نزّل الملفات المجانية بالأسفل بضغطة واحدة وبدون تسجيل.' : 'Download the files below for free — one click, no signup required.',
     all: lang === 'ar' ? 'الكل' : 'All',
-    remix: lang === 'ar' ? 'ريمكس' : 'Remix',
     simplePack: lang === 'ar' ? 'حزمة بسيطة' : 'Simple Pack',
     noCategory: lang === 'ar' ? 'لا توجد ملفات مجانية في هذا التصنيف بعد.' : 'No free files in this category yet.',
     preview: lang === 'ar' ? 'معاينة' : 'Preview',
@@ -30,13 +29,11 @@ const FreeTracksList = ({ tracks, onPlay }) => {
     if (category === 'all') return true;
     const normalizedCategory = (track.category || '').toLowerCase();
     if (normalizedCategory) {
-      if (category === 'remix') return normalizedCategory === 'remix';
       if (category === 'simple-pack') return normalizedCategory === 'simple-pack';
       if (category === 'vst') return normalizedCategory === 'vst';
     }
     const text = `${track.title} ${track.artist}`.toLowerCase();
 
-    if (category === 'remix') return text.includes('remix');
     if (category === 'simple-pack') {
       return (
         text.includes('simple pack') ||
@@ -103,7 +100,6 @@ const FreeTracksList = ({ tracks, onPlay }) => {
       <div className="mb-5 flex flex-wrap gap-2">
         {[
           { id: 'all', label: t.all },
-          { id: 'remix', label: t.remix },
           { id: 'simple-pack', label: t.simplePack },
           { id: 'vst', label: t.vst },
         ].map((item) => (
@@ -113,8 +109,8 @@ const FreeTracksList = ({ tracks, onPlay }) => {
             onClick={() => setActiveCategory(item.id)}
             className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors ${
               activeCategory === item.id
-                ? 'bg-emerald-600 text-white'
-                : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                ? 'bg-[#59604c] text-white'
+                : 'bg-[#292a26] text-slate-300 hover:bg-[#363731]'
             }`}
           >
             {item.label}
@@ -137,10 +133,10 @@ const FreeTracksList = ({ tracks, onPlay }) => {
           {filteredTracks.map((track) => (
           <div
             key={track.id}
-            className="flex items-center gap-4 rounded-2xl border border-emerald-700/30 bg-gradient-to-r from-slate-800 to-slate-900 p-4 hover:border-emerald-600/60 transition-all duration-200"
+            className="flex items-center gap-4 rounded-2xl border border-[#41423c] bg-[#242521] p-4 transition-all duration-200 hover:border-[#777b65]"
           >
             {/* Cover */}
-            <div className="relative w-16 h-16 flex-shrink-0 rounded-xl overflow-hidden bg-gradient-to-br from-emerald-800 to-teal-700">
+            <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-xl bg-[#34362f]">
               {track.cover_image_url ? (
                 <img
                   src={resolveAssetUrl(track.cover_image_url)}
@@ -149,11 +145,11 @@ const FreeTracksList = ({ tracks, onPlay }) => {
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
-                  <Gift size={24} className="text-emerald-300" />
+                  <Gift size={24} className="text-[#b9b29a]" />
                 </div>
               )}
               {/* FREE badge */}
-              <span className="absolute top-1 left-1 rounded-md bg-emerald-500 px-1.5 py-0.5 text-[10px] font-extrabold text-white leading-none shadow">
+              <span className="absolute left-1 top-1 rounded-md bg-[#59604c] px-1.5 py-0.5 text-[10px] font-extrabold leading-none text-white shadow">
                 {t.free}
               </span>
             </div>
@@ -178,7 +174,7 @@ const FreeTracksList = ({ tracks, onPlay }) => {
                 type="button"
                 onClick={() => handleFreeDownload(track)}
                 disabled={downloading === track.id}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60 transition-colors"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-[#59604c] px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#687057] disabled:opacity-60"
               >
                 <Download size={15} />
                 {downloading === track.id ? t.downloading : t.download}
