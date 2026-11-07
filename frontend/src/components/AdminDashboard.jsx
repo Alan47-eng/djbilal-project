@@ -21,7 +21,6 @@ const initialTrackForm = {
   category: 'edit',
   price: '',
   gumroad_url: '',
-  gumroad_product_id: '',
   album_id: '',
   is_free: false,
   track_file: null,
@@ -48,7 +47,7 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
     releaseDate: 'تاريخ الإصدار', creating: 'جارٍ الإنشاء...', createAlbum: 'إنشاء ألبوم', save: 'حفظ',
     albumCover: 'غلاف الألبوم', noAlbums: 'لا توجد ألبومات بعد.', trackName: 'اسم المقطع', artist: 'الفنان',
     selectAlbum: 'اختر ألبومًا', single: 'منفرد', price: 'السعر', freeCheckbox: 'مجاني',
-    productUrl: 'رابط منتج Gumroad', productId: 'معرّف المنتج', trackFile: 'ملف المقطع',
+    productUrl: 'رابط منتج Gumroad', productUrlHelp: 'الصق رابط المنتج من Gumroad؛ لا حاجة إلى معرّف المنتج.', trackFile: 'ملف المقطع',
     previewFile: 'ملف المعاينة', addTrack: 'إضافة مقطع', adding: 'جارٍ الإضافة...', track: 'المقطع',
     operations: 'الإجراءات', noTracks: 'لا توجد مقاطع بعد.', adminAccount: 'حساب المسؤول', addTrackToAlbum: 'إضافة أغنية', paid: 'مدفوع',
     settingsDescription: 'تتم إدارة إعدادات الدفع والبريد الإلكتروني والتخزين من متغيرات بيئة الخادم لأسباب أمنية، ولا تظهر هنا.',
@@ -75,7 +74,7 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
     creating: 'Creating...', createAlbum: 'Create album', save: 'Save', albumCover: 'Album cover',
     noAlbums: 'No albums yet.', trackName: 'Track title', artist: 'Artist', selectAlbum: 'Select album',
     single: 'Single', price: 'Price', freeCheckbox: 'Free',
-    productUrl: 'Gumroad product URL', productId: 'Product ID', trackFile: 'Track file',
+    productUrl: 'Gumroad product link', productUrlHelp: 'Paste the product link from Gumroad. No product ID is needed.', trackFile: 'Track file',
     previewFile: 'Preview file', addTrack: 'Add track', adding: 'Adding...', track: 'Track',
     operations: 'Actions', noTracks: 'No tracks yet.', adminAccount: 'Administrator account', addTrackToAlbum: 'Add song', paid: 'Paid',
     settingsDescription: 'Payment, email, and storage settings are managed through server environment variables for security and are not displayed here.',
@@ -248,7 +247,6 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
         album_id: String(track.album_id || ''),
         price: String(track.price),
         gumroad_url: track.gumroad_url || track.external_product_id || '',
-        gumroad_product_id: track.gumroad_product_id || '',
         [key]: value,
       },
     }));
@@ -259,7 +257,6 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
       album_id: String(track.album_id || ''),
       price: String(track.price),
       gumroad_url: track.gumroad_url || track.external_product_id || '',
-      gumroad_product_id: track.gumroad_product_id || '',
     };
     const price = Number(draft.price);
     if (!Number.isFinite(price) || price < 0 || (!track.is_free && price <= 0)) {
@@ -275,7 +272,6 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
         album_id: draft.album_id ? Number(draft.album_id) : null,
         price: track.is_free ? 0 : Number(price.toFixed(2)),
         gumroad_url: draft.gumroad_url.trim() || null,
-        gumroad_product_id: draft.gumroad_product_id.trim() || null,
       });
       updateTrack(response.data);
       setNotice(t.trackUpdated);
@@ -325,7 +321,6 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
       if (trackForm.album_id) data.append('album_id', trackForm.album_id);
       if (!trackForm.is_free) {
         data.append('gumroad_url', trackForm.gumroad_url);
-        if (trackForm.gumroad_product_id) data.append('gumroad_product_id', trackForm.gumroad_product_id);
       }
       data.append('track_file', trackForm.track_file);
       data.append('preview_file', trackForm.preview_file);
@@ -520,8 +515,7 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
                         });
                       }} />{t.freeCheckbox}</label>
                       {!trackForm.is_free && <>
-                       <label className="text-xs font-semibold text-slate-400 sm:col-span-2">{t.productUrl}<input type="url" required className={`${fieldClass} mt-2`} value={trackForm.gumroad_url} onChange={(event) => setTrackForm({ ...trackForm, gumroad_url: event.target.value })} /></label>
-                       <label className="text-xs font-semibold text-slate-400">{t.productId}<input className={`${fieldClass} mt-2`} value={trackForm.gumroad_product_id} onChange={(event) => setTrackForm({ ...trackForm, gumroad_product_id: event.target.value })} /></label>
+                       <label className="text-xs font-semibold text-slate-400 sm:col-span-2">{t.productUrl}<input type="url" required placeholder="https://djbilal.gumroad.com/l/product" className={`${fieldClass} mt-2`} value={trackForm.gumroad_url} onChange={(event) => setTrackForm({ ...trackForm, gumroad_url: event.target.value })} /><span className="mt-1 block font-normal text-slate-500">{t.productUrlHelp}</span></label>
                       </>}
                       <label className="text-xs font-semibold text-slate-400">{t.trackFile}<input type="file" accept="audio/*" required className="mt-2 block w-full text-sm" onChange={(event) => setTrackForm({ ...trackForm, track_file: event.target.files?.[0] || null })} /></label>
                       <label className="text-xs font-semibold text-slate-400">{t.previewFile}<input type="file" accept="audio/*" required className="mt-2 block w-full text-sm" onChange={(event) => setTrackForm({ ...trackForm, preview_file: event.target.files?.[0] || null })} /></label>
@@ -531,29 +525,27 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
 
                     <div className="overflow-hidden rounded-xl border border-slate-800">
                       <div className="overflow-x-auto">
-                        <table className="w-full min-w-[1100px] text-left text-sm">
-                          <thead className="bg-slate-900 text-xs uppercase tracking-wide text-slate-400"><tr><th className="px-4 py-4">{t.track}</th><th className="px-4 py-4">{t.albums}</th><th className="px-4 py-4">{t.price}</th><th className="px-4 py-4">Gumroad URL</th><th className="px-4 py-4">{t.productId}</th><th className="px-4 py-4 text-end">{t.operations}</th></tr></thead>
+                        <table className="w-full min-w-[950px] text-left text-sm">
+                          <thead className="bg-slate-900 text-xs uppercase tracking-wide text-slate-400"><tr><th className="px-4 py-4">{t.track}</th><th className="px-4 py-4">{t.albums}</th><th className="px-4 py-4">{t.price}</th><th className="px-4 py-4">{t.productUrl}</th><th className="px-4 py-4 text-end">{t.operations}</th></tr></thead>
                           <tbody className="divide-y divide-slate-800">
                             {tracks.map((track) => {
                               const draft = trackDrafts[track.id] || {
                                 album_id: String(track.album_id || ''),
                                 price: String(track.price),
                                 gumroad_url: track.gumroad_url || track.external_product_id || '',
-                                gumroad_product_id: track.gumroad_product_id || '',
                               };
                               return <tr key={track.id} className="bg-slate-950">
                                 <td className="px-4 py-3"><p className="font-semibold text-white">{track.title}</p><p className="text-xs text-slate-400">{track.artist} · {track.is_free ? t.free : t.paid}</p></td>
                                 <td className="px-4 py-3"><select className={fieldClass} value={draft.album_id} onChange={(event) => updateTrackDraft(track, 'album_id', event.target.value)}><option value="">{t.single}</option>{albums.map((album) => <option key={album.id} value={album.id}>{album.title}</option>)}</select></td>
                                 <td className="px-4 py-3"><input aria-label={`${track.title} ${t.price}`} type="number" step="0.01" min="0" disabled={track.is_free} className="w-24 rounded-lg border border-slate-700 bg-slate-900 px-2 py-2 text-sm text-white disabled:opacity-50" value={track.is_free ? '0' : draft.price} onChange={(event) => updateTrackDraft(track, 'price', event.target.value)} /></td>
-                                <td className="px-4 py-3"><input aria-label={`${track.title} Gumroad URL`} className="w-56 rounded-lg border border-slate-700 bg-slate-900 px-2 py-2 text-xs text-white" value={draft.gumroad_url} disabled={track.is_free} onChange={(event) => updateTrackDraft(track, 'gumroad_url', event.target.value)} /></td>
-                                <td className="px-4 py-3"><input aria-label={`${track.title} Gumroad ID`} className="w-32 rounded-lg border border-slate-700 bg-slate-900 px-2 py-2 text-xs text-white" value={draft.gumroad_product_id} disabled={track.is_free} onChange={(event) => updateTrackDraft(track, 'gumroad_product_id', event.target.value)} /></td>
+                                <td className="px-4 py-3"><input aria-label={`${track.title} ${t.productUrl}`} placeholder="https://djbilal.gumroad.com/l/product" className="w-72 rounded-lg border border-slate-700 bg-slate-900 px-2 py-2 text-xs text-white" value={draft.gumroad_url} disabled={track.is_free} onChange={(event) => updateTrackDraft(track, 'gumroad_url', event.target.value)} /></td>
                                 <td className="px-4 py-3"><div className="flex justify-end gap-2">
                                   <button type="button" disabled={savingKey === `track-${track.id}`} onClick={() => saveTrack(track)} className={`${buttonClass} bg-slate-800 text-white hover:bg-slate-700`}>{t.save}</button>
                                   <button type="button" disabled={savingKey === `track-${track.id}`} onClick={() => deleteTrack(track)} aria-label={`${track.title} ${t.track}`} className={`${buttonClass} bg-red-950 text-red-300 hover:bg-red-900`}><Trash2 size={16} /></button>
                                 </div></td>
                               </tr>;
                             })}
-                            {!tracks.length && <tr><td colSpan="6" className="px-4 py-10 text-center text-slate-400">{t.noTracks}</td></tr>}
+                            {!tracks.length && <tr><td colSpan="5" className="px-4 py-10 text-center text-slate-400">{t.noTracks}</td></tr>}
                           </tbody>
                         </table>
                       </div>

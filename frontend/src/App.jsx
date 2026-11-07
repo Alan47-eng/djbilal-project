@@ -241,9 +241,22 @@ function AppContent() {
     }
 
     try {
+      let trackIds = [];
+      try {
+        const storedTrackIds = JSON.parse(
+          window.sessionStorage.getItem('gumroadCheckoutTrackIds') || '[]'
+        );
+        if (Array.isArray(storedTrackIds)) {
+          trackIds = storedTrackIds.filter(
+            (trackId) => Number.isInteger(trackId) && trackId > 0
+          );
+        }
+      } catch {
+        window.sessionStorage.removeItem('gumroadCheckoutTrackIds');
+      }
       window.sessionStorage.setItem(
         'gumroadCheckoutTrackIds',
-        JSON.stringify([track.id])
+        JSON.stringify([...new Set([...trackIds, track.id])])
       );
       setCheckoutPollNonce((current) => current + 1);
     } catch (error) {

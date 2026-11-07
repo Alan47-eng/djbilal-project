@@ -65,7 +65,7 @@ const TrackCard = ({
   const t = {
     playPreview: lang === 'ar' ? 'تشغيل المعاينة' : 'Play preview',
     downloadTrack: lang === 'ar' ? 'تنزيل التراك' : 'Download track',
-    addToCart: lang === 'ar' ? 'أضف إلى السلة' : 'Sepete Ekle',
+    addToCart: lang === 'ar' ? 'أضف إلى سلة Gumroad' : 'Add on Gumroad',
     preparingCheckout: lang === 'ar' ? 'جاري التحضير...' : 'Checkout preparing...',
     free: lang === 'ar' ? 'مجاني' : 'Free',
     purchased: lang === 'ar' ? 'تم الشراء' : 'Purchased',
