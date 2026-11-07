@@ -109,7 +109,7 @@ const FreeTracksList = ({ tracks, onPlay }) => {
             onClick={() => setActiveCategory(item.id)}
             className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors ${
               activeCategory === item.id
-                ? 'bg-[#d27b57] text-white'
+                ? 'bg-violet-600 text-white'
                 : 'bg-[#292d31] text-slate-300 hover:bg-[#363b40]'
             }`}
           >
@@ -133,7 +133,7 @@ const FreeTracksList = ({ tracks, onPlay }) => {
           {filteredTracks.map((track) => (
           <div
             key={track.id}
-            className="flex items-center gap-4 rounded-2xl border border-[#383c40] bg-[#222529] p-4 transition-all duration-200 hover:border-[#8b5a47]"
+            className="flex items-center gap-4 rounded-2xl border border-[#383c40] bg-[#222529] p-4 transition-all duration-200 hover:border-violet-500/70"
           >
             {/* Cover */}
             <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-xl bg-[#2b2e32]">
@@ -145,11 +145,11 @@ const FreeTracksList = ({ tracks, onPlay }) => {
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
-                  <Gift size={24} className="text-[#c2a99a]" />
+                  <Gift size={24} className="text-violet-300" />
                 </div>
               )}
               {/* FREE badge */}
-              <span className="absolute left-1 top-1 rounded-md bg-[#d27b57] px-1.5 py-0.5 text-[10px] font-extrabold leading-none text-white shadow">
+              <span className="absolute left-1 top-1 rounded-md bg-violet-600 px-1.5 py-0.5 text-[10px] font-extrabold leading-none text-white shadow">
                 {t.free}
               </span>
             </div>
@@ -174,7 +174,7 @@ const FreeTracksList = ({ tracks, onPlay }) => {
                 type="button"
                 onClick={() => handleFreeDownload(track)}
                 disabled={downloading === track.id}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-[#d27b57] px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#e08b66] disabled:opacity-60"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-violet-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-violet-700 disabled:opacity-60"
               >
                 <Download size={15} />
                 {downloading === track.id ? t.downloading : t.download}

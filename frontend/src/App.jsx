@@ -308,7 +308,7 @@ function AppContent() {
             >
               <Menu size={20} />
             </button>
-            <div className="rounded-lg bg-[#d27b57] p-2">
+            <div className="rounded-lg bg-violet-600 p-2">
               <Music size={28} className="text-white" />
             </div>
             <button
@@ -330,14 +330,14 @@ function AppContent() {
               <button
                 type="button"
                 onClick={() => setLang('en')}
-                className={`rounded px-2 py-1 font-semibold ${lang === 'en' ? 'bg-[#d27b57] text-white' : 'text-slate-300'}`}
+                className={`rounded px-2 py-1 font-semibold ${lang === 'en' ? 'bg-violet-600 text-white' : 'text-slate-300'}`}
               >
                 EN
               </button>
               <button
                 type="button"
                 onClick={() => setLang('ar')}
-                className={`rounded px-2 py-1 font-semibold ${lang === 'ar' ? 'bg-[#d27b57] text-white' : 'text-slate-300'}`}
+                className={`rounded px-2 py-1 font-semibold ${lang === 'ar' ? 'bg-violet-600 text-white' : 'text-slate-300'}`}
               >
                 AR
               </button>
@@ -345,10 +345,10 @@ function AppContent() {
             {user ? (
               <>
                 <div className="hidden md:flex items-center gap-2 text-slate-300">
-                  <User size={18} className="text-[#e39a76]" />
+                  <User size={18} className="text-violet-300" />
                   <span>{user.email}</span>
                   {isAdmin && (
-                    <span className="rounded-full bg-[#d27b57]/15 px-2 py-0.5 text-xs font-semibold text-[#e6a184]">
+                    <span className="rounded-full bg-violet-500/15 px-2 py-0.5 text-xs font-semibold text-violet-300">
                       <span className="inline-flex items-center gap-1"><ShieldCheck size={12} /> Admin</span>
                     </span>
                   )}
@@ -372,7 +372,7 @@ function AppContent() {
                 </button>
                 <button
                   onClick={() => setAuthModal({ isOpen: true, mode: 'register' })}
-                  className="flex items-center gap-2 rounded-lg bg-[#d27b57] px-3 py-2 text-sm font-semibold text-white transition-colors duration-200 hover:bg-[#e08b66] sm:px-4 sm:text-base"
+                  className="flex items-center gap-2 rounded-lg bg-violet-600 px-3 py-2 text-sm font-semibold text-white transition-colors duration-200 hover:bg-violet-700 sm:px-4 sm:text-base"
                 >
                   <UserPlus size={18} />
                   <span className="hidden sm:inline">{t.signUp}</span>
@@ -408,7 +408,7 @@ function AppContent() {
             onClick={() => setActiveTab('about')}
             className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold ${
               activeTab === 'about'
-                ? 'border-[#d27b57] bg-[#d27b57]/15 text-[#f0b095]'
+                ? 'border-violet-500 bg-violet-500/15 text-violet-200'
                 : 'border-[#41464b] bg-[#222529] text-[#c5c7c8] hover:bg-[#303438]'
             }`}
           >
@@ -421,7 +421,7 @@ function AppContent() {
               onClick={() => setActiveTab('library')}
               className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold ${
                 activeTab === 'library'
-                  ? 'border-[#d27b57] bg-[#d27b57]/15 text-[#f0b095]'
+                ? 'border-violet-500 bg-violet-500/15 text-violet-200'
                   : 'border-[#41464b] bg-[#222529] text-[#c5c7c8] hover:bg-[#303438]'
               }`}
             >
@@ -449,7 +449,7 @@ function AppContent() {
               }}
               className={`inline-flex shrink-0 items-center gap-2 rounded-xl px-3 sm:px-4 py-2 text-sm font-semibold transition-all duration-200 ${
                 activeTab === tab.id
-                  ? 'bg-[#d27b57] text-white shadow-sm'
+                  ? 'bg-violet-600 text-white shadow-sm'
                   : 'text-[#aeb2b5] hover:bg-[#303438] hover:text-white'
               }`}
             >
@@ -462,7 +462,7 @@ function AppContent() {
         {loading ? (
           <div className="flex justify-center items-center h-96">
             <div className="animate-spin">
-              <Music size={48} className="text-[#e39a76]" />
+              <Music size={48} className="text-violet-300" />
             </div>
           </div>
         ) : tracksError ? (
@@ -476,7 +476,7 @@ function AppContent() {
                 <button
                   type="button"
                   onClick={() => setMenuOpen(true)}
-                  className="inline-flex items-center gap-2 rounded-xl bg-[#d27b57] px-4 py-3 font-semibold text-white hover:bg-[#e08b66]"
+                  className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-3 font-semibold text-white hover:bg-violet-700"
                 >
                   <ShieldCheck size={16} />
                   {t.openAdmin}
@@ -507,7 +507,7 @@ function AppContent() {
                           />
                         )}
                         <div>
-                           <p className="text-sm font-semibold text-[#e39a76]">{t.albumTracks}</p>
+                            <p className="text-sm font-semibold text-violet-300">{t.albumTracks}</p>
                           <h2 className="mt-1 text-2xl font-bold text-white">{album?.title}</h2>
                           {album?.release_date && (
                             <p className="mt-1 text-sm text-slate-400">
@@ -538,7 +538,7 @@ function AppContent() {
                               key={album.id}
                               type="button"
                               onClick={() => setSelectedAlbumId(album.id)}
-                               className="overflow-hidden rounded-xl border border-[#383c40] bg-[#222529] text-left transition hover:border-[#8b5a47] hover:bg-[#292d31]"
+                                className="overflow-hidden rounded-xl border border-[#383c40] bg-[#222529] text-left transition hover:border-violet-500/70 hover:bg-[#292d31]"
                             >
                               {album.cover_image_url ? (
                                 <img
@@ -578,7 +578,7 @@ function AppContent() {
             {activeTab === 'free' && (
               <section>
                 <div className="mb-6">
-                  <p className="mb-1 inline-flex items-center gap-2 rounded-full bg-[#d27b57]/15 px-3 py-1 text-xs font-semibold text-[#e6a184]">
+                  <p className="mb-1 inline-flex items-center gap-2 rounded-full bg-violet-500/15 px-3 py-1 text-xs font-semibold text-violet-300">
                     <Gift size={12} />
                     {t.free}
                   </p>
@@ -602,7 +602,7 @@ function AppContent() {
             {activeTab === 'library' && (
               <section className="pb-32">
                 <div className="mb-6">
-                  <p className="mb-1 inline-flex items-center gap-2 rounded-full bg-[#d27b57]/15 px-3 py-1 text-xs font-semibold text-[#e6a184]">
+                  <p className="mb-1 inline-flex items-center gap-2 rounded-full bg-violet-500/15 px-3 py-1 text-xs font-semibold text-violet-300">
                     <Library size={12} />
                     {t.myLibrary}
                   </p>

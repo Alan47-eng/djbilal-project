@@ -57,7 +57,7 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
                 onClick={() => onNavigate?.(item.id)}
                 className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold transition-colors ${
                   activeTab === item.id
-                    ? 'border-[#d27b57] bg-[#d27b57]/15 text-[#f0b095]'
+                    ? 'border-violet-500 bg-violet-500/15 text-violet-200'
                     : 'border-[#41464b] bg-[#292d31] text-slate-200 hover:bg-[#363b40]'
                 }`}
               >
@@ -81,7 +81,7 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
             <button
               type="button"
               onClick={() => onOpenAuth?.('register')}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#d27b57] px-4 py-2.5 font-semibold text-white hover:bg-[#e08b66]"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-violet-600 px-4 py-2.5 font-semibold text-white hover:bg-violet-700"
             >
               <UserPlus size={16} />
               Sign Up

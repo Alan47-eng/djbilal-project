@@ -29,7 +29,7 @@ const initialTrackForm = {
 };
 
 const fieldClass =
-  'w-full rounded-lg border border-[#41464b] bg-[#191c1f] px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-[#d27b57] focus:outline-none';
+  'w-full rounded-lg border border-[#41464b] bg-[#191c1f] px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-violet-500 focus:outline-none';
 const buttonClass =
   'inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50';
 
@@ -355,7 +355,7 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
       >
         <aside className="hidden w-64 shrink-0 flex-col border-r border-[#383c40] bg-[#222529] p-5 md:flex">
           <div className="mb-9">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#e39a76]">DJ Bilal</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-violet-300">DJ Bilal</p>
             <h1 className="mt-2 text-xl font-bold">{t.dashboard}</h1>
           </div>
           <nav className="space-y-2" aria-label={t.dashboard}>
@@ -365,7 +365,7 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
                 type="button"
                 onClick={() => { setTab(id); setError(''); setNotice(''); }}
                 className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-start text-sm font-semibold transition-colors ${
-                  tab === id ? 'bg-[#d27b57] text-white' : 'text-slate-300 hover:bg-[#303438]'
+                  tab === id ? 'bg-violet-600 text-white' : 'text-slate-300 hover:bg-[#303438]'
                 }`}
               >
                 <Icon size={18} />
@@ -401,7 +401,7 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
         <main className="flex min-w-0 flex-1 flex-col">
           <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 px-4 py-4 sm:px-7">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-widest text-[#e39a76]">{t.dashboard}</p>
+              <p className="text-xs font-semibold uppercase tracking-widest text-violet-300">{t.dashboard}</p>
               <h2 className="mt-1 text-xl font-bold sm:text-2xl">{tabs.find((item) => item.id === tab)?.label}</h2>
             </div>
             <button type="button" onClick={onClose} aria-label={t.close} className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-white">
@@ -411,7 +411,7 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
               {tabs.map(({ id, label, icon: Icon }) => (
                 <button key={id} type="button" onClick={() => { setTab(id); setError(''); setNotice(''); }}
                   className={`inline-flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold ${
-                    tab === id ? 'bg-[#d27b57] text-white' : 'bg-[#303438] text-slate-300'
+                    tab === id ? 'bg-violet-600 text-white' : 'bg-[#303438] text-slate-300'
                   }`}>
                   <Icon size={15} />{label}
                 </button>
@@ -463,7 +463,7 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
                       <label className="text-xs font-semibold text-slate-400">{t.coverUrl}<input type="url" className={`${fieldClass} mt-2`} value={newAlbum.cover_image_url} onChange={(event) => setNewAlbum({ ...newAlbum, cover_image_url: event.target.value })} /></label>
                       <label className="text-xs font-semibold text-slate-400">{t.coverFile}<input type="file" accept="image/png,image/jpeg,image/webp" className="mt-2 block w-full text-sm" onChange={(event) => setNewAlbum({ ...newAlbum, cover_file: event.target.files?.[0] || null })} /></label>
                       <label className="text-xs font-semibold text-slate-400">{t.releaseDate}<input type="date" className={`${fieldClass} mt-2`} value={newAlbum.release_date} onChange={(event) => setNewAlbum({ ...newAlbum, release_date: event.target.value })} /></label>
-                      <button disabled={savingKey === 'new-album'} className={`${buttonClass} bg-[#59604c] text-white hover:bg-[#687057]`}>{savingKey === 'new-album' ? t.creating : t.createAlbum}</button>
+                      <button disabled={savingKey === 'new-album'} className={`${buttonClass} bg-violet-600 text-white hover:bg-violet-700`}>{savingKey === 'new-album' ? t.creating : t.createAlbum}</button>
                     </form>
                     <div className="overflow-hidden rounded-xl border border-slate-800">
                       <div className="overflow-x-auto">
@@ -477,7 +477,7 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
                                 <td className="px-4 py-3"><input type="url" aria-label={t.coverUrl} className={`${fieldClass} mb-2`} value={draft.cover_image_url || ''} onChange={(event) => setAlbumDrafts((current) => ({ ...current, [album.id]: { ...draft, cover_image_url: event.target.value } }))} /><input type="file" accept="image/png,image/jpeg,image/webp" aria-label={t.coverFile} className="block w-full text-xs" onChange={(event) => setAlbumDrafts((current) => ({ ...current, [album.id]: { ...draft, cover_file: event.target.files?.[0] || null } }))} /></td>
                                 <td className="px-4 py-3"><input type="date" className={fieldClass} value={draft.release_date || ''} onChange={(event) => setAlbumDrafts((current) => ({ ...current, [album.id]: { ...draft, release_date: event.target.value } }))} /></td>
                                 <td className="px-4 py-3"><div className="flex justify-end gap-2">
-                                  <button type="button" onClick={() => { setTrackForm({ ...initialTrackForm, album_id: String(album.id) }); setTab('tracks'); setError(''); setNotice(''); }} className={`${buttonClass} bg-[#59604c] text-white hover:bg-[#687057]`}><Plus size={15} />{t.addTrackToAlbum}</button>
+                                  <button type="button" onClick={() => { setTrackForm({ ...initialTrackForm, album_id: String(album.id) }); setTab('tracks'); setError(''); setNotice(''); }} className={`${buttonClass} bg-violet-600 text-white hover:bg-violet-700`}><Plus size={15} />{t.addTrackToAlbum}</button>
                                   <button type="button" disabled={savingKey === `album-${album.id}`} onClick={() => saveAlbum(album.id)} className={`${buttonClass} bg-slate-800 text-white hover:bg-slate-700`}>{t.save}</button>
                                   <button type="button" disabled={savingKey === `album-${album.id}`} onClick={() => deleteAlbum(album)} aria-label={`${t.albums}: ${album.title}`} className={`${buttonClass} bg-red-950 text-red-300 hover:bg-red-900`}><Trash2 size={16} /></button>
                                 </div></td>
@@ -520,7 +520,7 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
                       <label className="text-xs font-semibold text-slate-400">{t.trackFile}<input type="file" accept="audio/*" required className="mt-2 block w-full text-sm" onChange={(event) => setTrackForm({ ...trackForm, track_file: event.target.files?.[0] || null })} /></label>
                       <label className="text-xs font-semibold text-slate-400">{t.previewFile}<input type="file" accept="audio/*" required className="mt-2 block w-full text-sm" onChange={(event) => setTrackForm({ ...trackForm, preview_file: event.target.files?.[0] || null })} /></label>
                       <label className="text-xs font-semibold text-slate-400">{t.albumCover}<input type="file" accept="image/*" className="mt-2 block w-full text-sm" onChange={(event) => setTrackForm({ ...trackForm, cover_file: event.target.files?.[0] || null })} /></label>
-                      <div className="sm:col-span-2 lg:col-span-3"><button disabled={savingKey === 'new-track'} className={`${buttonClass} bg-[#59604c] px-5 text-white hover:bg-[#687057]`}>{savingKey === 'new-track' ? t.adding : t.addTrack}</button></div>
+                      <div className="sm:col-span-2 lg:col-span-3"><button disabled={savingKey === 'new-track'} className={`${buttonClass} bg-violet-600 px-5 text-white hover:bg-violet-700`}>{savingKey === 'new-track' ? t.adding : t.addTrack}</button></div>
                     </form>
 
                     <div className="overflow-hidden rounded-xl border border-slate-800">
