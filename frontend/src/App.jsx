@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { LogOut, LogIn, UserPlus, Music, User, Menu, LayoutGrid, ShieldCheck, Gift, Library, Info } from 'lucide-react';
+import { LogOut, LogIn, UserPlus, Music, User, Menu, LayoutGrid, ShieldCheck, Gift, Library, Info, ShoppingCart, X, Trash2 } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { TrackProvider, useTracks } from './context/TrackContext';
 import { PurchaseProvider, usePurchases } from './context/PurchaseContext';
@@ -43,6 +43,8 @@ function AppContent() {
   ); // 'albums' | 'free' | 'library' | 'about'
   const [gumroadCheckoutItems, setGumroadCheckoutItems] = useState([]);
   const [checkoutPollNonce, setCheckoutPollNonce] = useState(0);
+  const [cartTrackIds, setCartTrackIds] = useState([]);
+  const [cartOpen, setCartOpen] = useState(false);
   const [albums, setAlbums] = useState([]);
   const [albumsError, setAlbumsError] = useState('');
   const [selectedAlbumId, setSelectedAlbumId] = useState(null);
@@ -74,6 +76,13 @@ function AppContent() {
     terms: lang === 'ar' ? 'شروط الاستخدام' : 'Terms of Service',
     refund: lang === 'ar' ? 'سياسة الاسترجاع' : 'Refund Policy',
     contact: lang === 'ar' ? 'اتصل بنا' : 'Contact Us',
+    cart: lang === 'ar' ? 'السلة' : 'Cart',
+    cartEmpty: lang === 'ar' ? 'سلتك فارغة.' : 'Your cart is empty.',
+    removeFromCart: lang === 'ar' ? 'إزالة من السلة' : 'Remove from cart',
+    openGumroad: lang === 'ar' ? 'فتح خيارات الشراء' : 'Open purchase options',
+    cartCheckoutNote: lang === 'ar'
+      ? 'أضف كل مقطع إلى سلة الدفع من نافذته، ثم ادفع المجموع مرة واحدة.'
+      : 'Add each track to the checkout cart from its product window, then pay the total once.',
   };
 
   const isAdmin = user?.is_admin === true;
@@ -189,21 +198,14 @@ function AppContent() {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-32">
         {tracksToRender.map((track) => {
-          const checkoutItem = gumroadCheckoutItems.find(
-            (item) => item.track_id === track.id
-          );
           return (
             <TrackCard
               key={track.id}
               track={track}
               isPurchased={purchases.includes(track.id)}
-              checkoutUrl={checkoutItem?.checkout_url
-                ? buildGumroadOverlayUrl(checkoutItem.checkout_url)
-                : null}
-              checkoutLoading={checkoutLoading}
+              isInCart={cartTrackIds.includes(track.id)}
               onPlay={handlePlayPreview}
-                onCheckoutClick={rememberTrackForCheckout}
-              onBuy={handleBuyTrack}
+              onAddToCart={addTrackToCart}
               onDownload={handleDownloadTrack}
             />
           );
@@ -220,6 +222,16 @@ function AppContent() {
     setDownloadError(null);
     setCurrentTrack(track);
     setIsPlaying(true);
+  };
+
+  const addTrackToCart = (track) => {
+    setCartTrackIds((current) => (
+      current.includes(track.id) ? current : [...current, track.id]
+    ));
+  };
+
+  const removeTrackFromCart = (trackId) => {
+    setCartTrackIds((current) => current.filter((id) => id !== trackId));
   };
 
   const handleBuyTrack = async (track) => {
@@ -345,6 +357,21 @@ function AppContent() {
                 AR
               </button>
             </div>
+            <button
+              type="button"
+              onClick={() => setCartOpen(true)}
+              className="relative inline-flex items-center gap-2 rounded-lg border border-white/10 bg-[#181821]/80 p-2 text-slate-200 shadow-inner transition hover:border-violet-300/30 hover:text-white sm:px-3"
+              aria-label={`${t.cart}${cartTrackIds.length ? ` (${cartTrackIds.length})` : ''}`}
+              title={t.cart}
+            >
+              <ShoppingCart size={18} />
+              <span className="hidden text-sm font-semibold sm:inline">{t.cart}</span>
+              {cartTrackIds.length > 0 && (
+                <span className="absolute -right-2 -top-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-violet-500 px-1 text-[11px] font-bold text-white ring-2 ring-[#1e1d28]">
+                  {cartTrackIds.length}
+                </span>
+              )}
+            </button>
             {user ? (
               <>
                 <div className="hidden md:flex items-center gap-2 text-slate-300">
@@ -678,6 +705,99 @@ function AppContent() {
       {currentTrack && (
         <div className="fixed bottom-0 left-0 right-0 border-t border-violet-300/15 bg-gradient-to-r from-[#24222f]/95 via-[#242430]/95 to-[#1c202b]/95 shadow-[0_-16px_48px_rgba(8,7,18,0.38)] backdrop-blur-xl">
           <AudioPlayer track={currentTrack} isPlaying={isPlaying} onPlayPause={setIsPlaying} />
+        </div>
+      )}
+
+      {cartOpen && (
+        <div
+          className="fixed inset-0 z-50 flex justify-end bg-black/65 backdrop-blur-sm"
+          onClick={() => setCartOpen(false)}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="cart-title"
+            className="flex h-full w-full max-w-md flex-col border-l border-violet-300/15 bg-gradient-to-b from-[#292635] via-[#20212b] to-[#191a23] text-slate-100 shadow-2xl shadow-black/50"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
+              <h2 id="cart-title" className="text-xl font-bold">
+                {t.cart} ({cartTrackIds.length})
+              </h2>
+              <button
+                type="button"
+                onClick={() => setCartOpen(false)}
+                className="rounded-lg p-2 text-slate-300 transition hover:bg-white/10 hover:text-white"
+                aria-label={lang === 'ar' ? 'إغلاق السلة' : 'Close cart'}
+              >
+                <X size={20} />
+              </button>
+            </div>
+            {cartTrackIds.length > 0 && (
+              <p className="px-5 pt-4 text-sm text-slate-400">{t.cartCheckoutNote}</p>
+            )}
+            <div className="flex-1 space-y-3 overflow-y-auto p-5">
+              {cartTrackIds.length === 0 ? (
+                <p className="rounded-xl border border-white/10 bg-white/[0.03] p-5 text-center text-slate-300">
+                  {t.cartEmpty}
+                </p>
+              ) : cartTrackIds.map((trackId) => {
+                const track = tracks.find((item) => item.id === trackId);
+                if (!track) return null;
+                const checkoutItem = gumroadCheckoutItems.find(
+                  (item) => item.track_id === track.id
+                );
+                return (
+                  <div key={track.id} className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.04] p-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-semibold text-white">{track.title}</p>
+                      <p className="mt-1 text-sm text-violet-200">${Number(track.price).toFixed(2)}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeTrackFromCart(track.id)}
+                      className="rounded-lg p-2 text-slate-400 transition hover:bg-red-500/10 hover:text-red-300"
+                      aria-label={t.removeFromCart}
+                      title={t.removeFromCart}
+                    >
+                      <Trash2 size={17} />
+                    </button>
+                    {checkoutItem?.checkout_url ? (
+                      <a
+                        href={buildGumroadOverlayUrl(checkoutItem.checkout_url)}
+                        onClick={(event) => rememberTrackForCheckout(track, event)}
+                        className="gumroad-button shrink-0 rounded-lg bg-violet-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-violet-500"
+                      >
+                        {t.openGumroad}
+                      </a>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleBuyTrack(track)}
+                        disabled={checkoutLoading}
+                        className="shrink-0 rounded-lg bg-violet-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-violet-500 disabled:cursor-wait disabled:opacity-60"
+                      >
+                        {checkoutLoading ? '…' : t.openGumroad}
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            {cartTrackIds.length > 0 && (
+              <div className="border-t border-white/10 px-5 py-4">
+                <div className="flex items-center justify-between font-semibold">
+                  <span>{lang === 'ar' ? 'المجموع' : 'Subtotal'}</span>
+                  <span className="text-violet-200">
+                    ${cartTrackIds.reduce((sum, trackId) => {
+                      const track = tracks.find((item) => item.id === trackId);
+                      return sum + (track ? Number(track.price) || 0 : 0);
+                    }, 0).toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            )}
+          </section>
         </div>
       )}
 

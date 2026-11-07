@@ -52,12 +52,10 @@ function buildCoverArt(track) {
 const TrackCard = ({
   track,
   onPlay,
-  onCheckoutClick,
+  onAddToCart,
   onDownload,
   isPurchased,
-  checkoutUrl,
-  checkoutLoading,
-  onBuy,
+  isInCart,
 }) => {
   const { lang } = useLanguage();
   const isFree = track.is_free === true;
@@ -66,7 +64,7 @@ const TrackCard = ({
     playPreview: lang === 'ar' ? 'تشغيل المعاينة' : 'Play preview',
     downloadTrack: lang === 'ar' ? 'تنزيل التراك' : 'Download track',
     addToCart: lang === 'ar' ? 'أضف إلى السلة' : 'Add to cart',
-    preparingCheckout: lang === 'ar' ? 'جاري التحضير...' : 'Preparing...',
+    addedToCart: lang === 'ar' ? 'أُضيف إلى السلة' : 'Added to cart',
     free: lang === 'ar' ? 'مجاني' : 'Free',
     purchased: lang === 'ar' ? 'تم الشراء' : 'Purchased',
     download: lang === 'ar' ? 'تنزيل' : 'Download',
@@ -102,25 +100,16 @@ const TrackCard = ({
             >
               <Download size={24} />
             </button>
-          ) : checkoutUrl ? (
-            <a
-              href={checkoutUrl}
-              onClick={(event) => onCheckoutClick(track, event)}
-              className="gumroad-button rounded-full bg-violet-600 p-4 text-white transition-all duration-200 hover:scale-105 hover:bg-violet-700"
-              title={t.addToCart}
-              aria-label={t.addToCart}
-            >
-              <ShoppingCart size={24} />
-            </a>
           ) : (
             <button
               type="button"
-              onClick={() => onBuy(track)}
-              disabled={checkoutLoading}
+              onClick={() => onAddToCart(track)}
+              disabled={isInCart}
               className="rounded-full bg-violet-600 p-4 text-white transition-all duration-200 hover:scale-105 hover:bg-violet-700 disabled:cursor-wait disabled:opacity-60"
-              title={checkoutLoading ? t.preparingCheckout : t.addToCart}
+              title={isInCart ? t.addedToCart : t.addToCart}
+              aria-label={isInCart ? t.addedToCart : t.addToCart}
             >
-              <ShoppingCart size={24} />
+              {isInCart ? <BadgeCheck size={24} /> : <ShoppingCart size={24} />}
             </button>
           )}
         </div>
@@ -175,24 +164,15 @@ const TrackCard = ({
               <Download size={16} />
               {t.download}
             </button>
-          ) : checkoutUrl ? (
-            <a
-              href={checkoutUrl}
-              onClick={(event) => onCheckoutClick(track, event)}
-              className="gumroad-button inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-violet-600 px-4 py-3 text-sm font-semibold text-white hover:bg-violet-700"
-            >
-              <ShoppingCart size={16} />
-              {t.addToCart}
-            </a>
           ) : (
             <button
               type="button"
-              onClick={() => onBuy(track)}
-              disabled={checkoutLoading}
+              onClick={() => onAddToCart(track)}
+              disabled={isInCart}
               className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-violet-600 px-4 py-3 text-sm font-semibold text-white hover:bg-violet-700 disabled:cursor-wait disabled:opacity-60"
             >
-              <ShoppingCart size={16} />
-              {checkoutLoading ? t.preparingCheckout : t.addToCart}
+              {isInCart ? <BadgeCheck size={16} /> : <ShoppingCart size={16} />}
+              {isInCart ? t.addedToCart : t.addToCart}
             </button>
           )}
         </div>
