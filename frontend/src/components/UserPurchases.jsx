@@ -151,7 +151,7 @@ const UserPurchases = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20 text-[#727981]">
+      <div className="flex items-center justify-center py-20 text-slate-400">
         <RefreshCw size={28} className="animate-spin mr-3" />
         {t.loading}
       </div>
@@ -161,13 +161,13 @@ const UserPurchases = () => {
   return (
     <div>
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm text-[#68717a]">
+        <p className="text-sm text-slate-400">
           {t.reDownload}
         </p>
         <button
           type="button"
           onClick={fetchDetails}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-[#dedbd4] bg-white px-3 py-1.5 text-sm text-[#4f5861] transition-colors hover:bg-[#f1eee8]"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-700 transition-colors"
         >
           <RefreshCw size={14} />
           {t.refresh}
@@ -175,13 +175,13 @@ const UserPurchases = () => {
       </div>
 
       {error && (
-        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
+        <div className="mb-4 rounded-lg bg-red-600/20 border border-red-500 text-red-300 px-4 py-2 text-sm">
           {error}
         </div>
       )}
 
       {purchases.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-[#ddd8ce] bg-white p-12 text-center text-[#626a72]">
+        <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-900 p-12 text-center text-slate-500">
           <ShoppingBag size={40} className="mx-auto mb-4 opacity-40" />
           <p className="font-medium">{t.noPurchases}</p>
         </div>
@@ -191,11 +191,11 @@ const UserPurchases = () => {
             {purchases.map((purchase) => {
               const licenseClass =
                 LICENSE_COLORS[purchase.license_type] ||
-                'border-[#dedbd4] bg-[#f1eee8] text-[#59616a]';
+                'bg-slate-700/40 text-slate-300 border-slate-600/40';
               return (
-                <div key={purchase.id} className="rounded-xl border border-[#e4e0d8] bg-white p-4 shadow-sm">
+                <div key={purchase.id} className="rounded-xl border border-slate-700 bg-slate-900 p-4">
                   <div className="mb-3 flex items-center gap-3 min-w-0">
-                    <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[#e6f4f1]">
+                    <div className="w-10 h-10 rounded-lg flex-shrink-0 overflow-hidden bg-gradient-to-br from-purple-700 to-blue-700">
                       {purchase.cover_image_url ? (
                         <img
                           src={resolveAssetUrl(purchase.cover_image_url)}
@@ -204,16 +204,16 @@ const UserPurchases = () => {
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
-                          <BadgeCheck size={16} className="text-[#167965]" />
+                          <BadgeCheck size={16} className="text-white/60" />
                         </div>
                       )}
                     </div>
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-[#222831]">{purchase.track_title}</p>
-                      <p className="truncate text-xs text-[#727981]">{purchase.track_artist}</p>
+                      <p className="font-semibold text-white truncate text-sm">{purchase.track_title}</p>
+                      <p className="text-xs text-slate-400 truncate">{purchase.track_artist}</p>
                     </div>
                   </div>
-                  <div className="mb-3 text-xs text-[#727981]">
+                  <div className="mb-3 text-xs text-slate-400">
                     {new Date(purchase.purchased_at).toLocaleDateString('en-US', {
                       year: 'numeric',
                       month: 'short',
@@ -231,7 +231,7 @@ const UserPurchases = () => {
                         type="button"
                         onClick={() => handleDownloadLicense(purchase)}
                         disabled={downloadingLicense === purchase.id}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-[#dedbd4] bg-white px-3 py-2 text-xs font-semibold text-[#4f5861] transition-colors hover:bg-[#f1eee8] disabled:opacity-60"
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-xs font-semibold text-slate-200 hover:bg-slate-700 disabled:opacity-60 transition-colors"
                       >
                         <FileText size={13} />
                         {downloadingLicense === purchase.id ? '...' : t.licensePdf}
@@ -240,7 +240,7 @@ const UserPurchases = () => {
                         type="button"
                         onClick={() => handleDownload(purchase)}
                         disabled={downloading === purchase.track_id}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-[#167965] px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#126453] disabled:opacity-60"
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-purple-600 px-3 py-2 text-xs font-semibold text-white hover:bg-purple-700 disabled:opacity-60 transition-colors"
                       >
                         <Download size={13} />
                         {downloading === purchase.track_id ? '...' : t.download}
@@ -252,8 +252,8 @@ const UserPurchases = () => {
             })}
           </div>
 
-          <div className="hidden overflow-hidden rounded-2xl border border-[#e4e0d8] bg-white shadow-sm md:block">
-            <div className="grid grid-cols-12 gap-4 border-b border-[#e8e4dc] bg-[#f1eee8] px-6 py-3 text-xs font-semibold uppercase tracking-widest text-[#69717a]">
+          <div className="hidden rounded-2xl border border-slate-700 bg-slate-900 overflow-hidden md:block">
+            <div className="grid grid-cols-12 gap-4 px-6 py-3 text-xs font-semibold uppercase tracking-widest text-slate-500 border-b border-slate-800 bg-slate-950">
               <div className="col-span-5">{t.track}</div>
               <div className="col-span-3">{t.purchaseDate}</div>
               <div className="col-span-2">{t.license}</div>
@@ -263,14 +263,14 @@ const UserPurchases = () => {
             {purchases.map((purchase) => {
               const licenseClass =
                 LICENSE_COLORS[purchase.license_type] ||
-                'border-[#dedbd4] bg-[#f1eee8] text-[#59616a]';
+                'bg-slate-700/40 text-slate-300 border-slate-600/40';
               return (
                 <div
                   key={purchase.id}
-                  className="grid grid-cols-12 items-center gap-4 border-b border-[#eeeae2] px-6 py-4 transition-colors last:border-0 hover:bg-[#fbfaf7]"
+                  className="grid grid-cols-12 gap-4 px-6 py-4 items-center border-b border-slate-800 last:border-0 hover:bg-slate-800/50 transition-colors"
                 >
                   <div className="col-span-5 flex items-center gap-3 min-w-0">
-                    <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[#e6f4f1]">
+                    <div className="w-10 h-10 rounded-lg flex-shrink-0 overflow-hidden bg-gradient-to-br from-purple-700 to-blue-700">
                       {purchase.cover_image_url ? (
                         <img
                           src={resolveAssetUrl(purchase.cover_image_url)}
@@ -279,17 +279,17 @@ const UserPurchases = () => {
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
-                          <BadgeCheck size={16} className="text-[#167965]" />
+                          <BadgeCheck size={16} className="text-white/60" />
                         </div>
                       )}
                     </div>
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-[#222831]">{purchase.track_title}</p>
-                      <p className="truncate text-xs text-[#727981]">{purchase.track_artist}</p>
+                      <p className="font-semibold text-white truncate text-sm">{purchase.track_title}</p>
+                      <p className="text-xs text-slate-400 truncate">{purchase.track_artist}</p>
                     </div>
                   </div>
 
-                  <div className="col-span-3 text-sm text-[#727981]">
+                  <div className="col-span-3 text-sm text-slate-400">
                     {new Date(purchase.purchased_at).toLocaleDateString('en-US', {
                       year: 'numeric',
                       month: 'short',
@@ -310,7 +310,7 @@ const UserPurchases = () => {
                       type="button"
                       onClick={() => handleDownloadLicense(purchase)}
                       disabled={downloadingLicense === purchase.id}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-[#dedbd4] bg-white px-3 py-2 text-xs font-semibold text-[#4f5861] transition-colors hover:bg-[#f1eee8] disabled:opacity-60"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-xs font-semibold text-slate-200 hover:bg-slate-700 disabled:opacity-60 transition-colors"
                     >
                       <FileText size={13} />
                       {downloadingLicense === purchase.id ? '...' : t.licensePdf}
@@ -319,7 +319,7 @@ const UserPurchases = () => {
                       type="button"
                       onClick={() => handleDownload(purchase)}
                       disabled={downloading === purchase.track_id}
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-[#167965] px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#126453] disabled:opacity-60"
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-purple-600 px-3 py-2 text-xs font-semibold text-white hover:bg-purple-700 disabled:opacity-60 transition-colors"
                     >
                       <Download size={13} />
                       {downloading === purchase.track_id ? '...' : t.download}

@@ -84,7 +84,7 @@ const FreeTracksList = ({ tracks, onPlay }) => {
 
   if (freeTracks.length === 0) {
     return (
-      <div className="rounded-2xl border border-dashed border-[#ddd8ce] bg-white p-10 text-center text-[#626a72]">
+      <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-900 p-10 text-center text-slate-500">
         <Gift size={36} className="mx-auto mb-3 opacity-40" />
         <p>{t.noFreeTracks}</p>
       </div>
@@ -93,7 +93,7 @@ const FreeTracksList = ({ tracks, onPlay }) => {
 
   return (
     <div>
-      <p className="mb-4 text-sm text-[#68717a]">
+      <p className="mb-4 text-sm text-slate-400">
         {t.intro}
       </p>
 
@@ -109,8 +109,8 @@ const FreeTracksList = ({ tracks, onPlay }) => {
             onClick={() => setActiveCategory(item.id)}
             className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors ${
               activeCategory === item.id
-                ? 'bg-[#222831] text-white'
-                : 'border border-[#e4e0d8] bg-white text-[#626a72] hover:bg-[#f1eee8]'
+                ? 'bg-[#d27b57] text-white'
+                : 'bg-[#292d31] text-slate-300 hover:bg-[#363b40]'
             }`}
           >
             {item.label}
@@ -119,13 +119,13 @@ const FreeTracksList = ({ tracks, onPlay }) => {
       </div>
 
       {error && (
-        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
+        <div className="mb-4 rounded-lg bg-red-600/20 border border-red-500 text-red-300 px-4 py-2 text-sm">
           {error}
         </div>
       )}
 
       {filteredTracks.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-[#ddd8ce] bg-white p-8 text-center text-[#626a72]">
+        <div className="rounded-2xl border border-dashed border-[#41464b] bg-[#202327] p-8 text-center text-slate-400">
           {t.noCategory}
         </div>
       ) : (
@@ -133,10 +133,10 @@ const FreeTracksList = ({ tracks, onPlay }) => {
           {filteredTracks.map((track) => (
           <div
             key={track.id}
-            className="flex items-center gap-4 rounded-2xl border border-[#e4e0d8] bg-white p-4 shadow-sm transition-all duration-200 hover:border-[#f0b39e] hover:shadow-md"
+            className="flex items-center gap-4 rounded-2xl border border-[#383c40] bg-[#222529] p-4 transition-all duration-200 hover:border-[#8b5a47]"
           >
             {/* Cover */}
-            <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-xl bg-[#f1eee8]">
+            <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-xl bg-[#2b2e32]">
               {track.cover_image_url ? (
                 <img
                   src={resolveAssetUrl(track.cover_image_url)}
@@ -145,19 +145,19 @@ const FreeTracksList = ({ tracks, onPlay }) => {
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
-                  <Gift size={24} className="text-[#d17b5c]" />
+                  <Gift size={24} className="text-[#c2a99a]" />
                 </div>
               )}
               {/* FREE badge */}
-              <span className="absolute left-1 top-1 rounded-md bg-[#167965] px-1.5 py-0.5 text-[10px] font-extrabold leading-none text-white shadow">
+              <span className="absolute left-1 top-1 rounded-md bg-[#d27b57] px-1.5 py-0.5 text-[10px] font-extrabold leading-none text-white shadow">
                 {t.free}
               </span>
             </div>
 
             {/* Info */}
             <div className="flex-1 min-w-0">
-              <p className="truncate font-semibold text-[#222831]">{track.title}</p>
-              <p className="truncate text-sm text-[#727981]">{track.artist}</p>
+              <p className="font-semibold text-white truncate">{track.title}</p>
+              <p className="text-sm text-slate-400 truncate">{track.artist}</p>
             </div>
 
             {/* Actions */}
@@ -165,7 +165,7 @@ const FreeTracksList = ({ tracks, onPlay }) => {
               <button
                 type="button"
                 onClick={() => onPlay(track)}
-                className="rounded-lg border border-[#dedbd4] bg-white p-2 text-[#555d65] transition-colors hover:bg-[#f1eee8] hover:text-[#222831]"
+                className="rounded-lg border border-[#41464b] bg-[#292d31] p-2 text-slate-300 transition-colors hover:bg-[#363b40] hover:text-white"
                 title={t.preview}
               >
                 <Play size={16} fill="currentColor" />
@@ -174,7 +174,7 @@ const FreeTracksList = ({ tracks, onPlay }) => {
                 type="button"
                 onClick={() => handleFreeDownload(track)}
                 disabled={downloading === track.id}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-[#167965] px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#126453] disabled:opacity-60"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-[#d27b57] px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#e08b66] disabled:opacity-60"
               >
                 <Download size={15} />
                 {downloading === track.id ? t.downloading : t.download}
