@@ -905,7 +905,9 @@ class TestCheckoutAndWebhook:
     """Test Gumroad checkout and purchase processing."""
 
     @pytest.mark.asyncio
-    async def test_cart_checkout_builds_gumroad_url(self, client, test_db, monkeypatch):
+    async def test_single_track_checkout_builds_gumroad_product_links(
+        self, client, test_db, monkeypatch
+    ):
         _, AsyncSessionLocal = test_db
 
         async with AsyncSessionLocal() as session:
@@ -923,19 +925,16 @@ class TestCheckoutAndWebhook:
         )
         token = login_response.json()["access_token"]
 
-        response = await client.post(
-            "/checkout/cart",
-            json={"track_ids": [track_one.id, track_two.id]},
-            headers={"Authorization": f"Bearer {token}"},
-        )
-
-        assert response.status_code == 200
-        data = response.json()
-        assert set(data["track_ids"]) == {track_one.id, track_two.id}
-        checkout_items = {item["track_id"]: item for item in data["checkout_items"]}
-        assert set(checkout_items) == {track_one.id, track_two.id}
         for track in (track_one, track_two):
-            parsed = urlparse(checkout_items[track.id]["checkout_url"])
+            response = await client.post(
+                f"/tracks/{track.id}/checkout",
+                headers={"Authorization": f"Bearer {token}"},
+            )
+
+            assert response.status_code == 200
+            data = response.json()
+            assert data["track_id"] == track.id
+            parsed = urlparse(data["checkout_url"])
             query = parse_qs(parsed.query)
             assert parsed.netloc == "djbilal.gumroad.com"
             assert parsed.path == f"/l/{track.external_product_id.rsplit('/', 1)[-1]}"

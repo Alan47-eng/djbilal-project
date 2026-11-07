@@ -455,48 +455,6 @@ class TrackService:
             "checkout_url": checkout_url,
         }
 
-    async def create_cart_checkout(
-        self,
-        session: AsyncSession,
-        track_ids: list[int],
-        current_user: User,
-    ) -> dict[str, list[int] | list[dict[str, int | str]]]:
-        """Create signed Gumroad product links for each paid item in the cart."""
-        tracks_result = await session.execute(
-            select(Track).where(Track.id.in_(track_ids))
-        )
-        tracks_by_id = {track.id: track for track in tracks_result.scalars().all()}
-        missing_ids = [track_id for track_id in track_ids if track_id not in tracks_by_id]
-        if missing_ids:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Tracks not found: {', '.join(str(track_id) for track_id in missing_ids)}",
-            )
-
-        selected_tracks = [tracks_by_id[track_id] for track_id in track_ids]
-        paid_tracks = [track for track in selected_tracks if not track.is_free]
-        if not paid_tracks:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Cart must include at least one paid track",
-            )
-
-        cart_track_ids = [track.id for track in paid_tracks]
-
-        return {
-            "track_ids": cart_track_ids,
-            "checkout_items": [
-                {
-                    "track_id": track.id,
-                    "checkout_url": self._build_gumroad_checkout_url(
-                        track,
-                        current_user,
-                    ),
-                }
-                for track in paid_tracks
-            ],
-        }
-
     @staticmethod
     def _build_gumroad_checkout_url(track: Track, current_user: User) -> str:
         product_value = (track.gumroad_url or track.external_product_id or "").strip()

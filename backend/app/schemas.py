@@ -409,16 +409,6 @@ class TrackResponse(DTO):
         return _validate_gumroad_product_id(value)
 
 
-class CheckoutItem(DTO):
-    track_id: int
-    checkout_url: str
-
-
-class CartCheckoutResponse(DTO):
-    track_ids: list[int]
-    checkout_items: list[CheckoutItem]
-
-
 class PurchaseDetail(DTO):
     id: int
     track_id: int
@@ -440,24 +430,6 @@ class DownloadResponse(DTO):
 
     model_config = ConfigDict(from_attributes=True, extra="forbid")
 
-
-class CartCheckoutRequest(DTO):
-    track_ids: list[int]
-
-    @field_validator("track_ids")
-    @classmethod
-    def validate_track_ids(cls, values: list[int]) -> list[int]:
-        if not values:
-            raise ValueError("track_ids cannot be empty")
-        unique_ids = []
-        seen = set()
-        for track_id in values:
-            if track_id <= 0:
-                raise ValueError("track_ids must contain positive integers")
-            if track_id not in seen:
-                seen.add(track_id)
-                unique_ids.append(track_id)
-        return unique_ids
 
 def calculate_discounted_price(price: float, discount_percent: float) -> float:
     """
