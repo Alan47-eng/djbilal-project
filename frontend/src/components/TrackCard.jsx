@@ -73,15 +73,16 @@ const TrackCard = ({
   };
 
   return (
-    <div className="group cursor-pointer overflow-hidden rounded-xl border border-[#383c40] bg-[#222529] transition-colors duration-300 hover:border-violet-500/70 hover:bg-[#292d31]">
+    <div className="group cursor-pointer overflow-hidden rounded-2xl border border-white/[0.08] bg-gradient-to-br from-[#302d3e] via-[#242430] to-[#1d2029] shadow-[0_12px_30px_rgba(5,5,12,0.22),inset_0_1px_rgba(255,255,255,0.04)] transition-all duration-300 hover:-translate-y-1 hover:border-violet-400/40 hover:shadow-2xl hover:shadow-violet-950/20">
       {/* Track Cover / Placeholder */}
-      <div className="relative aspect-square overflow-hidden bg-[#2b2e32]">
+      <div className="relative aspect-square overflow-hidden bg-[#252331]">
         <img
           src={resolveAssetUrl(track.cover_image_url) || buildCoverArt(track)}
           alt={`${track.title} cover`}
-          className="h-full w-full object-cover"
+          className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
           loading="lazy"
         />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#17141f]/75 via-transparent to-white/[0.04]" />
 
         {/* Overlay on hover */}
         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center gap-4">
@@ -135,7 +136,7 @@ const TrackCard = ({
       </div>
 
       {/* Track Info */}
-      <div className="p-4">
+      <div className="bg-gradient-to-b from-transparent to-black/[0.08] p-4 sm:p-5">
         <h3 className="truncate text-lg font-bold text-white transition-colors group-hover:text-violet-200">
           {track.title}
         </h3>

@@ -295,9 +295,9 @@ function AppContent() {
   };
 
   return (
-    <div className={`min-h-screen bg-[#17191c] text-[#f3f0e9] ${isRTL ? 'text-right' : ''}`}>
+    <div className={`store-shell text-[#f3f0e9] ${isRTL ? 'text-right' : ''}`}>
       {/* Header */}
-      <header className="sticky top-0 z-40 border-b border-[#383c40] bg-[#202327]/95 shadow-sm backdrop-blur-sm">
+      <header className="store-header sticky top-0 z-40 border-b border-violet-300/10 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <button
@@ -308,7 +308,7 @@ function AppContent() {
             >
               <Menu size={20} />
             </button>
-            <div className="rounded-lg bg-violet-600 p-2">
+            <div className="rounded-xl bg-gradient-to-br from-violet-500 to-indigo-700 p-2 shadow-lg shadow-violet-950/40 ring-1 ring-white/10">
               <Music size={28} className="text-white" />
             </div>
             <button
@@ -326,7 +326,7 @@ function AppContent() {
           </div>
 
           <div className="flex items-center gap-2 sm:gap-4">
-            <div className="flex items-center rounded-lg border border-[#41464b] bg-[#17191c] p-1 text-xs">
+            <div className="flex items-center rounded-lg border border-white/10 bg-[#181821]/80 p-1 text-xs shadow-inner">
               <button
                 type="button"
                 onClick={() => setLang('en')}
@@ -372,7 +372,7 @@ function AppContent() {
                 </button>
                 <button
                   onClick={() => setAuthModal({ isOpen: true, mode: 'register' })}
-                  className="flex items-center gap-2 rounded-lg bg-violet-600 px-3 py-2 text-sm font-semibold text-white transition-colors duration-200 hover:bg-violet-700 sm:px-4 sm:text-base"
+                   className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-violet-600 to-purple-600 px-3 py-2 text-sm font-semibold text-white shadow-lg shadow-violet-950/30 transition-all duration-200 hover:from-violet-500 hover:to-purple-500 sm:px-4 sm:text-base"
                 >
                   <UserPlus size={18} />
                   <span className="hidden sm:inline">{t.signUp}</span>
@@ -391,7 +391,7 @@ function AppContent() {
           </div>
         )}
 
-        <div className="mb-4 flex flex-wrap items-center gap-2">
+        <div className="mb-5 flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={() => {
@@ -432,7 +432,7 @@ function AppContent() {
         </div>
 
         {/* Tab Navigation */}
-        <nav className="mb-6 sm:mb-8 flex max-w-full items-center gap-1 overflow-x-auto rounded-2xl border border-[#34383d] bg-[#202327] p-1">
+        <nav className="mb-8 flex max-w-full items-center gap-1 overflow-x-auto rounded-2xl border border-white/[0.07] bg-gradient-to-r from-[#24232f] via-[#22222d] to-[#1d2029] p-1.5 shadow-lg shadow-black/10">
           {[
              { id: 'albums', label: t.albums, icon: <Library size={15} /> },
              { id: 'free', label: t.free, icon: <Gift size={15} /> },
@@ -449,8 +449,8 @@ function AppContent() {
               }}
               className={`inline-flex shrink-0 items-center gap-2 rounded-xl px-3 sm:px-4 py-2 text-sm font-semibold transition-all duration-200 ${
                 activeTab === tab.id
-                  ? 'bg-violet-600 text-white shadow-sm'
-                  : 'text-[#aeb2b5] hover:bg-[#303438] hover:text-white'
+                  ? 'bg-gradient-to-r from-violet-600 to-purple-600 text-white shadow-lg shadow-violet-950/40 ring-1 ring-white/10'
+                  : 'text-[#b9b8c5] hover:bg-white/[0.06] hover:text-white'
               }`}
             >
               {tab.icon}
@@ -521,16 +521,20 @@ function AppContent() {
                   );
                 })() : (
                   <>
-                    <div className="mb-6">
-                      <h2 className="text-2xl font-bold text-white">{t.albums}</h2>
-                      <p className="mt-1 text-sm text-slate-400">{t.albumsDesc}</p>
+                    <div className="store-section-heading mb-7 px-6 py-6 sm:px-8 sm:py-7">
+                      <p className="mb-2 inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-violet-300">
+                        <span className="h-1.5 w-1.5 rounded-full bg-violet-400 shadow-[0_0_12px_rgba(167,139,250,0.9)]" />
+                        DJ Bilal Music
+                      </p>
+                      <h2 className="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">{t.albums}</h2>
+                      <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300/80 sm:text-base">{t.albumsDesc}</p>
                     </div>
                     {albumsError ? (
                       <div className="rounded-lg border border-red-500 bg-red-600/20 p-4 text-red-200">
                         {albumsError}
                       </div>
                     ) : albums.length ? (
-                      <div className="grid grid-cols-1 gap-6 pb-32 sm:grid-cols-2 lg:grid-cols-3">
+                      <div className="grid grid-cols-1 gap-5 pb-32 sm:grid-cols-2 lg:grid-cols-3 xl:gap-6">
                         {albums.map((album) => {
                           const albumTrackCount = tracks.filter((track) => track.album_id === album.id).length;
                           return (
@@ -538,24 +542,33 @@ function AppContent() {
                               key={album.id}
                               type="button"
                               onClick={() => setSelectedAlbumId(album.id)}
-                                className="overflow-hidden rounded-xl border border-[#383c40] bg-[#222529] text-left transition hover:border-violet-500/70 hover:bg-[#292d31]"
+                              className="album-card group overflow-hidden rounded-2xl border border-white/[0.08] text-left transition-all duration-300 hover:-translate-y-1 hover:border-violet-400/40 hover:shadow-2xl hover:shadow-violet-950/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
                             >
-                              {album.cover_image_url ? (
-                                <img
-                                  src={resolveAssetUrl(album.cover_image_url)}
-                                  alt={`${album.title} cover`}
-                                  className="aspect-square w-full object-cover"
-                                  loading="lazy"
-                                />
-                              ) : (
-                                <div className="flex aspect-square items-center justify-center bg-[#2b2e32]">
-                                  <Music size={48} className="text-[#b9a296]" />
+                              <div className="relative aspect-square overflow-hidden">
+                                {album.cover_image_url ? (
+                                  <img
+                                    src={resolveAssetUrl(album.cover_image_url)}
+                                    alt={`${album.title} cover`}
+                                    className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+                                    loading="lazy"
+                                  />
+                                ) : (
+                                  <div className="album-cover-placeholder flex h-full w-full items-center justify-center">
+                                    <div className="flex h-24 w-24 items-center justify-center rounded-full border border-white/20 bg-white/[0.08] shadow-2xl backdrop-blur-sm transition-transform duration-500 group-hover:scale-110">
+                                      <Music size={42} className="text-white/90 drop-shadow-lg" />
+                                    </div>
+                                  </div>
+                                )}
+                                <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#17141f]/75 via-transparent to-white/[0.04]" />
+                                <div className="absolute bottom-3 left-3 inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-black/35 px-3 py-1 text-xs font-semibold text-white/90 shadow-lg backdrop-blur-md">
+                                  <Music size={12} className="text-violet-200" />
+                                  {albumTrackCount} {t.albumTracks}
                                 </div>
-                              )}
-                              <div className="p-4">
-                                <h3 className="truncate text-lg font-bold text-white">{album.title}</h3>
-                                <p className="mt-1 text-sm text-slate-400">
-                                  {albumTrackCount} · {album.release_date
+                              </div>
+                              <div className="p-4 sm:p-5">
+                                <h3 className="truncate text-lg font-bold text-white transition-colors group-hover:text-violet-200">{album.title}</h3>
+                                <p className="mt-1.5 text-sm text-slate-400">
+                                  {album.release_date
                                     ? new Date(album.release_date).toLocaleDateString(lang === 'ar' ? 'ar' : 'en')
                                     : t.albums}
                                 </p>
@@ -618,7 +631,7 @@ function AppContent() {
         )}
       </main>
 
-      <footer className="border-t border-[#383c40] bg-[#202327]">
+      <footer className="border-t border-white/[0.06] bg-gradient-to-r from-[#191922] via-[#20202b] to-[#191922]">
         <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 sm:px-6 py-6 text-sm text-slate-400 md:flex-row md:items-center md:justify-between">
           <p>© {new Date().getFullYear()} DJ Bilal Music Store</p>
           <div className="flex flex-wrap items-center gap-4">
@@ -660,7 +673,7 @@ function AppContent() {
 
       {/* Player */}
       {currentTrack && (
-        <div className="fixed bottom-0 left-0 right-0 border-t border-[#41464b] bg-[#25292d]">
+        <div className="fixed bottom-0 left-0 right-0 border-t border-violet-300/15 bg-gradient-to-r from-[#24222f]/95 via-[#242430]/95 to-[#1c202b]/95 shadow-[0_-16px_48px_rgba(8,7,18,0.38)] backdrop-blur-xl">
           <AudioPlayer track={currentTrack} isPlaying={isPlaying} onPlayPause={setIsPlaying} />
         </div>
       )}

@@ -88,13 +88,13 @@ const AudioPlayer = ({ track, isPlaying, onPlayPause }) => {
 
   return (
     <div
-      className="fixed bottom-0 left-0 right-0 bg-slate-800 border-t border-slate-700 shadow-2xl z-50"
+      className="fixed bottom-0 left-0 right-0 z-50 border-t border-violet-300/15 bg-gradient-to-r from-[#282535] via-[#252531] to-[#20232e] shadow-2xl shadow-black/30"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
       {/* Progress Bar */}
       <div
         onClick={handleProgressClick}
-        className="h-1 bg-slate-700 hover:h-2 transition-all duration-200 cursor-pointer"
+        className="h-1 cursor-pointer bg-slate-700 transition-all duration-200 hover:h-1.5"
         style={{
           background: `linear-gradient(to right, #a855f7 0%, #a855f7 ${
             duration ? (currentTime / duration) * 100 : 0
@@ -103,7 +103,7 @@ const AudioPlayer = ({ track, isPlaying, onPlayPause }) => {
       />
 
       {/* Player Content */}
-      <div className="flex flex-col gap-3 px-4 sm:px-6 py-3 sm:py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+      <div className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:px-6 sm:py-4">
         {/* Track Info */}
         <div className="w-full sm:flex-1 min-w-0">
           <h4 className="text-white font-semibold truncate">{track.title}</h4>

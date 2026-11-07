@@ -34,7 +34,7 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
   return (
     <div className="fixed inset-0 z-50 bg-black/60" onClick={onClose}>
       <aside
-        className="absolute left-0 top-0 flex h-full w-full max-w-sm flex-col border-r border-[#383c40] bg-[#202327] text-slate-100 shadow-2xl"
+        className="absolute left-0 top-0 flex h-full w-full max-w-sm flex-col border-r border-violet-300/10 bg-gradient-to-b from-[#292635] via-[#20212b] to-[#191a23] text-slate-100 shadow-2xl shadow-black/40"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-slate-800 px-5 py-4">
