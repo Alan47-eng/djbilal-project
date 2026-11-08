@@ -540,7 +540,6 @@ function AppContent() {
       <ShopierCheckoutModal
         isOpen={checkoutOpen}
         tracks={cartTracks}
-        user={user}
         busy={checkoutBusy}
         onClose={() => setCheckoutOpen(false)}
         onRemoveTrack={(trackId) => setCartTracks((current) => current.filter((track) => track.id !== trackId))}

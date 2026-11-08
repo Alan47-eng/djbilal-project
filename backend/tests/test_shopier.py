@@ -20,14 +20,6 @@ from app.shopier import callback_signature, checkout_signature
 TEST_SECRET = "shopier-test-secret"
 CHECKOUT = {
     "track_ids": [1, 2],
-    "buyer_name": "Test",
-    "buyer_surname": "Customer",
-    "buyer_id_nr": "12345678901",
-    "buyer_phone": "+905551234567",
-    "billing_address": "Test street 1",
-    "billing_city": "Istanbul",
-    "billing_country": "Turkey",
-    "billing_postcode": "34000",
     "current_language": "en",
 }
 
@@ -50,7 +42,6 @@ async def shopier_client(monkeypatch):
     app.dependency_overrides[get_session] = override_session
     monkeypatch.setenv("SHOPIER_API_KEY", "shopier-test-key")
     monkeypatch.setenv("SHOPIER_API_SECRET", TEST_SECRET)
-    monkeypatch.setenv("SHOPIER_CURRENCY", "1")
 
     async with session_factory() as session:
         user = User(
@@ -128,8 +119,9 @@ async def send_callback(
 
 
 @pytest.mark.asyncio
-async def test_checkout_creates_pending_order_and_signed_form(shopier_client):
+async def test_checkout_creates_pending_order_and_signed_form(shopier_client, monkeypatch):
     client, session_factory = shopier_client
+    monkeypatch.setenv("SHOPIER_CURRENCY", "0")
     checkout = await create_order(client)
 
     fields = checkout.fields
@@ -138,6 +130,15 @@ async def test_checkout_creates_pending_order_and_signed_form(shopier_client):
     assert fields["total_order_value"] == "7.75"
     assert fields["currency"] == "1"
     assert fields["buyer_email"] == "shopier-test@example.com"
+    assert fields["buyer_name"] == "Test"
+    assert fields["buyer_surname"] == "Customer"
+    assert fields["buyer_id_nr"] == "11111111111"
+    assert fields["buyer_phone"] == "0000000000"
+    assert fields["billing_address"] == "Digital Delivery"
+    assert fields["shipping_address"] == "Digital Delivery"
+    assert fields["billing_city"] == "Istanbul"
+    assert fields["billing_country"] == "Turkey"
+    assert fields["billing_postcode"] == "34000"
     assert fields["signature"] == checkout_signature(
         TEST_SECRET,
         fields["random_nr"],

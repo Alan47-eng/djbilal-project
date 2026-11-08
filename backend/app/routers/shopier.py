@@ -24,20 +24,18 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1", tags=["shopier"])
 SHOPIER_FORM_URL = "https://www.shopier.com/ShowProduct/api_pay4.php"
-SHOPIER_CURRENCY_NAMES = {0: "TRY", 1: "USD", 2: "EUR"}
+SHOPIER_CURRENCY = 1
+SHOPIER_FINAL_CONSUMER_ID = "11111111111"
+SHOPIER_DIGITAL_CONTACT_PHONE = "0000000000"
+SHOPIER_DIGITAL_ADDRESS = "Digital Delivery"
+SHOPIER_DIGITAL_CITY = "Istanbul"
+SHOPIER_DIGITAL_COUNTRY = "Turkey"
+SHOPIER_DIGITAL_POSTCODE = "34000"
 CENT = Decimal("0.01")
 
 
 class ShopierCheckoutRequest(schemas.DTO):
     track_ids: list[int] = Field(min_length=1, max_length=50)
-    buyer_name: str = Field(min_length=1, max_length=100)
-    buyer_surname: str = Field(min_length=1, max_length=100)
-    buyer_id_nr: str = Field(min_length=1, max_length=32)
-    buyer_phone: str = Field(min_length=5, max_length=32)
-    billing_address: str = Field(min_length=1, max_length=500)
-    billing_city: str = Field(min_length=1, max_length=100)
-    billing_country: str = Field(min_length=2, max_length=100)
-    billing_postcode: str = Field(min_length=1, max_length=20)
     current_language: str = Field(default="en", pattern="^(en|tr)$")
 
 
@@ -48,28 +46,15 @@ class ShopierCheckoutResponse(schemas.DTO):
     fields: dict[str, str]
 
 
-def _shopier_settings() -> tuple[str, str, int]:
+def _shopier_settings() -> tuple[str, str]:
     api_key = os.getenv("SHOPIER_API_KEY", "").strip()
     api_secret = os.getenv("SHOPIER_API_SECRET", "").strip()
-    raw_currency = os.getenv("SHOPIER_CURRENCY", "")
     if not api_key or not api_secret:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Shopier checkout is not configured",
         )
-    try:
-        currency = int(raw_currency)
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="SHOPIER_CURRENCY must be set to 0, 1, or 2",
-        ) from exc
-    if currency not in SHOPIER_CURRENCY_NAMES:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="SHOPIER_CURRENCY must be set to 0, 1, or 2",
-        )
-    return api_key, api_secret, currency
+    return api_key, api_secret
 
 
 def _price_to_minor_units(value: float) -> int:
@@ -110,7 +95,8 @@ async def initiate_shopier_checkout(
     current_user: User = Depends(auth.get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> ShopierCheckoutResponse:
-    api_key, api_secret, currency = _shopier_settings()
+    api_key, api_secret = _shopier_settings()
+    currency = SHOPIER_CURRENCY
     if len(set(checkout.track_ids)) != len(checkout.track_ids):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -145,6 +131,12 @@ async def initiate_shopier_checkout(
         )
 
     ordered_tracks = [tracks_by_id[track_id] for track_id in checkout.track_ids]
+    name_parts = (current_user.full_name or "").strip().split()
+    if len(name_parts) < 2:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Add your first and last name to your account before checkout",
+        )
     items = [
         (track, _price_to_minor_units(track.price)) for track in ordered_tracks
     ]
@@ -187,20 +179,20 @@ async def initiate_shopier_checkout(
         "platform_order_id": platform_order_id,
         "product_name": f"DJ Bilal - {len(items)} digital track(s)",
         "product_type": "2",
-        "buyer_name": checkout.buyer_name.strip(),
-        "buyer_surname": checkout.buyer_surname.strip(),
+        "buyer_name": name_parts[0],
+        "buyer_surname": " ".join(name_parts[1:]),
         "buyer_email": current_user.email,
         "buyer_account_age": str(_account_age_days(current_user)),
-        "buyer_id_nr": checkout.buyer_id_nr.strip(),
-        "buyer_phone": checkout.buyer_phone.strip(),
-        "billing_address": checkout.billing_address.strip(),
-        "billing_city": checkout.billing_city.strip(),
-        "billing_country": checkout.billing_country.strip(),
-        "billing_postcode": checkout.billing_postcode.strip(),
-        "shipping_address": checkout.billing_address.strip(),
-        "shipping_city": checkout.billing_city.strip(),
-        "shipping_country": checkout.billing_country.strip(),
-        "shipping_postcode": checkout.billing_postcode.strip(),
+        "buyer_id_nr": SHOPIER_FINAL_CONSUMER_ID,
+        "buyer_phone": SHOPIER_DIGITAL_CONTACT_PHONE,
+        "billing_address": SHOPIER_DIGITAL_ADDRESS,
+        "billing_city": SHOPIER_DIGITAL_CITY,
+        "billing_country": SHOPIER_DIGITAL_COUNTRY,
+        "billing_postcode": SHOPIER_DIGITAL_POSTCODE,
+        "shipping_address": SHOPIER_DIGITAL_ADDRESS,
+        "shipping_city": SHOPIER_DIGITAL_CITY,
+        "shipping_country": SHOPIER_DIGITAL_COUNTRY,
+        "shipping_postcode": SHOPIER_DIGITAL_POSTCODE,
         "total_order_value": total_order_value,
         "currency": str(currency),
         "platform": "0",

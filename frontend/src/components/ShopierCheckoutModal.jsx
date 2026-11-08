@@ -3,22 +3,9 @@ import { Loader2, ShoppingCart, Trash2, X } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { getApiErrorMessage } from '../utils/errors';
 
-const EMPTY_FORM = {
-  buyer_name: '',
-  buyer_surname: '',
-  buyer_id_nr: '',
-  buyer_phone: '',
-  billing_address: '',
-  billing_city: '',
-  billing_country: '',
-  billing_postcode: '',
-  current_language: 'en',
-};
-
 export default function ShopierCheckoutModal({
   isOpen,
   tracks,
-  user,
   busy,
   onClose,
   onRemoveTrack,
@@ -26,7 +13,6 @@ export default function ShopierCheckoutModal({
 }) {
   const { lang } = useLanguage();
   const isArabic = lang === 'ar';
-  const [form, setForm] = useState(EMPTY_FORM);
   const [error, setError] = useState('');
   const [checkoutForm, setCheckoutForm] = useState(null);
   const paymentFormRef = useRef(null);
@@ -35,18 +21,7 @@ export default function ShopierCheckoutModal({
     title: isArabic ? 'سلة التسوق' : 'Your cart',
     empty: isArabic ? 'سلتك فارغة.' : 'Your cart is empty.',
     total: isArabic ? 'الإجمالي' : 'Total',
-    buyer: isArabic ? 'بيانات المشتري' : 'Buyer details',
-    firstName: isArabic ? 'الاسم' : 'First name',
-    lastName: isArabic ? 'اسم العائلة' : 'Last name',
-    idNumber: isArabic ? 'رقم الهوية' : 'National ID / tax number',
-    phone: isArabic ? 'رقم الهاتف' : 'Phone',
-    billing: isArabic ? 'عنوان الفواتير' : 'Billing address',
-    address: isArabic ? 'العنوان' : 'Address',
-    city: isArabic ? 'المدينة' : 'City',
-    country: isArabic ? 'الدولة' : 'Country',
-    postcode: isArabic ? 'الرمز البريدي' : 'Postcode',
-    billingNote: isArabic ? 'سيُستخدم هذا العنوان أيضاً كعنوان شحن في بيانات الطلب.' : 'This same real address will also be sent as the shipping address in the order details.',
-    checkout: isArabic ? 'المتابعة إلى الدفع' : 'Continue to payment',
+    checkout: isArabic ? 'ادفع عبر Shopier' : 'Pay with Shopier',
     working: isArabic ? 'جارٍ التحضير...' : 'Preparing checkout...',
     close: isArabic ? 'إغلاق' : 'Close',
     secureNote: isArabic
@@ -54,17 +29,6 @@ export default function ShopierCheckoutModal({
       : 'Order details will be sent to Shopier to complete payment.',
     currency: 'USD',
   };
-
-  useEffect(() => {
-    if (user?.full_name) {
-      const [firstName, ...rest] = user.full_name.trim().split(/\s+/);
-      setForm((current) => ({
-        ...current,
-        buyer_name: current.buyer_name || firstName || '',
-        buyer_surname: current.buyer_surname || rest.join(' '),
-      }));
-    }
-  }, [user?.full_name]);
 
   useEffect(() => {
     if (checkoutForm && paymentFormRef.current) {
@@ -80,17 +44,11 @@ export default function ShopierCheckoutModal({
 
   if (!isOpen) return null;
 
-  const setField = (event) => {
-    const { name, value } = event.target;
-    setForm((current) => ({ ...current, [name]: value }));
-  };
-
   const handleSubmit = async (event) => {
     event.preventDefault();
     setError('');
     const payload = {
       track_ids: tracks.map((track) => track.id),
-      ...form,
       current_language: lang === 'ar' ? 'en' : lang,
     };
 
@@ -102,23 +60,6 @@ export default function ShopierCheckoutModal({
     }
   };
 
-  const inputClass = 'mt-1 w-full rounded-lg border border-[#44434a] bg-[#202027] px-3 py-2 text-sm text-white outline-none focus:border-violet-400 focus:ring-1 focus:ring-violet-400';
-  const field = (name, label, options = {}) => (
-    <label key={name} className="block text-sm text-slate-300">
-      {label}
-      <input
-        className={inputClass}
-        name={name}
-        value={form[name]}
-        onChange={setField}
-        required
-        maxLength={options.maxLength || 500}
-        type={options.type || 'text'}
-        autoComplete={options.autoComplete}
-      />
-    </label>
-  );
-
   return (
     <>
       <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/70 p-0 backdrop-blur-sm sm:items-center sm:p-4">
@@ -126,7 +67,7 @@ export default function ShopierCheckoutModal({
           role="dialog"
           aria-modal="true"
           aria-labelledby="shopier-cart-title"
-          className="max-h-[94vh] w-full max-w-3xl overflow-y-auto rounded-t-2xl border border-white/10 bg-[#18181e] p-4 shadow-2xl sm:rounded-2xl sm:p-6"
+          className="max-h-[94vh] w-full max-w-xl overflow-y-auto rounded-t-2xl border border-white/10 bg-[#18181e] p-4 shadow-2xl sm:rounded-2xl sm:p-6"
           dir={isArabic ? 'rtl' : 'ltr'}
         >
           <div className="mb-5 flex items-center justify-between gap-3">
@@ -141,7 +82,7 @@ export default function ShopierCheckoutModal({
           {tracks.length === 0 ? (
             <p className="rounded-xl bg-white/[0.04] p-5 text-center text-slate-300">{text.empty}</p>
           ) : (
-            <form onSubmit={handleSubmit} className="space-y-5">
+            <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 {tracks.map((track) => (
                   <div key={track.id} className="flex items-center justify-between gap-3 rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2.5">
@@ -163,28 +104,6 @@ export default function ShopierCheckoutModal({
                 </div>
                 <p className="text-xs text-slate-500">{text.secureNote}</p>
               </div>
-
-              <fieldset className="space-y-3">
-                <legend className="mb-2 font-semibold text-white">{text.buyer}</legend>
-                <p className="text-xs text-slate-400">{user?.email}</p>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {field('buyer_name', text.firstName, { autoComplete: 'given-name', maxLength: 100 })}
-                  {field('buyer_surname', text.lastName, { autoComplete: 'family-name', maxLength: 100 })}
-                  {field('buyer_id_nr', text.idNumber, { maxLength: 32 })}
-                  {field('buyer_phone', text.phone, { type: 'tel', autoComplete: 'tel', maxLength: 32 })}
-                </div>
-              </fieldset>
-
-              <fieldset className="space-y-3">
-                <legend className="mb-2 font-semibold text-white">{text.billing}</legend>
-                <p className="text-xs text-slate-400">{text.billingNote}</p>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {field('billing_address', text.address, { autoComplete: 'billing street-address' })}
-                  {field('billing_city', text.city, { autoComplete: 'billing address-level2', maxLength: 100 })}
-                  {field('billing_country', text.country, { autoComplete: 'billing country-name', maxLength: 100 })}
-                  {field('billing_postcode', text.postcode, { autoComplete: 'billing postal-code', maxLength: 20 })}
-                </div>
-              </fieldset>
 
               {error && <p role="alert" className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">{error}</p>}
               <div className="flex flex-col-reverse gap-2 border-t border-white/10 pt-4 sm:flex-row sm:justify-end">
