@@ -3,10 +3,9 @@ from .albums import router as albums_router
 from .media import router as media_router
 from .password_reset import router as password_reset_router
 from .profile import router as profile_router
-from .purchases import router as purchases_router
 from .system import router as system_router
+from .shopier import router as shopier_router
 from .tracks import router as tracks_router
-from .webhooks import router as webhooks_router
 
 __all__ = [
     "auth_router",
@@ -14,8 +13,7 @@ __all__ = [
     "media_router",
     "password_reset_router",
     "profile_router",
-    "purchases_router",
     "system_router",
+    "shopier_router",
     "tracks_router",
-    "webhooks_router",
 ]

@@ -1,4 +1,18 @@
-from sqlalchemy import Column, Integer, String, Date, DateTime, Float, Boolean, JSON, func, ForeignKey, UniqueConstraint
+from sqlalchemy import (
+    Boolean,
+    BigInteger,
+    CheckConstraint,
+    Column,
+    Date,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    SmallInteger,
+    String,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.orm import declarative_base
 
 Base = declarative_base()
@@ -33,9 +47,6 @@ class Track(Base):
     artist = Column(String(255), nullable=False, index=True)
     price = Column(Float, nullable=False)
     cover_image_url = Column(String(1024), nullable=True)
-    external_product_id = Column(String(1024), nullable=True)
-    gumroad_url = Column(String(1024), nullable=True)
-    gumroad_product_id = Column(String(255), nullable=True, unique=True, index=True)
     album_id = Column(Integer, ForeignKey("albums.id", ondelete="SET NULL"), nullable=True, index=True)
     preview_url = Column(String(1024), nullable=False)
     full_file_path = Column(String(1024), nullable=False)
@@ -43,31 +54,6 @@ class Track(Base):
     free_download_url = Column(String(1024), nullable=True)
     category = Column(String(50), nullable=False, default="edit")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-
-
-class Purchase(Base):
-    __tablename__ = 'purchases'
-    __table_args__ = (
-        UniqueConstraint('user_id', 'track_id', name='uq_user_track_purchase'),
-    )
-
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=False, index=True)
-    track_id = Column(Integer, ForeignKey('tracks.id', ondelete='CASCADE'), nullable=False, index=True)
-    license_type = Column(String(100), nullable=True)
-    created_at = Column('purchased_at', DateTime(timezone=True), server_default=func.now())
-
-
-class GumroadSale(Base):
-    __tablename__ = 'gumroad_sales'
-
-    sale_id = Column(String(255), primary_key=True)
-    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=False, index=True)
-    track_ids = Column(JSON, nullable=False)
-    paid_cents = Column(Integer, nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-
-
 class ProfilePhoto(Base):
     __tablename__ = "profile_photos"
 
@@ -84,3 +70,52 @@ class PendingRegistration(Base):
     verification_code_hash = Column(String(64), nullable=False)
     expires_at = Column(DateTime(timezone=True), nullable=False)
     attempts = Column(Integer, default=0, nullable=False)
+
+
+class Order(Base):
+    __tablename__ = "orders"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('pending', 'paid_pending_delivery', 'success', 'failed')",
+            name="ck_orders_status",
+        ),
+        CheckConstraint("total_amount_minor > 0", name="ck_orders_total_amount_positive"),
+        CheckConstraint("currency IN (0, 1, 2)", name="ck_orders_currency"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    platform_order_id = Column(String(36), nullable=False, unique=True)
+    total_amount_minor = Column(BigInteger, nullable=False)
+    currency = Column(SmallInteger, nullable=False)
+    status = Column(String(32), nullable=False, default="pending", server_default="pending", index=True)
+    shopier_payment_id = Column(String(255), nullable=True, unique=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    paid_at = Column(DateTime(timezone=True), nullable=True)
+    delivered_at = Column(DateTime(timezone=True), nullable=True)
+
+
+class OrderItem(Base):
+    __tablename__ = "order_items"
+    __table_args__ = (
+        UniqueConstraint("order_id", "track_id", name="uq_order_item_track"),
+        CheckConstraint("price_minor > 0", name="ck_order_item_price_positive"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    order_id = Column(Integer, ForeignKey("orders.id", ondelete="CASCADE"), nullable=False, index=True)
+    track_id = Column(Integer, ForeignKey("tracks.id", ondelete="RESTRICT"), nullable=False, index=True)
+    track_title = Column(String(255), nullable=False)
+    price_minor = Column(Integer, nullable=False)
+
+
+class Purchase(Base):
+    __tablename__ = "purchases"
+    __table_args__ = (
+        UniqueConstraint("user_id", "track_id", name="uq_user_track_purchase"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    track_id = Column(Integer, ForeignKey("tracks.id", ondelete="RESTRICT"), nullable=False, index=True)
+    purchased_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())

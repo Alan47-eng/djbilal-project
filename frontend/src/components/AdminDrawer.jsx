@@ -1,9 +1,9 @@
 import React from 'react';
 import {
   Gift,
-  Library,
   LogIn,
   LogOut,
+  Library,
   UserPlus,
   X,
 } from 'lucide-react';
@@ -28,7 +28,6 @@ const AdminDrawer = ({ isOpen, onClose, activeTab, onNavigate, onOpenAuth, onLog
   const menuItems = [
     { id: 'albums', label: 'Albums', icon: <Library size={16} /> },
     { id: 'free', label: 'Free', icon: <Gift size={16} /> },
-    ...(user ? [{ id: 'library', label: 'My Library', icon: <Library size={16} /> }] : []),
   ];
 
   return (

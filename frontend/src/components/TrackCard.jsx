@@ -1,5 +1,5 @@
 import React from 'react';
-import { Play, ShoppingCart, Download, BadgeCheck, Gift } from 'lucide-react';
+import { Play, ShoppingCart, Download, Gift } from 'lucide-react';
 import { resolveAssetUrl } from '../api';
 import { useLanguage } from '../context/LanguageContext';
 
@@ -52,21 +52,17 @@ function buildCoverArt(track) {
 const TrackCard = ({
   track,
   onPlay,
-  onAddToCart,
   onDownload,
-  isPurchased,
-  isInCart,
+  onAddToCart,
 }) => {
   const { lang } = useLanguage();
   const isFree = track.is_free === true;
-  const canDownloadDirectly = isFree || isPurchased;
+  const canDownloadDirectly = isFree;
   const t = {
     playPreview: lang === 'ar' ? 'تشغيل المعاينة' : 'Play preview',
     downloadTrack: lang === 'ar' ? 'تنزيل التراك' : 'Download track',
-    addToCart: lang === 'ar' ? 'أضف إلى السلة' : 'Add to cart',
-    addedToCart: lang === 'ar' ? 'أُضيف إلى السلة' : 'Added to cart',
+    buy: lang === 'ar' ? 'أضف إلى السلة' : 'Add to cart',
     free: lang === 'ar' ? 'مجاني' : 'Free',
-    purchased: lang === 'ar' ? 'تم الشراء' : 'Purchased',
     download: lang === 'ar' ? 'تنزيل' : 'Download',
   };
 
@@ -104,12 +100,11 @@ const TrackCard = ({
             <button
               type="button"
               onClick={() => onAddToCart(track)}
-              disabled={isInCart}
               className="rounded-full bg-violet-600 p-4 text-white transition-all duration-200 hover:scale-105 hover:bg-violet-700 disabled:cursor-wait disabled:opacity-60"
-              title={isInCart ? t.addedToCart : t.addToCart}
-              aria-label={isInCart ? t.addedToCart : t.addToCart}
+              title={t.buy}
+              aria-label={t.buy}
             >
-              {isInCart ? <BadgeCheck size={24} /> : <ShoppingCart size={24} />}
+              <ShoppingCart size={24} />
             </button>
           )}
         </div>
@@ -142,11 +137,6 @@ const TrackCard = ({
               <Gift size={16} />
               {t.free}
             </span>
-          ) : isPurchased ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-violet-500/15 px-3 py-1 text-sm font-semibold text-violet-300">
-              <BadgeCheck size={16} />
-              {t.purchased}
-            </span>
           ) : (
             <span className="text-xl font-bold text-violet-200">
               ${track.price.toFixed(2)}
@@ -168,11 +158,10 @@ const TrackCard = ({
             <button
               type="button"
               onClick={() => onAddToCart(track)}
-              disabled={isInCart}
               className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-violet-600 px-4 py-3 text-sm font-semibold text-white hover:bg-violet-700 disabled:cursor-wait disabled:opacity-60"
             >
-              {isInCart ? <BadgeCheck size={16} /> : <ShoppingCart size={16} />}
-              {isInCart ? t.addedToCart : t.addToCart}
+              <ShoppingCart size={16} />
+              {t.buy}
             </button>
           )}
         </div>

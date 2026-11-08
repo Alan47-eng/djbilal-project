@@ -4,10 +4,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from .. import auth, schemas
 from ..database import get_session
-from ..dependencies import get_purchase_service, get_storage_service, get_track_service
+from ..dependencies import get_storage_service, get_track_service
 from ..interfaces import BaseStorageService
 from ..models import Track, User
-from ..services import TrackService, PurchaseService
+from ..services import TrackService
 from ..utils import (
     AUDIO_EXTENSIONS,
     IMAGE_EXTENSIONS,
@@ -33,9 +33,6 @@ def _track_response(track: Track) -> schemas.TrackResponse:
             "artist": track.artist,
             "price": track.price,
             "cover_image_url": normalize_media_url(track.cover_image_url),
-            "external_product_id": track.external_product_id,
-            "gumroad_url": track.gumroad_url,
-            "gumroad_product_id": track.gumroad_product_id,
             "album_id": track.album_id,
             "preview_url": normalize_media_url(track.preview_url),
             "is_free": track.is_free,
@@ -63,10 +60,7 @@ async def upload_track(
     artist: str = Form(...),
     category: str = Form(...),
     price: float | None = Form(None),
-    gumroad_url: str | None = Form(None),
-    gumroad_product_id: str | None = Form(None),
     album_id: int | None = Form(None),
-    external_product_id: str | None = Form(None),
     is_free: bool = Form(False),
     free_download_url: str | None = Form(None),
     track_file: UploadFile = File(...),
@@ -132,9 +126,6 @@ async def upload_track(
             artist=artist,
             category=category,
             price=price,
-            external_product_id=external_product_id,
-            gumroad_url=gumroad_url,
-            gumroad_product_id=gumroad_product_id,
             album_id=album_id,
             is_free=is_free,
             free_download_url=free_download_url,
@@ -240,81 +231,6 @@ async def free_download_track_file(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="This track is not available for free download",
         )
-    if is_r2_object_key(track.full_file_path):
-        return RedirectResponse(
-            url=storage_service.generate_signed_url(track.full_file_path),
-            status_code=302,
-        )
-
-    file_path = resolve_uploaded_file_path(track.full_file_path, "tracks")
-    return FileResponse(
-        path=file_path,
-        filename=file_path.name,
-        media_type="application/octet-stream",
-    )
-
-
-@router.post("/{track_id}/checkout")
-async def create_checkout(
-    track_id: int,
-    current_user: User = Depends(auth.get_current_user),
-    session: AsyncSession = Depends(get_session),
-    track_service: TrackService = Depends(get_track_service),
-) -> dict[str, int | str]:
-    return await track_service.create_checkout(session, track_id, current_user)
-
-
-@router.get("/{track_id}/download", response_model=schemas.DownloadResponse)
-async def download_track(
-    track_id: int,
-    current_user: User = Depends(auth.get_current_user),
-    session: AsyncSession = Depends(get_session),
-    track_service: TrackService = Depends(get_track_service),
-    purchase_service: PurchaseService = Depends(get_purchase_service),
-    storage_service: BaseStorageService = Depends(get_storage_service),
-) -> schemas.DownloadResponse:
-    track = await track_service.get_track(session, track_id)
-    if not await purchase_service.can_download(session, current_user.id, track_id):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You must purchase this track before downloading it",
-        )
-
-    if is_r2_object_key(track.full_file_path):
-        return schemas.DownloadResponse.model_validate(
-            {
-                "track_id": track.id,
-                "full_file_path": track.full_file_path,
-                "download_url": storage_service.generate_signed_url(track.full_file_path),
-            }
-        )
-
-    download_url = normalize_media_url(track.full_file_path)
-    return schemas.DownloadResponse.model_validate(
-        {
-            "track_id": track.id,
-            "full_file_path": download_url,
-            "download_url": download_url,
-        }
-    )
-
-
-@router.get("/{track_id}/download-file", response_model=None)
-async def download_track_file(
-    track_id: int,
-    current_user: User = Depends(auth.get_current_user),
-    session: AsyncSession = Depends(get_session),
-    track_service: TrackService = Depends(get_track_service),
-    purchase_service: PurchaseService = Depends(get_purchase_service),
-    storage_service: BaseStorageService = Depends(get_storage_service),
-) -> FileResponse | RedirectResponse:
-    track = await track_service.get_track(session, track_id)
-    if not await purchase_service.can_download(session, current_user.id, track_id):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You must purchase this track before downloading it",
-        )
-
     if is_r2_object_key(track.full_file_path):
         return RedirectResponse(
             url=storage_service.generate_signed_url(track.full_file_path),

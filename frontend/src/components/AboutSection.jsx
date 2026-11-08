@@ -111,10 +111,10 @@ const AboutSection = () => {
 
 DJ Bilal Hamsho هو مشروع موسيقي متكامل يجمع بين DJing، Music Production، Remixing، Performance والتعليم الموسيقي، بخبرة تتجاوز عقدين من الزمن وحضور رقمي واسع، مع توجه مستمر نحو تطوير الموسيقى العربية وتقديمها بأسلوب إلكتروني عصري.`
       : 'Hi! I am DJ Bilal — a production artist with years of experience across live stages and studio sessions. I create professional beats and instrumentals across a wide range of styles, from electronic music to hip-hop. Every track is carefully mixed and mastered to deliver top-level quality. Whether you want a ready-to-use beat or a custom offer for your project, you are in the right place.',
-    howWorks: lang === 'ar' ? 'طريقة الشراء' : 'How purchase works',
+    howWorks: lang === 'ar' ? 'استمع وتصفّح' : 'Listen and explore',
     howWorksDesc: lang === 'ar'
-      ? 'اختر التراك، أكمل الدفع، ثم نزّل الملف المرخّص مباشرة.'
-      : 'Choose a track, complete payment, and instantly download your licensed audio file.',
+      ? 'استمع إلى معاينات المقاطع وتصفّح الإصدارات والتنزيلات المجانية.'
+      : 'Listen to track previews and explore releases and free downloads.',
     contact: lang === 'ar' ? 'التواصل' : 'Contact',
     years: lang === 'ar' ? 'سنوات الخبرة' : 'Years of Experience',
     released: lang === 'ar' ? 'إصدارات الإيقاعات' : 'Released Beats',

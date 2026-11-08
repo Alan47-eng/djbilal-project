@@ -1,29 +1,25 @@
 """Business logic layer - Service classes for domain operations."""
 import io
 import logging
-from decimal import Decimal, ROUND_HALF_UP
 
 from fastapi import HTTPException, status
 from pydantic import ValidationError
 from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.exc import IntegrityError
 
 from . import auth, schemas
-from .adapters.gumroad import GumroadService
 from .interfaces import BaseStorageService
-from .models import Album, GumroadSale, User, Track, Purchase
-from .repositories import PurchaseDetailData, PurchaseRepository, TrackRepository, UserRepository
+from .models import Album, User, Track
+from .repositories import TrackRepository, UserRepository
 from .utils import (
     build_storage_name,
-    build_gumroad_checkout_url,
     validate_upload_data,
     AUDIO_EXTENSIONS,
     IMAGE_EXTENSIONS,
     MAX_TRACK_UPLOAD_BYTES,
     MAX_PREVIEW_UPLOAD_BYTES,
     MAX_COVER_UPLOAD_BYTES,
-    generate_license_pdf,
 )
 
 logger = logging.getLogger(__name__)
@@ -184,9 +180,6 @@ class TrackService:
             artist=track_data.artist,
             price=track_data.price,
             cover_image_url=track_data.cover_image_url,
-            external_product_id=track_data.external_product_id,
-            gumroad_url=track_data.gumroad_url,
-            gumroad_product_id=track_data.gumroad_product_id,
             album_id=track_data.album_id,
             preview_url=track_data.preview_url,
             full_file_path=track_data.full_file_path,
@@ -226,14 +219,6 @@ class TrackService:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Album not found",
-            )
-
-        if "external_product_id" in update_values and "gumroad_url" not in update_values:
-            legacy_product_id = update_values.pop("external_product_id")
-            update_values["gumroad_url"] = (
-                f"https://djbilal.gumroad.com/l/{legacy_product_id.strip()}"
-                if isinstance(legacy_product_id, str) and legacy_product_id.strip()
-                else None
             )
 
         category_value = update_values.get("category")
@@ -289,9 +274,16 @@ class TrackService:
         return track
 
     async def delete_track(self, session: AsyncSession, track_id: int) -> None:
-        """Delete a track and its purchase records via cascade."""
+        """Delete a track."""
         track = await self.get_track(session, track_id)
-        await self.repo.delete(session, track)
+        try:
+            await self.repo.delete(session, track)
+        except IntegrityError as exc:
+            await session.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Tracks in an order or user library cannot be deleted",
+            ) from exc
 
     async def upload_track(
         self,
@@ -301,9 +293,6 @@ class TrackService:
         artist: str,
         category: str,
         price: float | None,
-        external_product_id: str | None,
-        gumroad_url: str | None,
-        gumroad_product_id: str | None,
         album_id: int | None,
         is_free: bool,
         free_download_url: str | None,
@@ -327,9 +316,6 @@ class TrackService:
                 title=title.strip(),
                 artist=artist.strip(),
                 price=normalized_price,
-                external_product_id=None if is_free else external_product_id,
-                gumroad_url=None if is_free else gumroad_url,
-                gumroad_product_id=None if is_free else gumroad_product_id,
                 album_id=album_id,
                 preview_url="/media/previews/pending.mp3",
                 full_file_path="/media/tracks/pending.mp3",
@@ -353,14 +339,6 @@ class TrackService:
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail=detail,
             ) from exc
-        if not track_data.is_free and not (
-            track_data.gumroad_url
-            or track_data.external_product_id
-        ):
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="A Gumroad product URL is required for paid tracks",
-            )
         track_bytes = track_file
         preview_bytes = preview_file
         cover_bytes = cover_file
@@ -433,324 +411,3 @@ class TrackService:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Track upload failed while storing files or saving track metadata",
             ) from exc
-
-    async def create_checkout(
-        self, session: AsyncSession, track_id: int, current_user: User
-    ) -> dict[str, int | str]:
-        """Create checkout URL for one paid track."""
-        track = await self.get_track(session, track_id)
-        if track.is_free:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="This track is free to download",
-            )
-
-        checkout_url = self._build_gumroad_checkout_url(
-            track,
-            current_user,
-        )
-
-        return {
-            "track_id": track.id,
-            "checkout_url": checkout_url,
-        }
-
-    @staticmethod
-    def _build_gumroad_checkout_url(track: Track, current_user: User) -> str:
-        product_value = (track.gumroad_url or track.external_product_id or "").strip()
-        canonical_permalink = GumroadService.normalize_product_permalink(product_value)
-        if not canonical_permalink:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"A valid Gumroad product URL is required for track {track.id}",
-            )
-        product_url = f"https://djbilal.gumroad.com/l/{canonical_permalink}"
-        return build_gumroad_checkout_url(
-            product_url,
-            user_id=current_user.id,
-            track_ids=[track.id],
-            signature=GumroadService.checkout_signature(
-                current_user.id,
-                track.id,
-                canonical_permalink,
-            ),
-        )
-
-
-class PurchaseService:
-    """Handle purchase-related business logic."""
-
-    def __init__(
-        self,
-        gumroad_service: GumroadService,
-        track_service: TrackService,
-    ) -> None:
-        self.repo = PurchaseRepository()
-        self.track_service = track_service
-        self.gumroad_service = gumroad_service
-
-    async def get_user_purchases(self, session: AsyncSession, user_id: int) -> list[int]:
-        """Get user's purchased track IDs."""
-        return await self.repo.get_user_purchases(session, user_id)
-
-    async def record_purchase(
-        self, session: AsyncSession, user_id: int, track_id: int, license_type: str | None = None
-    ) -> Purchase:
-        """Record a purchase."""
-        await self.track_service.get_track(session, track_id)
-
-        existing = await self.repo.get_purchase(session, user_id, track_id)
-        if existing:
-            return existing
-
-        return await self.repo.create(
-            session,
-            user_id=user_id,
-            track_id=track_id,
-            license_type=license_type,
-        )
-
-    async def get_user_purchases_detailed(
-        self, session: AsyncSession, user_id: int
-    ) -> list[PurchaseDetailData]:
-        """Get detailed purchase list with track info."""
-        return await self.repo.get_user_purchases_detailed(session, user_id)
-
-    async def can_download(
-        self, session: AsyncSession, user_id: int, track_id: int
-    ) -> bool:
-        """Check if user can download track."""
-        return await self.repo.has_purchased(session, user_id, track_id)
-
-    async def process_gumroad_ping(
-        self,
-        session: AsyncSession,
-        payload: dict[str, str],
-    ) -> dict[str, str | list[int]]:
-        """Verify a Gumroad sale and add its paid tracks to the buyer's library."""
-        ignored_reason = self.gumroad_service.ignored_ping_reason(payload)
-        if ignored_reason:
-            logger.info("Ignoring Gumroad notification: %s", ignored_reason)
-            return {"status": "ignored", "purchase_ids": []}
-
-        custom_data = self.gumroad_service.extract_checkout_data(payload)
-        user_id_value = custom_data.get("user_id")
-        track_ids_value = custom_data.get("track_ids")
-        signature = custom_data.get("signature")
-        logger.info(
-            "Gumroad checkout context extracted: user_present=%s "
-            "track_ids_present=%s signature_present=%s",
-            bool(user_id_value),
-            bool(track_ids_value),
-            bool(signature),
-        )
-        has_user_id = bool(user_id_value)
-        has_signature = bool(signature)
-        if has_user_id != has_signature:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Incomplete Gumroad checkout signature context",
-            )
-
-        sale = await self.gumroad_service.verify_sale(payload)
-        logger.info(
-            "Gumroad sale verified: permalink_present=%s product_id_present=%s "
-            "buyer_email_present=%s",
-            bool(sale.get("product_permalink")),
-            bool(sale.get("product_id")),
-            bool(sale.get("email")),
-        )
-        existing_sale = await session.get(GumroadSale, sale["sale_id"])
-        if existing_sale:
-            return {"status": "duplicate", "purchase_ids": []}
-
-        user_repository = UserRepository()
-        if has_user_id:
-            try:
-                user_id = int(user_id_value)
-            except ValueError as exc:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Gumroad buyer information contains an invalid user ID",
-                ) from exc
-            if user_id <= 0:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Gumroad buyer information contains an invalid user ID",
-                )
-            user = await user_repository.get_by_id(session, user_id)
-        else:
-            buyer_email = sale.get("email", "").strip().lower()
-            user = (
-                await user_repository.get_by_email(session, buyer_email)
-                if buyer_email
-                else None
-            )
-            if user and not user.email_verified:
-                user = None
-
-        if not user:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Verified Gumroad buyer account was not found",
-            )
-        user_id = user.id
-
-        product_permalink = GumroadService.normalize_product_permalink(
-            sale.get("product_permalink", "")
-        )
-        product_id = sale.get("product_id")
-        tracks_result = await session.execute(
-            select(Track).where(
-                Track.is_free.is_(False),
-            )
-        )
-        matching_tracks = [
-            track
-            for track in tracks_result.scalars().all()
-            if (
-                product_id
-                and track.gumroad_product_id == product_id
-            )
-            or (
-                product_permalink
-                and product_permalink
-                == GumroadService.normalize_product_permalink(
-                    track.gumroad_url or track.external_product_id or ""
-                )
-            )
-        ]
-        logger.info(
-            "Gumroad product mapping completed: match_count=%s",
-            len(matching_tracks),
-        )
-        if len(matching_tracks) != 1:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Gumroad product does not match exactly one paid track",
-            )
-        track = matching_tracks[0]
-        if track_ids_value:
-            try:
-                requested_track_ids = [
-                    int(value.strip()) for value in track_ids_value.split(",")
-                ]
-            except ValueError as exc:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Gumroad checkout contains invalid track IDs",
-                ) from exc
-            if requested_track_ids != [track.id]:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Gumroad checkout track does not match the purchased product",
-                )
-        if track.is_free:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Gumroad cart can only grant paid tracks",
-            )
-
-        track_permalink = GumroadService.normalize_product_permalink(
-            track.gumroad_url or track.external_product_id or ""
-        )
-        if product_permalink is not None and product_permalink != track_permalink:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Gumroad sale product does not match the requested track",
-            )
-        expected_cents = int(
-            (Decimal(str(track.price)) * 100).quantize(
-                Decimal("1"),
-                rounding=ROUND_HALF_UP,
-            )
-        )
-        if int(sale["price"]) != expected_cents:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Gumroad sale amount does not match the track price",
-            )
-        if has_signature:
-            signature_valid = self.gumroad_service.verify_checkout_signature(
-                user_id=user_id,
-                track_id=track.id,
-                product_permalink=track_permalink or product_id or "",
-                signature=signature,
-            )
-            logger.info("Gumroad checkout signature validation: valid=%s", signature_valid)
-            if not signature_valid:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Invalid Gumroad checkout signature",
-                )
-        else:
-            logger.info(
-                "Gumroad purchase matched to a verified buyer email and product"
-            )
-
-        license_type = custom_data.get("license_type")
-        session.add(
-            GumroadSale(
-                sale_id=sale["sale_id"],
-                user_id=user_id,
-                track_ids=[track.id],
-                paid_cents=int(sale["price"]),
-            )
-        )
-        purchases: list[Purchase] = []
-        existing_purchase_ids: list[int] = []
-        for resolved_track_id in [track.id]:
-            purchase = await self.repo.get_purchase(
-                session, user_id, resolved_track_id
-            )
-            if purchase:
-                existing_purchase_ids.append(purchase.id)
-                continue
-            purchase = Purchase(user_id=user_id, track_id=resolved_track_id)
-            if license_type is not None:
-                purchase.license_type = license_type
-            session.add(purchase)
-            purchases.append(purchase)
-
-        try:
-            await session.flush()
-            purchase_ids = existing_purchase_ids + [
-                purchase.id for purchase in purchases
-            ]
-            await session.commit()
-        except IntegrityError:
-            await session.rollback()
-            if await session.get(GumroadSale, sale["sale_id"]):
-                return {"status": "duplicate", "purchase_ids": []}
-            raise
-
-        logger.info("Gumroad purchase recorded: track_count=%s", len(purchase_ids))
-        return {"status": "ok", "purchase_ids": purchase_ids}
-
-    async def generate_license_document(
-        self,
-        session: AsyncSession,
-        current_user: User,
-        purchase_id: int,
-    ) -> tuple[bytes, str]:
-        """Generate PDF license file for a user's purchase."""
-        row = await self.repo.get_purchase_with_track_for_user(session, current_user.id, purchase_id)
-        if not row:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Purchase not found",
-            )
-
-        purchase, track = row
-        buyer_name = (current_user.full_name or "").strip() or current_user.email
-        pdf_bytes = generate_license_pdf(
-            purchase_id=purchase.id,
-            buyer_name=buyer_name,
-            buyer_email=current_user.email,
-            track_title=track.title,
-            track_artist=track.artist,
-            license_type=purchase.license_type or "Standard",
-            purchased_at=purchase.created_at,
-        )
-        filename = f"license-{purchase.id}.pdf"
-        return pdf_bytes, filename

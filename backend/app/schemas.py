@@ -2,90 +2,11 @@ import re
 import math
 from datetime import date, datetime
 from typing import Literal
-from urllib.parse import urlparse, urlunsplit
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
 PAID_TRACK_CATEGORIES = {"edit", "remix"}
 FREE_TRACK_CATEGORIES = {"remix", "simple-pack", "vst"}
 ALL_TRACK_CATEGORIES = PAID_TRACK_CATEGORIES | FREE_TRACK_CATEGORIES
-
-
-def _validate_external_product_id(value: str | None) -> str | None:
-    if value is None:
-        return value
-    normalized = value.strip()
-    if not normalized:
-        raise ValueError('External product ID cannot be empty')
-    if len(normalized) > 1024:
-        raise ValueError('External product ID is too long')
-    if "://" not in normalized:
-        if not re.fullmatch(r"[A-Za-z0-9_-]+", normalized):
-            raise ValueError('Enter a Gumroad product permalink or URL')
-        return normalized
-
-    try:
-        parsed = urlparse(normalized)
-        port = parsed.port
-    except ValueError as exc:
-        raise ValueError('External product ID must be a valid Gumroad URL') from exc
-
-    hostname = (parsed.hostname or "").lower()
-    path_parts = [part for part in parsed.path.split("/") if part]
-    if (
-        parsed.scheme != "https"
-        or not (hostname == "gumroad.com" or hostname.endswith(".gumroad.com"))
-        or len(path_parts) != 2
-        or path_parts[0] != "l"
-        or not re.fullmatch(r"[A-Za-z0-9_-]+", path_parts[1])
-        or parsed.username is not None
-        or parsed.password is not None
-        or port not in (None, 443)
-    ):
-        raise ValueError('Enter a valid Gumroad product URL such as https://gumroad.com/l/product')
-
-    return path_parts[1]
-
-
-def _validate_gumroad_url(value: str | None) -> str | None:
-    if value is None:
-        return value
-    normalized = value.strip()
-    if not normalized:
-        raise ValueError("Gumroad URL cannot be empty")
-    if "://" not in normalized and re.fullmatch(r"[A-Za-z0-9_-]+", normalized):
-        return f"https://djbilal.gumroad.com/l/{normalized}"
-
-    try:
-        parsed = urlparse(normalized)
-        port = parsed.port
-    except ValueError as exc:
-        raise ValueError("Gumroad URL must be a valid product URL") from exc
-
-    hostname = (parsed.hostname or "").lower()
-    path_parts = [part for part in parsed.path.split("/") if part]
-    if (
-        parsed.scheme != "https"
-        or not (hostname == "gumroad.com" or hostname.endswith(".gumroad.com"))
-        or len(path_parts) != 2
-        or path_parts[0] != "l"
-        or not re.fullmatch(r"[A-Za-z0-9_-]+", path_parts[1])
-        or parsed.username is not None
-        or parsed.password is not None
-        or port not in (None, 443)
-    ):
-        raise ValueError(
-            "Enter a valid Gumroad product URL such as https://djbilal.gumroad.com/l/product"
-        )
-    return urlunsplit((parsed.scheme, parsed.netloc, parsed.path, "", ""))
-
-
-def _validate_gumroad_product_id(value: str | None) -> str | None:
-    if value is None:
-        return value
-    normalized = value.strip()
-    if not normalized or len(normalized) > 255 or not normalized.isdecimal():
-        raise ValueError("Gumroad product ID must contain only digits")
-    return normalized
 
 
 class DTO(BaseModel):
@@ -218,9 +139,6 @@ class TrackCreate(DTO):
     artist: str
     price: float
     cover_image_url: str | None = None
-    external_product_id: str | None = None
-    gumroad_url: str | None = None
-    gumroad_product_id: str | None = None
     album_id: int | None = None
     preview_url: str
     full_file_path: str
@@ -275,21 +193,6 @@ class TrackCreate(DTO):
             raise ValueError('Paid tracks must use category: edit or remix')
         return self
 
-    @field_validator('external_product_id')
-    @classmethod
-    def validate_external_product_id(cls, value: str | None) -> str | None:
-        return _validate_external_product_id(value)
-
-    @field_validator("gumroad_url")
-    @classmethod
-    def validate_gumroad_url(cls, value: str | None) -> str | None:
-        return _validate_gumroad_url(value)
-
-    @field_validator("gumroad_product_id")
-    @classmethod
-    def validate_gumroad_product_id(cls, value: str | None) -> str | None:
-        return _validate_gumroad_product_id(value)
-
     @field_validator('cover_image_url', 'preview_url', 'full_file_path', 'free_download_url')
     @classmethod
     def urls_not_empty(cls, v: str | None) -> str | None:
@@ -304,9 +207,6 @@ class TrackUpdate(DTO):
     artist: str | None = None
     price: float | None = None
     cover_image_url: str | None = None
-    external_product_id: str | None = None
-    gumroad_url: str | None = None
-    gumroad_product_id: str | None = None
     album_id: int | None = None
     preview_url: str | None = None
     is_free: bool | None = None
@@ -350,21 +250,6 @@ class TrackUpdate(DTO):
             raise ValueError("album_id must be a positive integer")
         return value
 
-    @field_validator('external_product_id')
-    @classmethod
-    def validate_external_product_id(cls, value: str | None) -> str | None:
-        return _validate_external_product_id(value)
-
-    @field_validator("gumroad_url")
-    @classmethod
-    def validate_gumroad_url(cls, value: str | None) -> str | None:
-        return _validate_gumroad_url(value)
-
-    @field_validator("gumroad_product_id")
-    @classmethod
-    def validate_gumroad_product_id(cls, value: str | None) -> str | None:
-        return _validate_gumroad_product_id(value)
-
     @field_validator('cover_image_url', 'preview_url', 'free_download_url')
     @classmethod
     def urls_not_empty(cls, v: str | None) -> str | None:
@@ -381,9 +266,6 @@ class TrackResponse(DTO):
     artist: str
     price: float
     cover_image_url: str | None = None
-    external_product_id: str | None = None
-    gumroad_url: str | None = None
-    gumroad_product_id: str | None = None
     album_id: int | None = None
     preview_url: str
     is_free: bool = False
@@ -392,36 +274,6 @@ class TrackResponse(DTO):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True, extra="forbid")
-
-    @field_validator("external_product_id")
-    @classmethod
-    def validate_external_product_id(cls, value: str | None) -> str | None:
-        return _validate_external_product_id(value)
-
-    @field_validator("gumroad_url")
-    @classmethod
-    def validate_gumroad_url(cls, value: str | None) -> str | None:
-        return _validate_gumroad_url(value)
-
-    @field_validator("gumroad_product_id")
-    @classmethod
-    def validate_gumroad_product_id(cls, value: str | None) -> str | None:
-        return _validate_gumroad_product_id(value)
-
-
-class PurchaseDetail(DTO):
-    id: int
-    track_id: int
-    track_title: str
-    track_artist: str
-    cover_image_url: str | None = None
-    download_url: str
-    license_pdf_url: str
-    license_type: str | None = None
-    purchased_at: datetime
-
-    model_config = ConfigDict(from_attributes=True, extra="forbid")
-
 
 class DownloadResponse(DTO):
     track_id: int

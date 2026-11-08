@@ -1,66 +1,6 @@
-import { useCallback, useRef, useState } from 'react';
+import { useState } from 'react';
 import api from '../api';
-import { useAuth } from '../context/AuthContext';
 import { getApiErrorMessage } from '../utils/errors';
-
-export function useCheckout() {
-  const { user } = useAuth();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const activeRequests = useRef(0);
-
-  const checkout = useCallback(async (trackId) => {
-    if (!user) {
-      setError('You must be logged in to purchase');
-      return null;
-    }
-
-    try {
-      activeRequests.current += 1;
-      setLoading(true);
-      setError(null);
-      const response = await api.post(`/tracks/${trackId}/checkout`);
-      return response.data.checkout_url;
-    } catch (err) {
-      const errorMsg = getApiErrorMessage(err, 'Checkout failed');
-      setError(errorMsg);
-      return null;
-    } finally {
-      activeRequests.current -= 1;
-      setLoading(activeRequests.current > 0);
-    }
-  }, [user]);
-
-  return { checkout, loading, error };
-}
-
-export function useDownload() {
-  const { user } = useAuth();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-
-  const download = async (trackId) => {
-    if (!user) {
-      setError('You must be logged in to download');
-      return null;
-    }
-
-    try {
-      setLoading(true);
-      setError(null);
-      const response = await api.get(`/tracks/${trackId}/download`);
-      return response.data.download_url;
-    } catch (err) {
-      const errorMsg = getApiErrorMessage(err, 'Download failed');
-      setError(errorMsg);
-      return null;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return { download, loading, error };
-}
 
 export function useTrackUpload() {
   const [loading, setLoading] = useState(false);

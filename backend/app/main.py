@@ -18,10 +18,9 @@ from .routers import (
     media_router,
     password_reset_router,
     profile_router,
-    purchases_router,
+    shopier_router,
     system_router,
     tracks_router,
-    webhooks_router,
 )
 
 
@@ -52,5 +51,4 @@ app.include_router(albums_router)
 app.include_router(password_reset_router)
 app.include_router(profile_router)
 app.include_router(tracks_router)
-app.include_router(purchases_router)
-app.include_router(webhooks_router)
+app.include_router(shopier_router)

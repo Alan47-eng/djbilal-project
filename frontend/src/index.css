@@ -69,12 +69,3 @@ html {
   content: '';
   pointer-events: none;
 }
-
-a[href*="gumroad.com"] svg.gumroad-button-logo,
-.gumroad-button-logo {
-  display: none !important;
-}
-
-a[href*="gumroad.com"] .logo-full {
-  display: none !important;
-}
