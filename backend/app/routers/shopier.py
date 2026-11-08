@@ -38,10 +38,6 @@ class ShopierCheckoutRequest(schemas.DTO):
     billing_city: str = Field(min_length=1, max_length=100)
     billing_country: str = Field(min_length=2, max_length=100)
     billing_postcode: str = Field(min_length=1, max_length=20)
-    shipping_address: str = Field(min_length=1, max_length=500)
-    shipping_city: str = Field(min_length=1, max_length=100)
-    shipping_country: str = Field(min_length=2, max_length=100)
-    shipping_postcode: str = Field(min_length=1, max_length=20)
     current_language: str = Field(default="en", pattern="^(en|tr)$")
 
 
@@ -201,10 +197,10 @@ async def initiate_shopier_checkout(
         "billing_city": checkout.billing_city.strip(),
         "billing_country": checkout.billing_country.strip(),
         "billing_postcode": checkout.billing_postcode.strip(),
-        "shipping_address": checkout.shipping_address.strip(),
-        "shipping_city": checkout.shipping_city.strip(),
-        "shipping_country": checkout.shipping_country.strip(),
-        "shipping_postcode": checkout.shipping_postcode.strip(),
+        "shipping_address": checkout.billing_address.strip(),
+        "shipping_city": checkout.billing_city.strip(),
+        "shipping_country": checkout.billing_country.strip(),
+        "shipping_postcode": checkout.billing_postcode.strip(),
         "total_order_value": total_order_value,
         "currency": str(currency),
         "platform": "0",

@@ -28,10 +28,6 @@ CHECKOUT = {
     "billing_city": "Istanbul",
     "billing_country": "Turkey",
     "billing_postcode": "34000",
-    "shipping_address": "Test street 1",
-    "shipping_city": "Istanbul",
-    "shipping_country": "Turkey",
-    "shipping_postcode": "34000",
     "current_language": "en",
 }
 

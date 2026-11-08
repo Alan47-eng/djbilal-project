@@ -12,10 +12,6 @@ const EMPTY_FORM = {
   billing_city: '',
   billing_country: '',
   billing_postcode: '',
-  shipping_address: '',
-  shipping_city: '',
-  shipping_country: '',
-  shipping_postcode: '',
   current_language: 'en',
 };
 
@@ -31,7 +27,6 @@ export default function ShopierCheckoutModal({
   const { lang } = useLanguage();
   const isArabic = lang === 'ar';
   const [form, setForm] = useState(EMPTY_FORM);
-  const [sameShipping, setSameShipping] = useState(true);
   const [error, setError] = useState('');
   const [checkoutForm, setCheckoutForm] = useState(null);
   const paymentFormRef = useRef(null);
@@ -46,12 +41,11 @@ export default function ShopierCheckoutModal({
     idNumber: isArabic ? 'رقم الهوية' : 'National ID / tax number',
     phone: isArabic ? 'رقم الهاتف' : 'Phone',
     billing: isArabic ? 'عنوان الفواتير' : 'Billing address',
-    shipping: isArabic ? 'عنوان الشحن' : 'Shipping address',
     address: isArabic ? 'العنوان' : 'Address',
     city: isArabic ? 'المدينة' : 'City',
     country: isArabic ? 'الدولة' : 'Country',
     postcode: isArabic ? 'الرمز البريدي' : 'Postcode',
-    sameShipping: isArabic ? 'استخدم عنوان الفواتير للشحن' : 'Use billing address for shipping',
+    billingNote: isArabic ? 'سيُستخدم هذا العنوان أيضاً كعنوان شحن في بيانات الطلب.' : 'This same real address will also be sent as the shipping address in the order details.',
     checkout: isArabic ? 'المتابعة إلى الدفع' : 'Continue to payment',
     working: isArabic ? 'جارٍ التحضير...' : 'Preparing checkout...',
     close: isArabic ? 'إغلاق' : 'Close',
@@ -91,30 +85,12 @@ export default function ShopierCheckoutModal({
     setForm((current) => ({ ...current, [name]: value }));
   };
 
-  const handleSameShippingChange = (event) => {
-    const checked = event.target.checked;
-    setSameShipping(checked);
-    if (checked) {
-      setForm((current) => ({
-        ...current,
-        shipping_address: current.billing_address,
-        shipping_city: current.billing_city,
-        shipping_country: current.billing_country,
-        shipping_postcode: current.billing_postcode,
-      }));
-    }
-  };
-
   const handleSubmit = async (event) => {
     event.preventDefault();
     setError('');
     const payload = {
       track_ids: tracks.map((track) => track.id),
       ...form,
-      shipping_address: sameShipping ? form.billing_address : form.shipping_address,
-      shipping_city: sameShipping ? form.billing_city : form.shipping_city,
-      shipping_country: sameShipping ? form.billing_country : form.shipping_country,
-      shipping_postcode: sameShipping ? form.billing_postcode : form.shipping_postcode,
       current_language: lang === 'ar' ? 'en' : lang,
     };
 
@@ -190,6 +166,7 @@ export default function ShopierCheckoutModal({
 
               <fieldset className="space-y-3">
                 <legend className="mb-2 font-semibold text-white">{text.buyer}</legend>
+                <p className="text-xs text-slate-400">{user?.email}</p>
                 <div className="grid gap-3 sm:grid-cols-2">
                   {field('buyer_name', text.firstName, { autoComplete: 'given-name', maxLength: 100 })}
                   {field('buyer_surname', text.lastName, { autoComplete: 'family-name', maxLength: 100 })}
@@ -200,6 +177,7 @@ export default function ShopierCheckoutModal({
 
               <fieldset className="space-y-3">
                 <legend className="mb-2 font-semibold text-white">{text.billing}</legend>
+                <p className="text-xs text-slate-400">{text.billingNote}</p>
                 <div className="grid gap-3 sm:grid-cols-2">
                   {field('billing_address', text.address, { autoComplete: 'billing street-address' })}
                   {field('billing_city', text.city, { autoComplete: 'billing address-level2', maxLength: 100 })}
@@ -207,22 +185,6 @@ export default function ShopierCheckoutModal({
                   {field('billing_postcode', text.postcode, { autoComplete: 'billing postal-code', maxLength: 20 })}
                 </div>
               </fieldset>
-
-              <label className="flex items-center gap-2 text-sm text-slate-300">
-                <input type="checkbox" checked={sameShipping} onChange={handleSameShippingChange} className="accent-violet-500" />
-                {text.sameShipping}
-              </label>
-              {!sameShipping && (
-                <fieldset className="space-y-3">
-                  <legend className="mb-2 font-semibold text-white">{text.shipping}</legend>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    {field('shipping_address', text.address, { autoComplete: 'shipping street-address' })}
-                    {field('shipping_city', text.city, { autoComplete: 'shipping address-level2', maxLength: 100 })}
-                    {field('shipping_country', text.country, { autoComplete: 'shipping country-name', maxLength: 100 })}
-                    {field('shipping_postcode', text.postcode, { autoComplete: 'shipping postal-code', maxLength: 20 })}
-                  </div>
-                </fieldset>
-              )}
 
               {error && <p role="alert" className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">{error}</p>}
               <div className="flex flex-col-reverse gap-2 border-t border-white/10 pt-4 sm:flex-row sm:justify-end">
