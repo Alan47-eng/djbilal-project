@@ -1,47 +1,54 @@
-import base64
 import asyncio
 import hashlib
 import hmac
+import json
 from datetime import datetime, timezone
 
 import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import func, select
+from sqlalchemy.engine import URL
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app import auth
 from app.database import get_session
 from app.main import app
-from app.models import Base, Order, Purchase, Track, User
-from app.routers.shopier import ShopierCheckoutResponse
-from app.shopier import callback_signature, checkout_signature
+from app.models import (
+    Base,
+    Order,
+    Purchase,
+    ShopierWebhookEvent,
+    Track,
+    User,
+)
 
 
-TEST_SECRET = "shopier-test-secret"
-CHECKOUT = {
-    "track_ids": [1, 2],
-    "current_language": "en",
-}
+TEST_WEBHOOK_TOKEN = "shopier-test-webhook-token"
+TEST_PRODUCT_IDS = ("shopier-product-1", "shopier-product-2")
 
 
 @pytest.fixture
-async def shopier_client(monkeypatch):
+async def shopier_client(monkeypatch, tmp_path):
     previous_session_override = app.dependency_overrides.get(get_session)
-    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    database_url = URL.create(
+        "sqlite+aiosqlite", database=str(tmp_path / "shopier-test.db")
+    )
+    engine = create_async_engine(database_url)
     async with engine.begin() as connection:
         await connection.run_sync(Base.metadata.create_all)
 
-    session_factory = async_sessionmaker(
-        engine, expire_on_commit=False
-    )
+    session_factory = async_sessionmaker(engine, expire_on_commit=False)
 
     async def override_session():
         async with session_factory() as session:
             yield session
 
     app.dependency_overrides[get_session] = override_session
-    monkeypatch.setenv("SHOPIER_API_KEY", "shopier-test-key")
-    monkeypatch.setenv("SHOPIER_API_SECRET", TEST_SECRET)
+    monkeypatch.setenv("SHOPIER_ACCESS_TOKEN", "shopier-test-access-token")
+    monkeypatch.setenv("SHOPIER_WEBHOOK_TOKEN", TEST_WEBHOOK_TOKEN)
+    monkeypatch.setenv(
+        "SHOPIER_WEBHOOK_URL", "https://api.example.com/api/v1/webhooks/shopier"
+    )
 
     async with session_factory() as session:
         user = User(
@@ -63,6 +70,7 @@ async def shopier_client(monkeypatch):
                     full_file_path="tracks/first.mp3",
                     is_free=False,
                     category="edit",
+                    shopier_product_id=TEST_PRODUCT_IDS[0],
                 ),
                 Track(
                     title="Second Track",
@@ -72,6 +80,7 @@ async def shopier_client(monkeypatch):
                     full_file_path="tracks/second.mp3",
                     is_free=False,
                     category="edit",
+                    shopier_product_id=TEST_PRODUCT_IDS[1],
                 ),
             ]
         )
@@ -90,196 +99,273 @@ async def shopier_client(monkeypatch):
     await engine.dispose()
 
 
-async def create_order(client: AsyncClient) -> ShopierCheckoutResponse:
-    response = await client.post("/api/v1/checkout/shopier/init", json=CHECKOUT)
-    assert response.status_code == 200, response.text
-    return ShopierCheckoutResponse.model_validate(response.json())
+def build_order_payload(**overrides):
+    payload = {
+        "id": "shopier-order-123",
+        "status": "unfulfilled",
+        "paymentStatus": "paid",
+        "currency": "USD",
+        "totals": {"subtotal": "7.75", "shipping": "0.00", "total": "7.75"},
+        "shippingInfo": {"email": "shopier-test@example.com"},
+        "lineItems": [
+            {
+                "productId": TEST_PRODUCT_IDS[0],
+                "title": "First Track - DJ Bilal",
+                "type": "digital",
+            },
+            {
+                "productId": TEST_PRODUCT_IDS[1],
+                "title": "Second Track - DJ Bilal",
+                "type": "digital",
+            },
+        ],
+    }
+    payload.update(overrides)
+    return payload
 
 
-async def send_callback(
+async def send_webhook(
     client: AsyncClient,
-    order_id: str,
+    payload: dict[str, object] | None = None,
     *,
-    status_value: str = "success",
-    payment_id: str = "payment-123",
-    random_nr: str = "7654321",
+    event_id: str = "webhook-event-123",
     signature: str | None = None,
 ):
+    raw_body = json.dumps(
+        payload or build_order_payload(), separators=(",", ":"), ensure_ascii=False
+    ).encode("utf-8")
+    expected_signature = hmac.new(
+        TEST_WEBHOOK_TOKEN.encode("utf-8"), raw_body, hashlib.sha256
+    ).hexdigest()
     return await client.post(
         "/api/v1/webhooks/shopier",
-        data={
-            "status": status_value,
-            "platform_order_id": order_id,
-            "payment_id": payment_id,
-            "random_nr": random_nr,
-            "signature": signature
-            or callback_signature(TEST_SECRET, random_nr, order_id),
+        content=raw_body,
+        headers={
+            "Content-Type": "application/json",
+            "Shopier-Event": "order.created",
+            "Shopier-Webhook-Id": event_id,
+            "Shopier-Signature": signature or expected_signature,
         },
     )
 
 
 @pytest.mark.asyncio
-async def test_checkout_creates_pending_order_and_signed_form(shopier_client, monkeypatch):
+async def test_sync_creates_digital_usd_product_and_saves_shopier_url(
+    shopier_client, monkeypatch
+):
     client, session_factory = shopier_client
-    monkeypatch.setenv("SHOPIER_CURRENCY", "0")
-    checkout = await create_order(client)
+    api_calls = []
+    async with session_factory() as session:
+        track = await session.get(Track, 1)
+        assert track is not None
+        track.shopier_product_id = None
+        await session.commit()
 
-    fields = checkout.fields
-    assert checkout.action_url == "https://www.shopier.com/ShowProduct/api_pay4.php"
-    assert checkout.method == "POST"
-    assert fields["total_order_value"] == "7.75"
-    assert fields["currency"] == "1"
-    assert fields["buyer_email"] == "shopier-test@example.com"
-    assert fields["buyer_name"] == "Test"
-    assert fields["buyer_surname"] == "Customer"
-    assert fields["buyer_id_nr"] == "11111111111"
-    assert fields["buyer_phone"] == "0000000000"
-    assert fields["billing_address"] == "Digital Delivery"
-    assert fields["shipping_address"] == "Digital Delivery"
-    assert fields["billing_city"] == "Istanbul"
-    assert fields["billing_country"] == "Turkey"
-    assert fields["billing_postcode"] == "34000"
-    assert fields["signature"] == checkout_signature(
-        TEST_SECRET,
-        fields["random_nr"],
-        checkout.order_id,
-        "7.75",
-        1,
+    async def fake_shopier_api_request(method, path, *, payload=None):
+        api_calls.append((method, path, payload))
+        return {
+            "id": "shopier-product-created",
+            "url": "https://www.shopier.com/123456",
+        }
+
+    monkeypatch.setattr(
+        "app.routers.shopier.shopier_api_request", fake_shopier_api_request
     )
+    response = await client.post("/api/v1/admin/shopier/tracks/1/sync")
+
+    assert response.status_code == 200, response.text
+    assert response.json() == {
+        "product_id": "shopier-product-created",
+        "product_url": "https://www.shopier.com/123456",
+        "currency": "USD",
+    }
+    assert api_calls[0][0:2] == ("POST", "/products")
+    assert api_calls[0][2]["type"] == "digital"
+    assert api_calls[0][2]["priceData"] == {"currency": "USD", "price": "4.25"}
+    assert api_calls[0][2]["media"] == []
+
+    async with session_factory() as session:
+        track = await session.get(Track, 1)
+        assert track is not None
+        assert track.shopier_product_id == "shopier-product-created"
+        assert track.shopier_product_url == "https://www.shopier.com/123456"
+
+
+@pytest.mark.asyncio
+async def test_sync_updates_existing_product_and_rejects_bad_shopier_url(
+    shopier_client, monkeypatch
+):
+    client, _ = shopier_client
+    calls = []
+
+    async def fake_shopier_api_request(method, path, *, payload=None):
+        calls.append((method, path))
+        return {"id": TEST_PRODUCT_IDS[0], "url": "https://attacker.example"}
+
+    monkeypatch.setattr(
+        "app.routers.shopier.shopier_api_request", fake_shopier_api_request
+    )
+    response = await client.post("/api/v1/admin/shopier/tracks/1/sync")
+
+    assert calls == [("PUT", f"/products/{TEST_PRODUCT_IDS[0]}")]
+    assert response.status_code == 502
+
+
+@pytest.mark.asyncio
+async def test_register_webhook_returns_token_for_server_configuration(
+    shopier_client, monkeypatch
+):
+    client, _ = shopier_client
+    calls = []
+
+    async def fake_shopier_api_request(method, path, *, payload=None):
+        calls.append((method, path, payload))
+        return {"id": "hook-1", "token": "new-secret-token"}
+
+    monkeypatch.setattr(
+        "app.routers.shopier.shopier_api_request", fake_shopier_api_request
+    )
+    response = await client.post("/api/v1/admin/shopier/webhooks/order-created")
+
+    assert response.status_code == 200
+    assert calls == [
+        (
+            "POST",
+            "/webhooks",
+            {
+                "event": "order.created",
+                "url": "https://api.example.com/api/v1/webhooks/shopier",
+            },
+        )
+    ]
+    assert response.json()["webhook_token"] == "new-secret-token"
+
+
+@pytest.mark.asyncio
+async def test_signed_paid_order_delivers_all_tracks_once(shopier_client):
+    client, session_factory = shopier_client
+    first = await send_webhook(client)
+    duplicate = await send_webhook(client)
+
+    assert first.status_code == 200, first.text
+    assert duplicate.status_code == 200, duplicate.text
 
     async with session_factory() as session:
         order = await session.scalar(
-            select(Order).where(Order.platform_order_id == checkout.order_id)
+            select(Order).where(Order.platform_order_id == "shopier-order-123")
         )
         assert order is not None
-        assert order.status == "pending"
+        assert order.status == "success"
         assert order.total_amount_minor == 775
         assert order.currency == 1
-
-
-@pytest.mark.asyncio
-async def test_successful_callback_delivers_tracks_once(shopier_client):
-    client, session_factory = shopier_client
-    checkout = await create_order(client)
-
-    first = await send_callback(client, checkout.order_id)
-    second = await send_callback(client, checkout.order_id)
-    assert first.status_code == 200
-    assert second.status_code == 200
-
-    async with session_factory() as session:
-        order = await session.scalar(
-            select(Order).where(Order.platform_order_id == checkout.order_id)
-        )
-        purchase_count = await session.scalar(select(func.count()).select_from(Purchase))
-        assert order is not None
-        assert order.status == "success"
-        assert order.shopier_payment_id == "payment-123"
-        assert purchase_count == 2
-
-
-@pytest.mark.asyncio
-async def test_concurrent_duplicate_callbacks_are_idempotent(shopier_client):
-    client, session_factory = shopier_client
-    checkout = await create_order(client)
-
-    responses = await asyncio.gather(
-        send_callback(client, checkout.order_id),
-        send_callback(client, checkout.order_id),
-    )
-    assert [response.status_code for response in responses] == [200, 200]
-
-    async with session_factory() as session:
-        order = await session.scalar(
-            select(Order).where(Order.platform_order_id == checkout.order_id)
-        )
-        assert order is not None
-        assert order.status == "success"
         assert await session.scalar(select(func.count()).select_from(Purchase)) == 2
-
-
-@pytest.mark.asyncio
-async def test_failed_callback_does_not_deliver_tracks(shopier_client):
-    client, session_factory = shopier_client
-    checkout = await create_order(client)
-
-    response = await send_callback(
-        client, checkout.order_id, status_value="fail"
-    )
-    assert response.status_code == 200
-
-    async with session_factory() as session:
-        order = await session.scalar(
-            select(Order).where(Order.platform_order_id == checkout.order_id)
+        assert (
+            await session.scalar(
+                select(func.count()).select_from(ShopierWebhookEvent)
+            )
+            == 1
         )
-        purchase_count = await session.scalar(select(func.count()).select_from(Purchase))
-        assert order is not None
-        assert order.status == "failed"
-        assert purchase_count == 0
 
 
 @pytest.mark.asyncio
-async def test_invalid_callback_signature_is_rejected(shopier_client):
+async def test_invalid_signature_is_rejected_without_recording_order(shopier_client):
     client, session_factory = shopier_client
-    checkout = await create_order(client)
+    response = await send_webhook(client, signature="invalid")
 
-    response = await send_callback(
-        client, checkout.order_id, signature="invalid-signature"
-    )
     assert response.status_code == 400
-
     async with session_factory() as session:
-        order = await session.scalar(
-            select(Order).where(Order.platform_order_id == checkout.order_id)
-        )
-        assert order is not None
-        assert order.status == "pending"
+        assert await session.scalar(select(func.count()).select_from(Order)) == 0
         assert await session.scalar(select(func.count()).select_from(Purchase)) == 0
 
 
 @pytest.mark.asyncio
-async def test_delivery_failure_keeps_payment_pending_for_retry(
+async def test_unpaid_order_is_not_delivered(shopier_client):
+    client, session_factory = shopier_client
+    response = await send_webhook(
+        client, build_order_payload(paymentStatus="unpaid")
+    )
+
+    assert response.status_code == 200
+    async with session_factory() as session:
+        assert await session.scalar(select(func.count()).select_from(Order)) == 0
+        assert await session.scalar(select(func.count()).select_from(Purchase)) == 0
+
+
+@pytest.mark.asyncio
+async def test_non_usd_order_is_rejected(shopier_client):
+    client, session_factory = shopier_client
+    response = await send_webhook(client, build_order_payload(currency="TRY"))
+
+    assert response.status_code == 400
+    async with session_factory() as session:
+        assert await session.scalar(select(func.count()).select_from(Order)) == 0
+
+
+@pytest.mark.asyncio
+async def test_unknown_buyer_email_is_retried_and_not_delivered(shopier_client):
+    client, session_factory = shopier_client
+    response = await send_webhook(
+        client,
+        build_order_payload(
+            shippingInfo={"email": "not-registered@example.com"}
+        ),
+    )
+
+    assert response.status_code == 503
+    async with session_factory() as session:
+        assert await session.scalar(select(func.count()).select_from(Order)) == 0
+        assert await session.scalar(select(func.count()).select_from(Purchase)) == 0
+
+
+@pytest.mark.asyncio
+async def test_delivery_failure_keeps_paid_order_retryable(
     shopier_client, monkeypatch
 ):
     client, session_factory = shopier_client
-    checkout = await create_order(client)
 
     async def fail_delivery(_session, _order_id):
         raise RuntimeError("simulated purchase insert failure")
 
     with monkeypatch.context() as patch:
         patch.setattr("app.routers.shopier._deliver_order", fail_delivery)
-        response = await send_callback(client, checkout.order_id)
+        response = await send_webhook(client)
         assert response.status_code == 500
 
     async with session_factory() as session:
         order = await session.scalar(
-            select(Order).where(Order.platform_order_id == checkout.order_id)
+            select(Order).where(Order.platform_order_id == "shopier-order-123")
         )
         assert order is not None
         assert order.status == "paid_pending_delivery"
-        assert order.shopier_payment_id == "payment-123"
         assert await session.scalar(select(func.count()).select_from(Purchase)) == 0
 
     retry = await client.post(
-        f"/api/v1/admin/shopier/orders/{checkout.order_id}/retry-delivery"
+        "/api/v1/admin/shopier/orders/shopier-order-123/retry-delivery"
     )
     assert retry.status_code == 200
-    assert retry.json()["status"] == "success"
     async with session_factory() as session:
         order = await session.scalar(
-            select(Order).where(Order.platform_order_id == checkout.order_id)
+            select(Order).where(Order.platform_order_id == "shopier-order-123")
         )
         assert order is not None
         assert order.status == "success"
         assert await session.scalar(select(func.count()).select_from(Purchase)) == 2
 
 
-def test_shopier_signatures_match_php_hmac_base64_format():
-    message = "7654321order-1237.751"
-    expected = base64.b64encode(
-        hmac.new(TEST_SECRET.encode(), message.encode(), hashlib.sha256).digest()
-    ).decode()
-    assert checkout_signature(
-        TEST_SECRET, "7654321", "order-123", "7.75", 1
-    ) == expected
+@pytest.mark.asyncio
+async def test_concurrent_duplicate_webhooks_are_idempotent(shopier_client):
+    client, session_factory = shopier_client
+    responses = await asyncio.gather(
+        send_webhook(client), send_webhook(client)
+    )
+
+    assert [response.status_code for response in responses] == [200, 200], [
+        response.text for response in responses
+    ]
+    async with session_factory() as session:
+        order = await session.scalar(
+            select(Order).where(Order.platform_order_id == "shopier-order-123")
+        )
+        assert order is not None
+        assert order.status == "success"
+        assert await session.scalar(select(func.count()).select_from(Purchase)) == 2

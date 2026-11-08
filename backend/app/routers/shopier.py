@@ -2,243 +2,203 @@ from __future__ import annotations
 
 import logging
 import os
-import secrets
-from datetime import datetime, timezone
-from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
-from uuid import uuid4
+from decimal import Decimal
+from urllib.parse import urlparse
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Response, status
-from pydantic import Field
-from sqlalchemy import func, select, update
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response, status
+from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as postgresql_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .. import auth, schemas
+from .. import auth
 from ..database import get_session
-from ..models import Order, OrderItem, Purchase, Track, User
-from ..shopier import checkout_signature, verify_callback_signature
+from ..models import (
+    Order,
+    OrderItem,
+    Purchase,
+    ShopierWebhookEvent,
+    Track,
+    User,
+)
+from ..shopier import (
+    SHOPIER_CURRENCY,
+    ShopierAPIError,
+    money_to_minor_units,
+    price_to_minor_units,
+    shopier_api_request,
+    shopier_product_url,
+    shopier_webhook_token,
+    verify_webhook_signature,
+)
 from .dependencies import require_admin
 
 logger = logging.getLogger(__name__)
-
 router = APIRouter(prefix="/api/v1", tags=["shopier"])
-SHOPIER_FORM_URL = "https://www.shopier.com/ShowProduct/api_pay4.php"
-SHOPIER_CURRENCY = 1
-SHOPIER_FINAL_CONSUMER_ID = "11111111111"
-SHOPIER_DIGITAL_CONTACT_PHONE = "0000000000"
-SHOPIER_DIGITAL_ADDRESS = "Digital Delivery"
-SHOPIER_DIGITAL_CITY = "Istanbul"
-SHOPIER_DIGITAL_COUNTRY = "Turkey"
-SHOPIER_DIGITAL_POSTCODE = "34000"
-CENT = Decimal("0.01")
+SUPPORTED_SHOPIER_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp"}
 
 
-class ShopierCheckoutRequest(schemas.DTO):
-    track_ids: list[int] = Field(min_length=1, max_length=50)
-    current_language: str = Field(default="en", pattern="^(en|tr)$")
+def _product_media(track: Track) -> list[dict[str, object]]:
+    image_url = track.cover_image_url
+    if not image_url:
+        return []
+    parsed = urlparse(image_url)
+    extension = os.path.splitext(parsed.path)[1].lower()
+    if (
+        parsed.scheme != "https"
+        or not parsed.hostname
+        or extension not in SUPPORTED_SHOPIER_IMAGE_EXTENSIONS
+    ):
+        return []
+    return [{"type": "image", "url": image_url, "placement": 1}]
 
 
-class ShopierCheckoutResponse(schemas.DTO):
-    order_id: str
-    action_url: str
-    method: str
-    fields: dict[str, str]
+def _product_payload(track: Track) -> dict[str, object]:
+    price_to_minor_units(track.price)
+    return {
+        "title": f"{track.title} - {track.artist}",
+        "description": f"Digital music track by {track.artist}.",
+        "type": "digital",
+        "media": _product_media(track),
+        "priceData": {
+            "currency": SHOPIER_CURRENCY,
+            "price": f"{Decimal(str(track.price)):.2f}",
+        },
+        "shippingPayer": "sellerPays",
+    }
 
 
-def _shopier_settings() -> tuple[str, str]:
-    api_key = os.getenv("SHOPIER_API_KEY", "").strip()
-    api_secret = os.getenv("SHOPIER_API_SECRET", "").strip()
-    if not api_key or not api_secret:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Shopier checkout is not configured",
-        )
-    return api_key, api_secret
-
-
-def _price_to_minor_units(value: float) -> int:
-    try:
-        price = Decimal(str(value))
-        rounded = price.quantize(CENT, rounding=ROUND_HALF_UP)
-    except (InvalidOperation, ValueError) as exc:
+async def _publish_track(track: Track, session: AsyncSession) -> dict[str, str]:
+    if track.is_free:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="A track has an invalid price",
-        ) from exc
-    if not price.is_finite() or price <= 0 or price != rounded:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Track prices must be positive and have at most two decimal places",
+            detail="Free tracks cannot be listed as Shopier products",
         )
-    return int(rounded * 100)
+
+    payload = _product_payload(track)
+    if track.shopier_product_id:
+        result = await shopier_api_request(
+            "PUT", f"/products/{track.shopier_product_id}", payload=payload
+        )
+    else:
+        result = await shopier_api_request("POST", "/products", payload=payload)
+
+    if not isinstance(result, dict):
+        raise ShopierAPIError("Shopier returned an invalid product response")
+    product_id = result.get("id")
+    if not isinstance(product_id, str) or not product_id.strip():
+        raise ShopierAPIError("Shopier did not return a product ID")
+    product_url = shopier_product_url(
+        result.get("url") or track.shopier_product_url
+    )
+
+    track.shopier_product_id = product_id
+    track.shopier_product_url = product_url
+    await session.commit()
+    await session.refresh(track)
+    return {
+        "product_id": product_id,
+        "product_url": product_url,
+        "currency": SHOPIER_CURRENCY,
+    }
 
 
-def _money_string(amount_minor: int) -> str:
-    return f"{Decimal(amount_minor) / 100:.2f}"
-
-
-def _account_age_days(user: User) -> int:
-    created_at = user.created_at or datetime.now(timezone.utc)
-    if created_at.tzinfo is None:
-        created_at = created_at.replace(tzinfo=timezone.utc)
-    return max(0, (datetime.now(timezone.utc) - created_at).days)
-
-
-@router.post(
-    "/checkout/shopier/init",
-    response_model=ShopierCheckoutResponse,
-    status_code=status.HTTP_200_OK,
-)
-async def initiate_shopier_checkout(
-    checkout: ShopierCheckoutRequest,
+@router.post("/admin/shopier/tracks/{track_id}/sync")
+async def sync_shopier_track(
+    track_id: int,
     current_user: User = Depends(auth.get_current_user),
     session: AsyncSession = Depends(get_session),
-) -> ShopierCheckoutResponse:
-    api_key, api_secret = _shopier_settings()
-    currency = SHOPIER_CURRENCY
-    if len(set(checkout.track_ids)) != len(checkout.track_ids):
+) -> dict[str, str]:
+    require_admin(current_user)
+    track = await session.get(Track, track_id)
+    if track is None:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="A track may only appear once in an order",
+            status_code=status.HTTP_404_NOT_FOUND, detail="Track not found"
+        )
+    try:
+        return await _publish_track(track, session)
+    except ShopierAPIError as exc:
+        await session.rollback()
+        logger.exception("Shopier product sync failed for track %s", track_id)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+
+
+@router.post("/admin/shopier/webhooks/order-created")
+async def register_shopier_order_webhook(
+    current_user: User = Depends(auth.get_current_user),
+) -> dict[str, str]:
+    require_admin(current_user)
+    webhook_url = os.getenv("SHOPIER_WEBHOOK_URL", "").strip()
+    parsed = urlparse(webhook_url)
+    if parsed.scheme != "https" or not parsed.netloc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Set SHOPIER_WEBHOOK_URL to the public HTTPS webhook endpoint",
         )
 
-    track_result = await session.execute(
-        select(Track).where(Track.id.in_(checkout.track_ids))
-    )
-    tracks_by_id = {track.id: track for track in track_result.scalars().all()}
-    if set(tracks_by_id) != set(checkout.track_ids):
+    try:
+        result = await shopier_api_request(
+            "POST",
+            "/webhooks",
+            payload={"event": "order.created", "url": webhook_url},
+        )
+    except ShopierAPIError as exc:
+        logger.exception("Shopier webhook registration failed")
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="One or more tracks were not found",
-        )
-    if any(track.is_free for track in tracks_by_id.values()):
+            status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)
+        ) from exc
+
+    if not isinstance(result, dict):
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Free tracks cannot be purchased",
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Shopier returned an invalid webhook response",
         )
-
-    owned_result = await session.execute(
-        select(Purchase.track_id).where(
-            Purchase.user_id == current_user.id,
-            Purchase.track_id.in_(checkout.track_ids),
-        )
-    )
-    if owned_result.scalars().first() is not None:
+    webhook_token = result.get("token")
+    if not isinstance(webhook_token, str) or not webhook_token:
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Your library already contains one or more selected tracks",
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Shopier did not return a webhook token",
         )
-
-    ordered_tracks = [tracks_by_id[track_id] for track_id in checkout.track_ids]
-    name_parts = (current_user.full_name or "").strip().split()
-    if len(name_parts) < 2:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Add your first and last name to your account before checkout",
-        )
-    items = [
-        (track, _price_to_minor_units(track.price)) for track in ordered_tracks
-    ]
-    total_amount_minor = sum(price_minor for _, price_minor in items)
-    total_order_value = _money_string(total_amount_minor)
-    platform_order_id = str(uuid4())
-    random_nr = str(100_000 + secrets.randbelow(900_000))
-
-    order = Order(
-        user_id=current_user.id,
-        platform_order_id=platform_order_id,
-        total_amount_minor=total_amount_minor,
-        currency=currency,
-        status="pending",
-    )
-    session.add(order)
-    await session.flush()
-    session.add_all(
-        [
-            OrderItem(
-                order_id=order.id,
-                track_id=track.id,
-                track_title=track.title,
-                price_minor=price_minor,
-            )
-            for track, price_minor in items
-        ]
-    )
-
-    signature = checkout_signature(
-        api_secret,
-        random_nr,
-        platform_order_id,
-        total_order_value,
-        currency,
-    )
-    fields = {
-        "API_key": api_key,
-        "website_index": "1",
-        "platform_order_id": platform_order_id,
-        "product_name": f"DJ Bilal - {len(items)} digital track(s)",
-        "product_type": "2",
-        "buyer_name": name_parts[0],
-        "buyer_surname": " ".join(name_parts[1:]),
-        "buyer_email": current_user.email,
-        "buyer_account_age": str(_account_age_days(current_user)),
-        "buyer_id_nr": SHOPIER_FINAL_CONSUMER_ID,
-        "buyer_phone": SHOPIER_DIGITAL_CONTACT_PHONE,
-        "billing_address": SHOPIER_DIGITAL_ADDRESS,
-        "billing_city": SHOPIER_DIGITAL_CITY,
-        "billing_country": SHOPIER_DIGITAL_COUNTRY,
-        "billing_postcode": SHOPIER_DIGITAL_POSTCODE,
-        "shipping_address": SHOPIER_DIGITAL_ADDRESS,
-        "shipping_city": SHOPIER_DIGITAL_CITY,
-        "shipping_country": SHOPIER_DIGITAL_COUNTRY,
-        "shipping_postcode": SHOPIER_DIGITAL_POSTCODE,
-        "total_order_value": total_order_value,
-        "currency": str(currency),
-        "platform": "0",
-        "is_in_frame": "0",
-        "current_language": checkout.current_language,
-        "modul_version": "1.0.4",
-        "random_nr": random_nr,
-        "signature": signature,
+    return {
+        "webhook_id": str(result.get("id", "")),
+        "webhook_token": webhook_token,
+        "instructions": "Save this token as SHOPIER_WEBHOOK_TOKEN on the backend, then restart it.",
     }
-    await session.commit()
-    return ShopierCheckoutResponse(
-        order_id=platform_order_id,
-        action_url=SHOPIER_FORM_URL,
-        method="POST",
-        fields=fields,
-    )
 
 
 async def _deliver_order(session: AsyncSession, platform_order_id: str) -> None:
     async with session.begin():
-        order_result = await session.execute(
+        result = await session.execute(
             select(Order)
             .where(Order.platform_order_id == platform_order_id)
             .with_for_update()
         )
-        order = order_result.scalar_one_or_none()
+        order = result.scalar_one_or_none()
         if order is None or order.status == "success":
             return
         if order.status != "paid_pending_delivery":
             return
 
-        item_result = await session.execute(
+        items_result = await session.execute(
             select(OrderItem).where(OrderItem.order_id == order.id)
         )
-        items = item_result.scalars().all()
+        items = items_result.scalars().all()
         if not items:
-            raise RuntimeError("A paid order has no order items")
-        values = [
+            raise RuntimeError("A paid Shopier order has no mapped tracks")
+
+        purchase_values = [
             {"user_id": order.user_id, "track_id": item.track_id}
             for item in items
         ]
         dialect_name = session.get_bind().dialect.name
         if dialect_name == "postgresql":
-            insert_statement = postgresql_insert(Purchase).values(values)
+            insert_statement = postgresql_insert(Purchase).values(purchase_values)
         elif dialect_name == "sqlite":
-            insert_statement = sqlite_insert(Purchase).values(values)
+            insert_statement = sqlite_insert(Purchase).values(purchase_values)
         else:
             raise RuntimeError(
                 f"Idempotent purchase insertion is unsupported for {dialect_name}"
@@ -252,86 +212,243 @@ async def _deliver_order(session: AsyncSession, platform_order_id: str) -> None:
         order.delivered_at = func.now()
 
 
-@router.post("/webhooks/shopier", response_class=Response)
-async def shopier_webhook(
-    status_value: str = Form(..., alias="status"),
-    platform_order_id: str = Form(...),
-    payment_id: str = Form(...),
-    random_nr: str = Form(...),
-    signature: str = Form(...),
-    session: AsyncSession = Depends(get_session),
-) -> Response:
-    api_secret = os.getenv("SHOPIER_API_SECRET", "").strip()
-    if not api_secret:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Shopier webhook is not configured",
-        )
-    if not verify_callback_signature(
-        api_secret, random_nr, platform_order_id, signature
-    ):
+def _buyer_email(payload: dict[str, object]) -> str | None:
+    for section_name in ("shippingInfo", "billingInfo"):
+        section = payload.get(section_name)
+        if isinstance(section, dict):
+            email = section.get("email")
+            if isinstance(email, str) and email.strip():
+                return email.strip()
+    return None
+
+
+def _mapped_product_ids(payload: dict[str, object]) -> list[str]:
+    line_items = payload.get("lineItems")
+    if not isinstance(line_items, list):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid Shopier callback signature",
+            detail="Shopier order is missing line items",
+        )
+    product_ids = {
+        item.get("productId")
+        for item in line_items
+        if isinstance(item, dict)
+        and isinstance(item.get("productId"), str)
+        and item.get("type") == "digital"
+    }
+    return sorted(product_ids)
+
+
+@router.post("/webhooks/shopier", response_class=Response)
+async def shopier_webhook(
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    event_name: str | None = Header(default=None, alias="Shopier-Event"),
+    event_id: str | None = Header(default=None, alias="Shopier-Webhook-Id"),
+    signature: str | None = Header(default=None, alias="Shopier-Signature"),
+) -> Response:
+    webhook_token = shopier_webhook_token()
+    raw_body = await request.body()
+    if len(raw_body) > 1_000_000:
+        raise HTTPException(
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+            detail="Shopier webhook payload is too large",
+        )
+    if not verify_webhook_signature(webhook_token, raw_body, signature or ""):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid Shopier webhook signature",
+        )
+    if not event_id or not event_id.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Shopier webhook ID is required",
+        )
+    if event_name != "order.created":
+        return Response(status_code=status.HTTP_200_OK)
+
+    try:
+        payload = await request.json()
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid Shopier webhook JSON",
+        ) from exc
+    if not isinstance(payload, dict):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid Shopier order payload",
         )
 
+    platform_order_id = payload.get("id")
+    if not isinstance(platform_order_id, str) or not platform_order_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Shopier order ID is required",
+        )
+    if payload.get("paymentStatus") != "paid":
+        return Response(status_code=status.HTTP_200_OK)
+    if payload.get("currency") != SHOPIER_CURRENCY:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Shopier order currency does not match the store currency",
+        )
+
+    totals = payload.get("totals")
+    total = totals.get("total") if isinstance(totals, dict) else None
+    try:
+        total_amount_minor = money_to_minor_units(total)
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Shopier order total is invalid",
+        ) from exc
+
+    product_ids = _mapped_product_ids(payload)
+    if not product_ids:
+        return Response(status_code=status.HTTP_200_OK)
+    tracks_result = await session.execute(
+        select(Track).where(
+            Track.shopier_product_id.in_(product_ids),
+            Track.is_free.is_(False),
+        )
+    )
+    tracks = tracks_result.scalars().all()
+    if not tracks:
+        return Response(status_code=status.HTTP_200_OK)
+
+    email = _buyer_email(payload)
+    if not email:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Shopier order has no buyer email; delivery is waiting for retry",
+        )
+    user_result = await session.execute(
+        select(User).where(func.lower(User.email) == email.lower())
+    )
+    user = user_result.scalar_one_or_none()
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Create an account with the Shopier checkout email to receive tracks",
+        )
+
+    order_values = {
+        "user_id": user.id,
+        "platform_order_id": platform_order_id,
+        "total_amount_minor": total_amount_minor,
+        "currency": 1,
+        "status": "paid_pending_delivery",
+    }
+    dialect_name = session.get_bind().dialect.name
+    if dialect_name == "postgresql":
+        order_insert = postgresql_insert(Order).values(**order_values)
+    elif dialect_name == "sqlite":
+        order_insert = sqlite_insert(Order).values(**order_values)
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Idempotent Shopier order insertion is unsupported for {dialect_name}",
+        )
+    insert_result = await session.execute(
+        order_insert.on_conflict_do_nothing(
+            index_elements=[Order.platform_order_id]
+        )
+    )
+    order_was_created = insert_result.rowcount == 1
     order_result = await session.execute(
         select(Order).where(Order.platform_order_id == platform_order_id)
     )
     order = order_result.scalar_one_or_none()
     if order is None:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Shopier order not found",
-        )
-    if order.status == "success" or order.status == "failed":
-        return Response(status_code=status.HTTP_200_OK)
-
-    if status_value not in {"success", "fail", "failed"}:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid Shopier callback status",
-        )
-    if not payment_id.strip():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Shopier callback is missing its payment ID",
-        )
-
-    if status_value != "success":
-        await session.execute(
-            update(Order)
-            .where(
-                Order.id == order.id,
-                Order.status == "pending",
-            )
-            .values(status="failed")
-        )
-        await session.commit()
-        return Response(status_code=status.HTTP_200_OK)
-
-    if order.status == "pending":
-        await session.execute(
-            update(Order)
-            .where(Order.id == order.id, Order.status == "pending")
-            .values(
-                status="paid_pending_delivery",
-                shopier_payment_id=payment_id,
-                paid_at=func.now(),
-            )
-        )
-        await session.commit()
-        await session.refresh(order)
-
-    if (
-        order.status == "paid_pending_delivery"
-        and order.shopier_payment_id
-        and order.shopier_payment_id != payment_id
-    ):
-        raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="The Shopier payment ID does not match this order",
+            detail="Shopier order could not be recorded",
         )
+
+    if order_was_created:
+        session.add_all(
+            [
+                OrderItem(
+                    order_id=order.id,
+                    track_id=track.id,
+                    track_title=track.title,
+                    price_minor=price_to_minor_units(track.price),
+                )
+                for track in tracks
+            ]
+        )
+    else:
+        existing_items_result = await session.execute(
+            select(OrderItem.track_id).where(OrderItem.order_id == order.id)
+        )
+        existing_track_ids = set(existing_items_result.scalars().all())
+        expected_track_ids = {track.id for track in tracks}
+        if (
+            order.user_id != user.id
+            or order.total_amount_minor != total_amount_minor
+            or order.currency != 1
+            or (existing_track_ids and existing_track_ids != expected_track_ids)
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Shopier order payload does not match the recorded order",
+            )
+        if not existing_track_ids:
+            order_item_values = [
+                {
+                    "order_id": order.id,
+                    "track_id": track.id,
+                    "track_title": track.title,
+                    "price_minor": price_to_minor_units(track.price),
+                }
+                for track in tracks
+            ]
+            if dialect_name == "postgresql":
+                item_insert = postgresql_insert(OrderItem).values(order_item_values)
+            else:
+                item_insert = sqlite_insert(OrderItem).values(order_item_values)
+            await session.execute(
+                item_insert.on_conflict_do_nothing(
+                    index_elements=[OrderItem.order_id, OrderItem.track_id]
+                )
+            )
+
+    existing_event = await session.get(ShopierWebhookEvent, event_id)
+    if existing_event is not None:
+        if existing_event.shopier_order_id != platform_order_id:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Shopier webhook ID is already associated with another order",
+            )
+    else:
+        session.add(
+            ShopierWebhookEvent(
+                id=event_id,
+                event=event_name,
+                shopier_order_id=platform_order_id,
+            )
+        )
+
+    try:
+        await session.commit()
+    except IntegrityError:
+        await session.rollback()
+        order_result = await session.execute(
+            select(Order).where(Order.platform_order_id == platform_order_id)
+        )
+        order = order_result.scalar_one_or_none()
+        event = await session.get(ShopierWebhookEvent, event_id)
+        if order is None or (
+            event is not None and event.shopier_order_id != platform_order_id
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Shopier order could not be recorded",
+            )
+
+    if order.status == "success":
+        return Response(status_code=status.HTTP_200_OK)
 
     await session.commit()
     try:
@@ -361,8 +478,7 @@ async def retry_shopier_delivery(
     order = order_result.scalar_one_or_none()
     if order is None:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Shopier order not found",
+            status_code=status.HTTP_404_NOT_FOUND, detail="Shopier order not found"
         )
     if order.status == "success":
         return {"order_id": platform_order_id, "status": "success"}
@@ -377,8 +493,7 @@ async def retry_shopier_delivery(
         await _deliver_order(session, platform_order_id)
     except Exception as exc:
         logger.exception(
-            "Manual Shopier delivery retry failed for order %s",
-            platform_order_id,
+            "Manual Shopier delivery retry failed for order %s", platform_order_id
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

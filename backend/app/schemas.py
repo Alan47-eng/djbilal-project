@@ -271,6 +271,7 @@ class TrackResponse(DTO):
     is_free: bool = False
     free_download_url: str | None = None
     category: str = "edit"
+    shopier_product_url: str | None = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True, extra="forbid")

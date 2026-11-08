@@ -8,6 +8,7 @@ import {
   Users,
   X,
   Plus,
+  ExternalLink,
 } from 'lucide-react';
 import api from '../api';
 import { useAuth } from '../context/AuthContext';
@@ -63,6 +64,14 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
     trackUpdated: 'تم تحديث معلومات المقطع.', trackUpdateError: 'تعذر تحديث المقطع.',
     trackDeleted: 'تم حذف المقطع.', trackDeleteError: 'تعذر حذف المقطع.',
     trackAdded: 'تمت إضافة المقطع إلى المكتبة.', trackAddError: 'تعذر إضافة المقطع.',
+    shopierSync: 'مزامنة Shopier', shopierPublished: 'تم نشر المنتج على Shopier.',
+    shopierSyncError: 'تم حفظ المقطع، لكن تعذرت مزامنته مع Shopier. أعد المحاولة من زر المزامنة.',
+    trackAddedShopierError: 'أُضيف المقطع، لكن تعذر نشره على Shopier. استخدم زر المزامنة لإعادة المحاولة.',
+    webhookSetup: 'إعداد إشعار الدفع', registerWebhook: 'إنشاء إشعار order.created',
+    shopierSetupInstructions: 'أضف SHOPIER_ACCESS_TOKEN وSHOPIER_WEBHOOK_URL إلى إعدادات الخادم أولًا. لا تضع رمز الوصول في الواجهة.',
+    webhookTokenInstruction: 'انسخ هذا الرمز إلى SHOPIER_WEBHOOK_TOKEN في إعدادات الخادم ثم أعد تشغيله.',
+    webhookSetupError: 'تعذر إعداد إشعار Shopier.',
+    webhookSetupDone: 'تم إنشاء الإشعار. احفظ الرمز في إعدادات الخادم.',
   } : {
     dashboard: 'Admin Dashboard', users: 'User Management', albums: 'Albums', tracks: 'Tracks', settings: 'Settings',
     siteSections: 'Site sections', free: 'Free',
@@ -90,6 +99,14 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
     trackUpdated: 'Track information updated.', trackUpdateError: 'Could not update track.',
     trackDeleted: 'Track deleted.', trackDeleteError: 'Could not delete track.',
     trackAdded: 'Track added to the catalog.', trackAddError: 'Could not add track.',
+    shopierSync: 'Sync Shopier', shopierPublished: 'Product published on Shopier.',
+    shopierSyncError: 'Track was saved, but Shopier sync failed. Retry with the sync button.',
+    trackAddedShopierError: 'Track was added, but Shopier publishing failed. Retry with the sync button.',
+    webhookSetup: 'Payment notifications', registerWebhook: 'Create order.created webhook',
+    shopierSetupInstructions: 'First set SHOPIER_ACCESS_TOKEN and SHOPIER_WEBHOOK_URL in the backend environment. Keep the access token out of the frontend.',
+    webhookTokenInstruction: 'Copy this token to SHOPIER_WEBHOOK_TOKEN in the backend environment, then restart the backend.',
+    webhookSetupError: 'Could not configure the Shopier webhook.',
+    webhookSetupDone: 'Webhook created. Save its token in the backend environment.',
   };
   const [tab, setTab] = useState('users');
   const [users, setUsers] = useState([]);
@@ -102,6 +119,7 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
   const [savingKey, setSavingKey] = useState('');
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
+  const [webhookToken, setWebhookToken] = useState('');
 
   const loadData = async () => {
     setLoading(true);
@@ -270,9 +288,51 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
         price: track.is_free ? 0 : Number(price.toFixed(2)),
       });
       updateTrack(response.data);
+      if (!track.is_free) {
+        try {
+          const syncResponse = await api.post(`/api/v1/admin/shopier/tracks/${track.id}/sync`);
+          updateTrack({ ...response.data, shopier_product_url: syncResponse.data.product_url });
+        } catch (syncError) {
+          setNotice('');
+          setError(`${t.shopierSyncError} ${getApiErrorMessage(syncError, '')}`);
+          await fetchTracks();
+          return;
+        }
+      }
       setNotice(t.trackUpdated);
     } catch (requestError) {
       showError(requestError, t.trackUpdateError);
+    } finally {
+      setSavingKey('');
+    }
+  };
+
+  const syncShopierTrack = async (track) => {
+    setSavingKey(`shopier-${track.id}`);
+    setError('');
+    setNotice('');
+    try {
+      const response = await api.post(`/api/v1/admin/shopier/tracks/${track.id}/sync`);
+      updateTrack({ ...track, shopier_product_url: response.data.product_url });
+      setNotice(t.shopierPublished);
+    } catch (requestError) {
+      showError(requestError, t.shopierSyncError);
+    } finally {
+      setSavingKey('');
+    }
+  };
+
+  const createShopierWebhook = async () => {
+    setSavingKey('shopier-webhook');
+    setError('');
+    setNotice('');
+    setWebhookToken('');
+    try {
+      const response = await api.post('/api/v1/admin/shopier/webhooks/order-created');
+      setWebhookToken(response.data.webhook_token);
+      setNotice(t.webhookSetupDone);
+    } catch (requestError) {
+      showError(requestError, t.webhookSetupError);
     } finally {
       setSavingKey('');
     }
@@ -318,12 +378,26 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
       data.append('track_file', trackForm.track_file);
       data.append('preview_file', trackForm.preview_file);
       if (trackForm.cover_file) data.append('cover_file', trackForm.cover_file);
-      await api.post('/tracks/upload', data, {
+      const uploadResponse = await api.post('/tracks/upload', data, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       setTrackForm(initialTrackForm);
       await fetchTracks();
       setNotice(t.trackAdded);
+      if (!trackForm.is_free) {
+        try {
+          const syncResponse = await api.post(
+            `/api/v1/admin/shopier/tracks/${uploadResponse.data.id}/sync`,
+          );
+          updateTrack({
+            ...uploadResponse.data,
+            shopier_product_url: syncResponse.data.product_url,
+          });
+          setNotice(t.shopierPublished);
+        } catch (syncError) {
+          setError(`${t.trackAddedShopierError} ${getApiErrorMessage(syncError, '')}`);
+        }
+      }
     } catch (requestError) {
       showError(requestError, t.trackAddError);
     } finally {
@@ -527,6 +601,18 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
                                 <td className="px-4 py-3"><select className={fieldClass} value={draft.album_id} onChange={(event) => updateTrackDraft(track, 'album_id', event.target.value)}><option value="">{t.single}</option>{albums.map((album) => <option key={album.id} value={album.id}>{album.title}</option>)}</select></td>
                                 <td className="px-4 py-3"><input aria-label={`${track.title} ${t.price}`} type="number" step="0.01" min="0" disabled={track.is_free} className="w-24 rounded-lg border border-slate-700 bg-slate-900 px-2 py-2 text-sm text-white disabled:opacity-50" value={track.is_free ? '0' : draft.price} onChange={(event) => updateTrackDraft(track, 'price', event.target.value)} /></td>
                                 <td className="px-4 py-3"><div className="flex justify-end gap-2">
+                                  {!track.is_free && (
+                                    <>
+                                      <button type="button" disabled={savingKey === `shopier-${track.id}`} onClick={() => syncShopierTrack(track)} className={`${buttonClass} bg-emerald-900 text-emerald-100 hover:bg-emerald-800`}>
+                                        <ExternalLink size={15} />{savingKey === `shopier-${track.id}` ? t.saving : t.shopierSync}
+                                      </button>
+                                      {track.shopier_product_url && (
+                                        <a href={track.shopier_product_url} target="_blank" rel="noreferrer" className={`${buttonClass} bg-slate-800 text-white hover:bg-slate-700`}>
+                                          <ExternalLink size={15} />Shopier
+                                        </a>
+                                      )}
+                                    </>
+                                  )}
                                   <button type="button" disabled={savingKey === `track-${track.id}`} onClick={() => saveTrack(track)} className={`${buttonClass} bg-slate-800 text-white hover:bg-slate-700`}>{t.save}</button>
                                   <button type="button" disabled={savingKey === `track-${track.id}`} onClick={() => deleteTrack(track)} aria-label={`${track.title} ${t.track}`} className={`${buttonClass} bg-red-950 text-red-300 hover:bg-red-900`}><Trash2 size={16} /></button>
                                 </div></td>
@@ -551,6 +637,24 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
                       <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-400">
                         {t.settingsDescription}
                       </p>
+                    </section>
+                    <section className="rounded-xl border border-slate-800 bg-slate-900/60 p-5 md:col-span-3">
+                      <h3 className="font-semibold">{t.webhookSetup}</h3>
+                      <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">{t.shopierSetupInstructions}</p>
+                      <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">{t.webhookTokenInstruction}</p>
+                      <button
+                        type="button"
+                        disabled={savingKey === 'shopier-webhook'}
+                        onClick={createShopierWebhook}
+                        className={`${buttonClass} mt-4 bg-slate-800 text-white hover:bg-slate-700`}
+                      >
+                        {savingKey === 'shopier-webhook' ? t.saving : t.registerWebhook}
+                      </button>
+                      {webhookToken && (
+                        <code dir="ltr" className="mt-4 block break-all rounded-lg border border-amber-700/60 bg-amber-950/30 p-3 text-sm text-amber-200">
+                          {webhookToken}
+                        </code>
+                      )}
                     </section>
                   </div>
                 )}

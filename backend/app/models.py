@@ -53,6 +53,8 @@ class Track(Base):
     is_free = Column(Boolean, default=False, nullable=False)
     free_download_url = Column(String(1024), nullable=True)
     category = Column(String(50), nullable=False, default="edit")
+    shopier_product_id = Column(String(255), nullable=True, unique=True, index=True)
+    shopier_product_url = Column(String(1024), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 class ProfilePhoto(Base):
     __tablename__ = "profile_photos"
@@ -85,7 +87,7 @@ class Order(Base):
 
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    platform_order_id = Column(String(36), nullable=False, unique=True)
+    platform_order_id = Column(String(255), nullable=False, unique=True)
     total_amount_minor = Column(BigInteger, nullable=False)
     currency = Column(SmallInteger, nullable=False)
     status = Column(String(32), nullable=False, default="pending", server_default="pending", index=True)
@@ -119,3 +121,12 @@ class Purchase(Base):
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     track_id = Column(Integer, ForeignKey("tracks.id", ondelete="RESTRICT"), nullable=False, index=True)
     purchased_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class ShopierWebhookEvent(Base):
+    __tablename__ = "shopier_webhook_events"
+
+    id = Column(String(255), primary_key=True)
+    event = Column(String(100), nullable=False)
+    shopier_order_id = Column(String(255), nullable=False, index=True)
+    received_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())

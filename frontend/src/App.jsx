@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { LogOut, LogIn, UserPlus, Music, User, Menu, LayoutGrid, ShieldCheck, Gift, Library, Info, ShoppingCart } from 'lucide-react';
+import { LogOut, LogIn, UserPlus, Music, User, Menu, LayoutGrid, ShieldCheck, Gift, Library, Info } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { TrackProvider, useTracks } from './context/TrackContext';
 import { LanguageProvider, useLanguage } from './context/LanguageContext';
@@ -9,7 +9,6 @@ import AuthModal from './components/AuthModal';
 import AdminDrawer from './components/AdminDrawer';
 import AboutSection from './components/AboutSection';
 import FreeTracksList from './components/FreeTracksList';
-import ShopierCheckoutModal from './components/ShopierCheckoutModal';
 import ResetPassword from './components/ResetPassword';
 import './index.css';
 import { getApiErrorMessage } from './utils/errors';
@@ -29,9 +28,6 @@ function AppContent() {
   const [albumsError, setAlbumsError] = useState('');
   const [selectedAlbumId, setSelectedAlbumId] = useState(null);
   const [downloadError, setDownloadError] = useState(null);
-  const [cartTracks, setCartTracks] = useState([]);
-  const [checkoutOpen, setCheckoutOpen] = useState(false);
-  const [checkoutBusy, setCheckoutBusy] = useState(false);
   const t = {
     free: lang === 'ar' ? 'مجاني' : 'Free',
     signIn: lang === 'ar' ? 'تسجيل الدخول' : 'Sign In',
@@ -56,8 +52,9 @@ function AppContent() {
     terms: lang === 'ar' ? 'شروط الاستخدام' : 'Terms of Service',
     refund: lang === 'ar' ? 'سياسة الاسترجاع' : 'Refund Policy',
     contact: lang === 'ar' ? 'اتصل بنا' : 'Contact Us',
-    cart: lang === 'ar' ? 'سلة التسوق' : 'Cart',
-    addedToCart: lang === 'ar' ? 'تمت الإضافة إلى السلة' : 'Added to cart',
+    shopierUnavailable: lang === 'ar'
+      ? 'هذا المقطع غير منشور على Shopier بعد.'
+      : 'This track is not listed on Shopier yet.',
   };
 
   const isAdmin = user?.is_admin === true;
@@ -95,13 +92,21 @@ function AppContent() {
               track={track}
               onPlay={handlePlayPreview}
               onDownload={handleDownloadTrack}
-              onAddToCart={(selectedTrack) => {
-                setCartTracks((current) => (
-                  current.some((item) => item.id === selectedTrack.id)
-                    ? current
-                    : [...current, selectedTrack]
-                ));
+              onBuyTrack={(selectedTrack) => {
+                if (!user) {
+                  setAuthModal({ isOpen: true, mode: 'login' });
+                  return;
+                }
+                if (!selectedTrack.shopier_product_url) {
+                  setDownloadError(t.shopierUnavailable);
+                  return;
+                }
                 setDownloadError(null);
+                window.open(
+                  selectedTrack.shopier_product_url,
+                  '_blank',
+                  'noopener,noreferrer',
+                );
               }}
             />
           );
@@ -137,24 +142,6 @@ function AppContent() {
       });
     } catch (err) {
       setDownloadError(getApiErrorMessage(err, t.downloadFailed));
-    }
-  };
-
-  const handleOpenCart = () => {
-    if (!user) {
-      setAuthModal({ isOpen: true, mode: 'login' });
-      return;
-    }
-    setCheckoutOpen(true);
-  };
-
-  const handleShopierCheckout = async (checkoutDetails) => {
-    setCheckoutBusy(true);
-    try {
-      const response = await api.post('/api/v1/checkout/shopier/init', checkoutDetails);
-      return response.data;
-    } finally {
-      setCheckoutBusy(false);
     }
   };
 
@@ -516,34 +503,12 @@ function AppContent() {
         </div>
       )}
 
-      {cartTracks.length > 0 && (
-        <button
-          type="button"
-          onClick={handleOpenCart}
-          className="fixed bottom-24 right-4 z-50 inline-flex items-center gap-2 rounded-full border border-white/15 bg-violet-700 px-5 py-3 font-semibold text-white shadow-xl shadow-black/30 transition hover:bg-violet-600 sm:right-6"
-          aria-label={`${t.cart} (${cartTracks.length})`}
-        >
-          <ShoppingCart size={18} />
-          <span>{t.cart}</span>
-          <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs">{cartTracks.length}</span>
-        </button>
-      )}
-
-
       {/* Modals */}
       <AuthModal
         isOpen={authModal.isOpen}
         mode={authModal.mode}
         onClose={() => setAuthModal({ ...authModal, isOpen: false })}
         onSuccess={() => setAuthModal({ isOpen: false, mode: 'login' })}
-      />
-      <ShopierCheckoutModal
-        isOpen={checkoutOpen}
-        tracks={cartTracks}
-        busy={checkoutBusy}
-        onClose={() => setCheckoutOpen(false)}
-        onRemoveTrack={(trackId) => setCartTracks((current) => current.filter((track) => track.id !== trackId))}
-        onCheckout={handleShopierCheckout}
       />
       <AdminDrawer
         isOpen={menuOpen}

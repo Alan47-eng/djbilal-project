@@ -38,6 +38,7 @@ def _track_response(track: Track) -> schemas.TrackResponse:
             "is_free": track.is_free,
             "free_download_url": normalize_media_url(track.free_download_url),
             "category": track.category,
+            "shopier_product_url": track.shopier_product_url,
             "created_at": track.created_at,
         }
     )

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Play, ShoppingCart, Download, Gift } from 'lucide-react';
+import { Play, ExternalLink, Download, Gift } from 'lucide-react';
 import { resolveAssetUrl } from '../api';
 import { useLanguage } from '../context/LanguageContext';
 
@@ -53,7 +53,7 @@ const TrackCard = ({
   track,
   onPlay,
   onDownload,
-  onAddToCart,
+  onBuyTrack,
 }) => {
   const { lang } = useLanguage();
   const isFree = track.is_free === true;
@@ -61,7 +61,8 @@ const TrackCard = ({
   const t = {
     playPreview: lang === 'ar' ? 'تشغيل المعاينة' : 'Play preview',
     downloadTrack: lang === 'ar' ? 'تنزيل التراك' : 'Download track',
-    buy: lang === 'ar' ? 'أضف إلى السلة' : 'Add to cart',
+    buy: lang === 'ar' ? 'اشترِ عبر Shopier' : 'Buy via Shopier',
+    unavailable: lang === 'ar' ? 'غير متاح بعد' : 'Not listed yet',
     free: lang === 'ar' ? 'مجاني' : 'Free',
     download: lang === 'ar' ? 'تنزيل' : 'Download',
   };
@@ -99,12 +100,13 @@ const TrackCard = ({
           ) : (
             <button
               type="button"
-              onClick={() => onAddToCart(track)}
-              className="rounded-full bg-violet-600 p-4 text-white transition-all duration-200 hover:scale-105 hover:bg-violet-700 disabled:cursor-wait disabled:opacity-60"
-              title={t.buy}
+              onClick={() => onBuyTrack(track)}
+              disabled={!track.shopier_product_url}
+              className="rounded-full bg-violet-600 p-4 text-white transition-all duration-200 hover:scale-105 hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50"
+              title={track.shopier_product_url ? t.buy : t.unavailable}
               aria-label={t.buy}
             >
-              <ShoppingCart size={24} />
+              <ExternalLink size={24} />
             </button>
           )}
         </div>
@@ -157,11 +159,12 @@ const TrackCard = ({
           ) : (
             <button
               type="button"
-              onClick={() => onAddToCart(track)}
-              className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-violet-600 px-4 py-3 text-sm font-semibold text-white hover:bg-violet-700 disabled:cursor-wait disabled:opacity-60"
+              onClick={() => onBuyTrack(track)}
+              disabled={!track.shopier_product_url}
+              className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-violet-600 px-4 py-3 text-sm font-semibold text-white hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              <ShoppingCart size={16} />
-              {t.buy}
+              <ExternalLink size={16} />
+              {track.shopier_product_url ? t.buy : t.unavailable}
             </button>
           )}
         </div>
