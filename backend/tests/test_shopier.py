@@ -4,6 +4,7 @@ import hmac
 import json
 from datetime import datetime, timezone
 
+import httpx
 import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import func, select
@@ -21,10 +22,27 @@ from app.models import (
     Track,
     User,
 )
+from app.shopier import _shopier_error_message
 
 
 TEST_WEBHOOK_TOKEN = "shopier-test-webhook-token"
 TEST_PRODUCT_IDS = ("shopier-product-1", "shopier-product-2")
+
+
+def test_shopier_api_error_message_includes_validation_reason_and_redacts_token():
+    response = httpx.Response(
+        400,
+        json={
+            "message": "Invalid product payload",
+            "errors": {"priceData": "Unsupported currency"},
+        },
+    )
+
+    message = _shopier_error_message(response, "secret-access-token")
+
+    assert "Invalid product payload" in message
+    assert "Unsupported currency" in message
+    assert "secret-access-token" not in message
 
 
 @pytest.fixture

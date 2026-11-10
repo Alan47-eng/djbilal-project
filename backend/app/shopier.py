@@ -18,6 +18,26 @@ class ShopierAPIError(RuntimeError):
     pass
 
 
+def _shopier_error_message(response: httpx.Response, access_token: str) -> str:
+    try:
+        body = response.json()
+    except ValueError:
+        body = None
+
+    details: list[str] = []
+    if isinstance(body, dict):
+        for key in ("message", "error", "errors", "detail"):
+            value = body.get(key)
+            if isinstance(value, str):
+                details.append(value)
+            elif isinstance(value, (dict, list)):
+                details.append(str(value))
+
+    message = "; ".join(details) or "No error details provided"
+    message = message.replace(access_token, "[redacted]")
+    return message[:500]
+
+
 def shopier_access_token() -> str:
     token = os.getenv("SHOPIER_ACCESS_TOKEN", "").strip()
     if not token:
@@ -104,7 +124,8 @@ async def shopier_api_request(
             body = response.json()
     except httpx.HTTPStatusError as exc:
         raise ShopierAPIError(
-            f"Shopier API returned HTTP {exc.response.status_code}"
+            f"Shopier API returned HTTP {exc.response.status_code}: "
+            f"{_shopier_error_message(exc.response, token)}"
         ) from exc
     except (httpx.RequestError, ValueError) as exc:
         raise ShopierAPIError("Shopier API request failed") from exc
