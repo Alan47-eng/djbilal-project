@@ -108,7 +108,7 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
     webhookSetupError: 'Could not configure the Shopier webhook.',
     webhookSetupDone: 'Webhook created. Save its token in the backend environment.',
   };
-  const [tab, setTab] = useState('tracks');
+  const [tab, setTab] = useState('users');
   const [users, setUsers] = useState([]);
   const [albums, setAlbums] = useState([]);
   const [albumDrafts, setAlbumDrafts] = useState({});
@@ -415,12 +415,12 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-2 sm:p-5" onClick={onClose}>
       <section
-        className={`flex h-[min(94vh,960px)] w-full max-w-7xl overflow-hidden rounded-2xl border border-[#41464b] bg-[#1d2023] text-slate-100 shadow-2xl ${isRTL ? 'flex-row-reverse' : 'flex-row'}`}
+        className="flex h-[min(94vh,960px)] w-full max-w-7xl overflow-hidden rounded-2xl border border-[#41464b] bg-[#1d2023] text-slate-100 shadow-2xl"
         onClick={(event) => event.stopPropagation()}
         aria-label={t.dashboard}
         dir={isRTL ? 'rtl' : 'ltr'}
       >
-        <aside className={`hidden w-64 shrink-0 flex-col bg-[#222529] p-5 md:flex ${isRTL ? 'border-l border-[#383c40]' : 'border-r border-[#383c40]'}`}>
+        <aside className="hidden w-64 shrink-0 flex-col border-r border-[#383c40] bg-[#222529] p-5 md:flex">
           <div className="mb-9">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-violet-300">DJ Bilal</p>
             <h1 className="mt-2 text-xl font-bold">{t.dashboard}</h1>
