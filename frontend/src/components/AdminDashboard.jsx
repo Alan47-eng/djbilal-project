@@ -420,28 +420,28 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
         aria-label={t.dashboard}
         dir={isRTL ? 'rtl' : 'ltr'}
       >
-        <aside className={`hidden w-64 shrink-0 flex-col bg-[#222529] p-5 md:flex ${isRTL ? 'border-l border-[#383c40]' : 'border-r border-[#383c40]'}`}>
-          <div className="mb-9">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-violet-300">DJ Bilal</p>
-            <h1 className="mt-2 text-xl font-bold">{t.dashboard}</h1>
-          </div>
-          <nav className="space-y-2" aria-label={t.dashboard}>
+        <aside className={`hidden w-24 shrink-0 flex-col items-center bg-[#222529] py-5 md:flex ${isRTL ? 'border-l border-[#383c40]' : 'border-r border-[#383c40]'}`}>
+          <button type="button" onClick={onClose} aria-label={t.close} className="mb-6 rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-white">
+            <X size={20} />
+          </button>
+
+          <nav className="flex w-full flex-col items-center gap-3" aria-label={t.dashboard}>
             {tabs.map(({ id, label, icon: Icon }) => (
               <button
                 key={id}
                 type="button"
+                title={label}
                 onClick={() => { setTab(id); setError(''); setNotice(''); }}
-                className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-start text-sm font-semibold transition-colors ${
-                  tab === id ? 'bg-violet-600 text-white' : 'text-slate-300 hover:bg-[#303438]'
+                className={`flex h-12 w-12 items-center justify-center rounded-xl transition-colors ${
+                  tab === id ? 'bg-violet-600 text-white shadow-lg shadow-violet-950/30' : 'text-slate-300 hover:bg-[#303438]'
                 }`}
               >
-                <Icon size={18} />
-                {label}
+                <Icon size={20} />
               </button>
             ))}
           </nav>
-          <div className="mt-8 border-t border-[#383c40] pt-4">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-slate-500">{t.siteSections}</p>
+
+          <div className="mt-auto flex w-full flex-col items-center gap-2 pt-4">
             {[
               ['albums', t.albums],
               ['free', t.free],
@@ -450,29 +450,24 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
                 key={id}
                 type="button"
                 onClick={() => { onNavigate?.(id); onClose?.(); }}
-                className="block w-full rounded-lg px-3 py-2 text-start text-sm text-[#aeb2b5] hover:bg-[#303438] hover:text-white"
+                title={label}
+                className="flex h-12 w-12 items-center justify-center rounded-xl text-slate-300 hover:bg-[#303438] hover:text-white"
               >
-                {label}
+                {id === 'albums' ? <Library size={18} /> : <Gift size={18} />}
               </button>
             ))}
-          </div>
-          <div className="mt-auto border-t border-[#383c40] pt-4">
-            <p className="truncate text-xs text-slate-400">{user?.email}</p>
-            <button type="button" onClick={onLogout} className={`${buttonClass} mt-3 w-full bg-slate-800 text-slate-200 hover:bg-slate-700`}>
-              {t.logout}
-            </button>
           </div>
         </aside>
 
         <main className="flex min-w-0 flex-1 flex-col">
-          <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 px-4 py-4 sm:px-7">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-widest text-violet-300">{t.dashboard}</p>
-              <h2 className="mt-1 text-xl font-bold sm:text-2xl">{tabs.find((item) => item.id === tab)?.label}</h2>
+          <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 bg-[#1d2023] px-4 py-4 sm:px-7">
+            <div className="flex w-full items-center justify-between gap-3">
+              <div className="w-10" />
+              <div className="flex-1 text-center sm:text-right">
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-violet-300">{t.dashboard}</p>
+                <h2 className="mt-1 text-2xl font-bold sm:text-3xl">{tabs.find((item) => item.id === tab)?.label}</h2>
+              </div>
             </div>
-            <button type="button" onClick={onClose} aria-label={t.close} className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-white">
-              <X size={20} />
-            </button>
             <nav className="flex w-full gap-2 overflow-x-auto md:hidden" aria-label={t.dashboard}>
               {tabs.map(({ id, label, icon: Icon }) => (
                 <button key={id} type="button" onClick={() => { setTab(id); setError(''); setNotice(''); }}
@@ -487,7 +482,14 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
 
           <div className="flex-1 overflow-y-auto p-4 sm:p-7">
             {notice && <p role="status" className="mb-4 rounded-lg border border-emerald-700/60 bg-emerald-950/50 px-4 py-3 text-sm text-emerald-300">{notice}</p>}
-            {error && <p role="alert" className="mb-4 rounded-lg border border-red-700/60 bg-red-950/50 px-4 py-3 text-sm text-red-300">{error}</p>}
+            {error && (
+              <div
+                role="alert"
+                className="mb-5 rounded-lg border border-red-700 bg-[#3a0d13]/80 px-5 py-4 text-center text-base font-medium text-red-100 shadow-[inset_0_0_0_1px_rgba(248,113,113,0.16)]"
+              >
+                {error}
+              </div>
+            )}
             {loading ? (
               <p className="py-12 text-center text-sm text-slate-400">{t.loading}</p>
             ) : (
@@ -558,46 +560,94 @@ const AdminDashboard = ({ onClose, onNavigate, onLogout }) => {
                 )}
 
                 {tab === 'tracks' && (
-                  <div className="space-y-6">
-                    <form onSubmit={submitTrack} className="grid gap-3 rounded-xl border border-[#41423c] bg-[#252622] p-4 sm:grid-cols-2 lg:grid-cols-3">
-                      <label className="text-xs font-semibold text-slate-400">{t.trackName}<input className={`${fieldClass} mt-2`} required value={trackForm.title} onChange={(event) => setTrackForm({ ...trackForm, title: event.target.value })} /></label>
-                      <label className="text-xs font-semibold text-slate-400">{t.artist}<input className={`${fieldClass} mt-2`} required value={trackForm.artist} onChange={(event) => setTrackForm({ ...trackForm, artist: event.target.value })} /></label>
-                      <label className="text-xs font-semibold text-slate-400">{t.selectAlbum}
-                        <select className={`${fieldClass} mt-2`} value={trackForm.album_id} onChange={(event) => setTrackForm({ ...trackForm, album_id: event.target.value })}>
-                          <option value="">{t.single}</option>{albums.map((album) => <option key={album.id} value={album.id}>{album.title}</option>)}
-                        </select>
-                      </label>
-                      <label className="text-xs font-semibold text-slate-400">{t.price}<input type="number" step="0.01" min="0" required={!trackForm.is_free} disabled={trackForm.is_free} className={`${fieldClass} mt-2`} value={trackForm.is_free ? '0' : trackForm.price} onChange={(event) => setTrackForm({ ...trackForm, price: event.target.value })} /></label>
-                      <label className="flex items-center gap-2 self-end rounded-lg border border-slate-700 p-3 text-sm text-slate-300"><input type="checkbox" checked={trackForm.is_free} onChange={(event) => {
-                        const isFree = event.target.checked;
-                        setTrackForm({
-                          ...trackForm,
-                          is_free: isFree,
-                          category: isFree && trackForm.category === 'edit'
-                            ? 'remix'
-                            : !isFree && ['simple-pack', 'vst'].includes(trackForm.category)
-                              ? 'edit'
-                              : trackForm.category,
-                        });
-                      }} />{t.freeCheckbox}</label>
-                      <label className="text-xs font-semibold text-slate-400">{t.trackFile}<input type="file" accept="audio/*" required className="mt-2 block w-full text-sm" onChange={(event) => setTrackForm({ ...trackForm, track_file: event.target.files?.[0] || null })} /></label>
-                      <label className="text-xs font-semibold text-slate-400">{t.previewFile}<input type="file" accept="audio/*" required className="mt-2 block w-full text-sm" onChange={(event) => setTrackForm({ ...trackForm, preview_file: event.target.files?.[0] || null })} /></label>
-                      <label className="text-xs font-semibold text-slate-400">{t.albumCover}<input type="file" accept="image/*" className="mt-2 block w-full text-sm" onChange={(event) => setTrackForm({ ...trackForm, cover_file: event.target.files?.[0] || null })} /></label>
-                      <div className="sm:col-span-2 lg:col-span-3"><button disabled={savingKey === 'new-track'} className={`${buttonClass} bg-violet-600 px-5 text-white hover:bg-violet-700`}>{savingKey === 'new-track' ? t.adding : t.addTrack}</button></div>
+                  <div className="space-y-5">
+                    {error && (
+                      <div className="rounded-lg border border-red-700/60 bg-red-950/70 px-4 py-3 text-sm text-red-200">
+                        {error}
+                      </div>
+                    )}
+
+                    <form onSubmit={submitTrack} className="rounded-xl border border-[#3b3f45] bg-[#2b2d30] p-4 shadow-inner shadow-black/20">
+                      <div className="grid gap-3 md:grid-cols-4">
+                        <label className="text-xs font-semibold text-slate-300">
+                          {t.trackName}
+                          <input className={`${fieldClass} mt-2`} required value={trackForm.title} onChange={(event) => setTrackForm({ ...trackForm, title: event.target.value })} />
+                        </label>
+                        <label className="text-xs font-semibold text-slate-300">
+                          {t.artist}
+                          <input className={`${fieldClass} mt-2`} required value={trackForm.artist} onChange={(event) => setTrackForm({ ...trackForm, artist: event.target.value })} />
+                        </label>
+                        <label className="text-xs font-semibold text-slate-300">
+                          {t.selectAlbum}
+                          <select className={`${fieldClass} mt-2`} value={trackForm.album_id} onChange={(event) => setTrackForm({ ...trackForm, album_id: event.target.value })}>
+                            <option value="">{t.single}</option>{albums.map((album) => <option key={album.id} value={album.id}>{album.title}</option>)}
+                          </select>
+                        </label>
+                        <label className="text-xs font-semibold text-slate-300">
+                          {t.price}
+                          <input type="number" step="0.01" min="0" required={!trackForm.is_free} disabled={trackForm.is_free} className={`${fieldClass} mt-2`} value={trackForm.is_free ? '0' : trackForm.price} onChange={(event) => setTrackForm({ ...trackForm, price: event.target.value })} />
+                        </label>
+
+                        <div className="flex items-end gap-2">
+                          <label className="flex h-[46px] items-center gap-2 rounded-lg border border-slate-700 bg-[#1f2124] px-3 text-sm text-slate-300">
+                            <input type="checkbox" checked={trackForm.is_free} onChange={(event) => {
+                              const isFree = event.target.checked;
+                              setTrackForm({
+                                ...trackForm,
+                                is_free: isFree,
+                                category: isFree && trackForm.category === 'edit'
+                                  ? 'remix'
+                                  : !isFree && ['simple-pack', 'vst'].includes(trackForm.category)
+                                    ? 'edit'
+                                    : trackForm.category,
+                              });
+                            }} />
+                            {t.freeCheckbox}
+                          </label>
+                        </div>
+
+                        <label className="text-xs font-semibold text-slate-300">
+                          {t.trackFile}
+                          <input type="file" accept="audio/*" required className="mt-2 block w-full text-sm" onChange={(event) => setTrackForm({ ...trackForm, track_file: event.target.files?.[0] || null })} />
+                        </label>
+                        <label className="text-xs font-semibold text-slate-300">
+                          {t.previewFile}
+                          <input type="file" accept="audio/*" required className="mt-2 block w-full text-sm" onChange={(event) => setTrackForm({ ...trackForm, preview_file: event.target.files?.[0] || null })} />
+                        </label>
+                        <label className="text-xs font-semibold text-slate-300">
+                          {t.albumCover}
+                          <input type="file" accept="image/*" className="mt-2 block w-full text-sm" onChange={(event) => setTrackForm({ ...trackForm, cover_file: event.target.files?.[0] || null })} />
+                        </label>
+                        <div className="flex items-end">
+                          <button disabled={savingKey === 'new-track'} className={`${buttonClass} w-full bg-violet-600 px-5 text-white hover:bg-violet-700`}>
+                            {savingKey === 'new-track' ? t.adding : t.addTrack}
+                          </button>
+                        </div>
+                      </div>
                     </form>
 
-                    <div className="overflow-hidden rounded-xl border border-slate-800">
+                    <div className="overflow-hidden rounded-xl border border-slate-800 bg-[#1f2124]">
                       <div className="overflow-x-auto">
-                        <table className="w-full min-w-[650px] text-left text-sm">
-                          <thead className="bg-slate-900 text-xs uppercase tracking-wide text-slate-400"><tr><th className="px-4 py-4">{t.track}</th><th className="px-4 py-4">{t.albums}</th><th className="px-4 py-4">{t.price}</th><th className="px-4 py-4 text-end">{t.operations}</th></tr></thead>
+                        <table className="w-full min-w-[700px] text-left text-sm">
+                          <thead className="bg-[#111317] text-xs uppercase tracking-wide text-slate-300">
+                            <tr>
+                              <th className="px-4 py-4">{t.track}</th>
+                              <th className="px-4 py-4">{t.albums}</th>
+                              <th className="px-4 py-4">{t.price}</th>
+                              <th className="px-4 py-4 text-end">{t.operations}</th>
+                            </tr>
+                          </thead>
                           <tbody className="divide-y divide-slate-800">
                             {tracks.map((track) => {
                               const draft = trackDrafts[track.id] || {
                                 album_id: String(track.album_id || ''),
                                 price: String(track.price),
                               };
-                              return <tr key={track.id} className="bg-slate-950">
-                                <td className="px-4 py-3"><p className="font-semibold text-white">{track.title}</p><p className="text-xs text-slate-400">{track.artist} · {track.is_free ? t.free : t.paid}</p></td>
+                              return <tr key={track.id} className="bg-[#1d2022]">
+                                <td className="px-4 py-3">
+                                  <p className="font-semibold text-white">{track.title}</p>
+                                  <p className="text-xs text-slate-400">{track.artist}</p>
+                                </td>
                                 <td className="px-4 py-3"><select className={fieldClass} value={draft.album_id} onChange={(event) => updateTrackDraft(track, 'album_id', event.target.value)}><option value="">{t.single}</option>{albums.map((album) => <option key={album.id} value={album.id}>{album.title}</option>)}</select></td>
                                 <td className="px-4 py-3"><input aria-label={`${track.title} ${t.price}`} type="number" step="0.01" min="0" disabled={track.is_free} className="w-24 rounded-lg border border-slate-700 bg-slate-900 px-2 py-2 text-sm text-white disabled:opacity-50" value={track.is_free ? '0' : draft.price} onChange={(event) => updateTrackDraft(track, 'price', event.target.value)} /></td>
                                 <td className="px-4 py-3"><div className="flex justify-end gap-2">
